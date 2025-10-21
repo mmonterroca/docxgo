@@ -125,3 +125,12 @@ func (r *Run) Font(ascii, eastAsia, hansi, hint string) *Run {
 	}
 	return r
 }
+
+// AddText adds text directly to a run
+func (r *Run) AddText(text string) *Run {
+	if r.RunProperties == nil {
+		r.RunProperties = &RunProperties{}
+	}
+	r.Children = append(r.Children, &Text{Text: text})
+	return r
+}
