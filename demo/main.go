@@ -1,52 +1,38 @@
-/*
-   Copyright (c) 2025 SlideLang Enhanced Fork
-
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU Affero General Public License as published
-   by the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU Affero General Public License for more details.
-
-   You should have received a copy of the GNU Affero General Public License
-   along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
-
-package docx
+// Package main demonstrates the enhanced go-docx features for SlideLang
+package main
 
 import (
+	"fmt"
 	"os"
-	"testing"
+
+	"github.com/fumiama/go-docx"
 )
 
-func TestEnhancedFeaturesDemo(t *testing.T) {
-	t.Log("🚀 SlideLang/go-docx Enhanced Fork Demo")
-	t.Log("======================================")
+func main() {
+	fmt.Println("🚀 SlideLang/go-docx Enhanced Fork Demo")
+	fmt.Println("======================================")
 
 	// Create a new document with enhanced features
-	doc := New()
+	doc := docx.New()
 
 	// Add document title
 	titlePara := doc.AddParagraph()
-	titlePara.AddText("SlideLang Enhanced Document").Bold().Size("28").Color("2E75B6")
+	titlePara.AddText("SlideLang Enhanced Document").Bold().Size("32").Color("2E75B6")
 	titlePara.Justification("center")
 
 	// Add some space
 	doc.AddParagraph()
 
 	// Add Table of Contents with all options
-	t.Log("📖 Adding Table of Contents...")
-	opts := DefaultTOCOptions()
+	fmt.Println("📖 Adding Table of Contents...")
+	opts := docx.DefaultTOCOptions()
 	opts.Title = "Table of Contents"
 	opts.Depth = 3
 	opts.PageNumbers = true
 	opts.Hyperlinks = true
 	err := doc.AddTOC(opts)
 	if err != nil {
-		t.Fatalf("Failed to add TOC: %v", err)
+		panic(err)
 	}
 
 	// Add page break after TOC
@@ -54,7 +40,7 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	pageBreakPara.AddPageBreaks()
 
 	// Add main content with headings and bookmarks
-	t.Log("📝 Adding content with headings and bookmarks...")
+	fmt.Println("📝 Adding content with headings and bookmarks...")
 
 	// Chapter 1
 	h1 := doc.AddHeadingWithTOC("1. Introduction", 1, 1)
@@ -104,7 +90,7 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	figPara.AddSeqField("Figure", "ARABIC")
 	figPara.AddText(": Document structure diagram")
 
-	// Chapter 3
+	// Chapter 3 
 	h3 := doc.AddHeadingWithTOC("3. Future Enhancements", 1, 5)
 	h3.Style("Heading1")
 
@@ -114,37 +100,34 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	enhancementsList := doc.AddParagraph()
 	enhancementsList.AddText("• Native Heading1-4 style definitions\n• Advanced headers and footers\n• Style customization API\n• Bibliography support\n• Track changes integration")
 
+	// Add footer with page numbers (simulated)
+	footerPara := doc.AddParagraph()
+	footerPara.AddText("Page ")
+	footerPara.AddPageField()
+	footerPara.Justification("center")
+
 	// Save the document
 	filename := "slidelang_enhanced_demo.docx"
-	t.Logf("💾 Saving document as %s...", filename)
+	fmt.Printf("💾 Saving document as %s...\n", filename)
 
 	file, err := os.Create(filename)
 	if err != nil {
-		t.Fatalf("Failed to create file: %v", err)
+		panic(err)
 	}
 	defer file.Close()
-	// Note: NOT removing file so you can test it in Word
-	// defer os.Remove(filename) 
 
 	_, err = doc.WriteTo(file)
 	if err != nil {
-		t.Fatalf("Failed to write document: %v", err)
+		panic(err)
 	}
 
-	t.Log("✅ Demo document created successfully!")
-	t.Logf("📁 Open %s in Microsoft Word to see:", filename)
-	t.Log("   • Dynamic Table of Contents (press F9 to update)")
-	t.Log("   • Clickable hyperlinks in TOC")
-	t.Log("   • Auto-updating page numbers")
-	t.Log("   • Cross-references between sections")
-	t.Log("   • Professional document structure")
-	t.Log("")
-	t.Log("🎯 This demonstrates the core features needed for DocLang/SlideLang!")
-
-	// Verify document structure
-	if len(doc.Document.Body.Items) < 10 {
-		t.Errorf("Expected at least 10 document items, got %d", len(doc.Document.Body.Items))
-	}
-
-	t.Log("✨ All enhanced features working correctly!")
+	fmt.Println("✅ Demo document created successfully!")
+	fmt.Printf("📁 Open %s in Microsoft Word to see:\n", filename)
+	fmt.Println("   • Dynamic Table of Contents (press F9 to update)")
+	fmt.Println("   • Clickable hyperlinks in TOC")
+	fmt.Println("   • Auto-updating page numbers")
+	fmt.Println("   • Cross-references between sections")
+	fmt.Println("   • Professional document structure")
+	fmt.Println()
+	fmt.Println("🎯 This demonstrates the core features needed for DocLang/SlideLang!")
 }
