@@ -29,10 +29,9 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	// Create a new document with enhanced features
 	doc := New().WithDefaultTheme()
 
-	// Add document title
+	// Add document title (left aligned, no unnecessary centering)
 	titlePara := doc.AddParagraph()
 	titlePara.AddText("SlideLang Enhanced Document").Bold().Size("28").Color("2E75B6")
-	titlePara.Justification("center")
 
 	// Add some space
 	doc.AddParagraph()
@@ -63,8 +62,22 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	introPara := doc.AddParagraph()
 	introPara.AddText("Welcome to the SlideLang enhanced fork of go-docx! This document demonstrates the new features including:")
 
-	listPara := doc.AddParagraph()
-	listPara.AddText("• Dynamic Table of Contents with page numbers\n• Bookmarks for cross-references\n• Field codes for auto-updating content\n• Professional heading styles")
+	// Bullet list with proper indentation
+	bullet1 := doc.AddParagraph()
+	bullet1.AddText("•  Dynamic Table of Contents with page numbers")
+	bullet1.Indent(720, 0, 0)
+
+	bullet2 := doc.AddParagraph()
+	bullet2.AddText("•  Bookmarks for cross-references")
+	bullet2.Indent(720, 0, 0)
+
+	bullet3 := doc.AddParagraph()
+	bullet3.AddText("•  Field codes for auto-updating content")
+	bullet3.Indent(720, 0, 0)
+
+	bullet4 := doc.AddParagraph()
+	bullet4.AddText("•  Professional heading styles")
+	bullet4.Indent(720, 0, 0)
 
 	// Chapter 1.1
 	h11 := doc.AddHeadingWithTOC("1.1 Key Features", 2, 2)
@@ -111,8 +124,26 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	futurePara := doc.AddParagraph()
 	futurePara.AddText("Future versions will include:")
 
-	enhancementsList := doc.AddParagraph()
-	enhancementsList.AddText("• Native Heading1-4 style definitions\n• Advanced headers and footers\n• Style customization API\n• Bibliography support\n• Track changes integration")
+	// Enhancement bullet list with proper indentation
+	enh1 := doc.AddParagraph()
+	enh1.AddText("•  Native Heading1-4 style definitions")
+	enh1.Indent(720, 0, 0)
+
+	enh2 := doc.AddParagraph()
+	enh2.AddText("•  Advanced headers and footers")
+	enh2.Indent(720, 0, 0)
+
+	enh3 := doc.AddParagraph()
+	enh3.AddText("•  Style customization API")
+	enh3.Indent(720, 0, 0)
+
+	enh4 := doc.AddParagraph()
+	enh4.AddText("•  Bibliography support")
+	enh4.Indent(720, 0, 0)
+
+	enh5 := doc.AddParagraph()
+	enh5.AddText("•  Track changes integration")
+	enh5.Indent(720, 0, 0)
 
 	// Add page size at the END (important!)
 	doc.WithA4Page()

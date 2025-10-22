@@ -127,3 +127,24 @@ func (p *Paragraph) NumSize(size string) *Paragraph {
 	p.Properties.RunProperties.Size = &Size{Val: size}
 	return p
 }
+
+// Indent sets paragraph indentation
+// left: left indentation in twips (1440 = 1 inch, 720 = 0.5 inch)
+// firstLine: first line indentation in twips (optional, use 0 for none)
+// hanging: hanging indentation in twips (optional, use 0 for none)
+func (p *Paragraph) Indent(left, firstLine, hanging int) *Paragraph {
+	if p.Properties == nil {
+		p.Properties = &ParagraphProperties{}
+	}
+	ind := &Ind{
+		Left: left,
+	}
+	if firstLine > 0 {
+		ind.FirstLine = firstLine
+	}
+	if hanging > 0 {
+		ind.Hanging = hanging
+	}
+	p.Properties.Ind = ind
+	return p
+}
