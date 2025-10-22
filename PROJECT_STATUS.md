@@ -1,7 +1,7 @@
 # Project Status - SlideLang/go-docx
 
-**Last Updated**: October 21, 2025  
-**Current Version**: v0.1.1-slidelang  
+**Last Updated**: October 22, 2025  
+**Current Version**: v0.2.0-slidelang  
 **Active Branch**: dev
 
 ## 🎯 Project Overview
@@ -51,7 +51,7 @@ Enhanced fork of fumiama/go-docx with professional document generation features 
 
 ### Branch Structure
 ```
-master (stable, tagged v0.1.1-slidelang)
+master (stable, tagged v0.2.0-slidelang)
   ↑
 dev (integration, 2 commits ahead)
   ↑
@@ -73,7 +73,7 @@ feature branches (as needed)
 
 ### Immediate (Ready to Work)
 1. **Merge dev to master** when ready for v0.1.1 release
-2. **Tag v0.1.1-slidelang** with documentation improvements
+2. **Tag v0.2.0-slidelang** with documentation improvements
 3. **Test integration** with DocLang/SlideLang CLI
 4. **Create example templates** for common use cases
 
@@ -141,7 +141,7 @@ feature branches (as needed)
 
 ## 🎉 Milestones
 
-- **October 21, 2025**: v0.1.1-slidelang released
+- **October 21, 2025**: v0.2.0-slidelang released
   - Complete TOC, bookmarks, fields, heading styles
   - Professional Word compatibility
   
