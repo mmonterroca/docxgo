@@ -3,3 +3,4 @@ docxlib
 *.docx
 /*.xml
 .DS_Store
+docx_debug/
