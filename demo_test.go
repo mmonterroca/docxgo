@@ -27,7 +27,7 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	t.Log("======================================")
 
 	// Create a new document with enhanced features
-	doc := New()
+	doc := New().WithDefaultTheme()
 
 	// Add document title
 	titlePara := doc.AddParagraph()
@@ -114,6 +114,9 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	enhancementsList := doc.AddParagraph()
 	enhancementsList.AddText("• Native Heading1-4 style definitions\n• Advanced headers and footers\n• Style customization API\n• Bibliography support\n• Track changes integration")
 
+	// Add page size at the END (important!)
+	doc.WithA4Page()
+
 	// Save the document
 	filename := "slidelang_enhanced_demo.docx"
 	t.Logf("💾 Saving document as %s...", filename)
@@ -124,7 +127,7 @@ func TestEnhancedFeaturesDemo(t *testing.T) {
 	}
 	defer file.Close()
 	// Note: NOT removing file so you can test it in Word
-	// defer os.Remove(filename) 
+	// defer os.Remove(filename)
 
 	_, err = doc.WriteTo(file)
 	if err != nil {

@@ -13,7 +13,7 @@ func main() {
 	fmt.Println("======================================")
 
 	// Create a new document with enhanced features
-	doc := docx.New()
+	doc := docx.New().WithDefaultTheme()
 
 	// Add document title
 	titlePara := doc.AddParagraph()
@@ -90,7 +90,7 @@ func main() {
 	figPara.AddSeqField("Figure", "ARABIC")
 	figPara.AddText(": Document structure diagram")
 
-	// Chapter 3 
+	// Chapter 3
 	h3 := doc.AddHeadingWithTOC("3. Future Enhancements", 1, 5)
 	h3.Style("Heading1")
 
@@ -105,6 +105,9 @@ func main() {
 	footerPara.AddText("Page ")
 	footerPara.AddPageField()
 	footerPara.Justification("center")
+
+	// Add page size at the END (important!)
+	doc.WithA4Page()
 
 	// Save the document
 	filename := "slidelang_enhanced_demo.docx"
