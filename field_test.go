@@ -29,11 +29,11 @@ func TestFldCharBasic(t *testing.T) {
 	if fldChar.FldCharType != "begin" {
 		t.Errorf("Expected fldCharType 'begin', got '%s'", fldChar.FldCharType)
 	}
-	
+
 	// Test adding FldChar to Run
 	w := New()
 	run := &Run{file: w, RunProperties: &RunProperties{}}
-	
+
 	fldCharAdded := run.AddFldChar("separate")
 	if fldCharAdded.FldCharType != "separate" {
 		t.Errorf("Expected fldCharType 'separate', got '%s'", fldCharAdded.FldCharType)
@@ -46,11 +46,11 @@ func TestInstrTextBasic(t *testing.T) {
 	if instrText.Text != "TOC \\o \"1-3\"" {
 		t.Errorf("Expected instrText 'TOC \\o \"1-3\"', got '%s'", instrText.Text)
 	}
-	
+
 	// Test adding InstrText to Run
 	w := New()
 	run := &Run{file: w, RunProperties: &RunProperties{}}
-	
+
 	instrTextAdded := run.AddInstrText("PAGEREF _Toc123")
 	if instrTextAdded.Text != "PAGEREF _Toc123" {
 		t.Errorf("Expected instrText 'PAGEREF _Toc123', got '%s'", instrTextAdded.Text)
@@ -60,20 +60,20 @@ func TestInstrTextBasic(t *testing.T) {
 func TestBasicField(t *testing.T) {
 	w := New()
 	p := w.AddParagraph()
-	
+
 	// Add a basic field
 	field := p.AddField("PAGE", "1")
-	
+
 	// Verify field structure
 	if field == nil {
 		t.Fatal("Field was not created")
 	}
-	
+
 	// Verify all components exist
 	if field.Begin == nil || field.InstrText == nil || field.Separate == nil || field.Result == nil || field.End == nil {
 		t.Error("Field structure is incomplete")
 	}
-	
+
 	// Verify the paragraph has 5 runs (begin, instrText, separate, result, end)
 	if len(p.Children) != 5 {
 		t.Errorf("Expected 5 runs in paragraph, got %d", len(p.Children))
@@ -83,14 +83,14 @@ func TestBasicField(t *testing.T) {
 func TestTOCField(t *testing.T) {
 	w := New()
 	p := w.AddParagraph()
-	
+
 	// Add TOC field with various options
 	tocField := p.AddTOCField(3, true, true)
-	
+
 	if tocField == nil {
 		t.Fatal("TOC field was not created")
 	}
-	
+
 	// Check that instrText contains expected TOC instruction
 	// Find the instrText run
 	var instrTextContent string
@@ -104,7 +104,7 @@ func TestTOCField(t *testing.T) {
 			}
 		}
 	}
-	
+
 	expectedInstr := "TOC \\o \"1-3\" \\h \\z \\u"
 	if instrTextContent != expectedInstr {
 		t.Errorf("Expected TOC instruction '%s', got '%s'", expectedInstr, instrTextContent)
@@ -114,14 +114,14 @@ func TestTOCField(t *testing.T) {
 func TestPageRefField(t *testing.T) {
 	w := New()
 	p := w.AddParagraph()
-	
+
 	// Add PAGEREF field
 	pageRefField := p.AddPageRefField("_Toc123456789", true)
-	
+
 	if pageRefField == nil {
 		t.Fatal("PAGEREF field was not created")
 	}
-	
+
 	// Check instrText content
 	var instrTextContent string
 	for _, child := range p.Children {
@@ -134,7 +134,7 @@ func TestPageRefField(t *testing.T) {
 			}
 		}
 	}
-	
+
 	expectedInstr := "PAGEREF _Toc123456789 \\h"
 	if instrTextContent != expectedInstr {
 		t.Errorf("Expected PAGEREF instruction '%s', got '%s'", expectedInstr, instrTextContent)
@@ -144,12 +144,12 @@ func TestPageRefField(t *testing.T) {
 func TestPageField(t *testing.T) {
 	w := New()
 	p := w.AddParagraph()
-	
+
 	pageField := p.AddPageField()
 	if pageField == nil {
 		t.Fatal("PAGE field was not created")
 	}
-	
+
 	// Verify instruction text
 	var instrTextContent string
 	for _, child := range p.Children {
@@ -162,7 +162,7 @@ func TestPageField(t *testing.T) {
 			}
 		}
 	}
-	
+
 	if instrTextContent != "PAGE" {
 		t.Errorf("Expected PAGE instruction, got '%s'", instrTextContent)
 	}
@@ -171,7 +171,7 @@ func TestPageField(t *testing.T) {
 func TestNumPagesField(t *testing.T) {
 	w := New()
 	p := w.AddParagraph()
-	
+
 	numPagesField := p.AddNumPagesField()
 	if numPagesField == nil {
 		t.Fatal("NUMPAGES field was not created")
@@ -181,12 +181,12 @@ func TestNumPagesField(t *testing.T) {
 func TestRefField(t *testing.T) {
 	w := New()
 	p := w.AddParagraph()
-	
+
 	refField := p.AddRefField("intro_bookmark", false)
 	if refField == nil {
 		t.Fatal("REF field was not created")
 	}
-	
+
 	// Check instruction content
 	var instrTextContent string
 	for _, child := range p.Children {
@@ -199,7 +199,7 @@ func TestRefField(t *testing.T) {
 			}
 		}
 	}
-	
+
 	expectedInstr := "REF intro_bookmark"
 	if instrTextContent != expectedInstr {
 		t.Errorf("Expected REF instruction '%s', got '%s'", expectedInstr, instrTextContent)
@@ -209,12 +209,12 @@ func TestRefField(t *testing.T) {
 func TestSeqField(t *testing.T) {
 	w := New()
 	p := w.AddParagraph()
-	
+
 	seqField := p.AddSeqField("figure", "ARABIC")
 	if seqField == nil {
 		t.Fatal("SEQ field was not created")
 	}
-	
+
 	// Check instruction content
 	var instrTextContent string
 	for _, child := range p.Children {
@@ -227,7 +227,7 @@ func TestSeqField(t *testing.T) {
 			}
 		}
 	}
-	
+
 	expectedInstr := "SEQ figure \\* ARABIC"
 	if instrTextContent != expectedInstr {
 		t.Errorf("Expected SEQ instruction '%s', got '%s'", expectedInstr, instrTextContent)
@@ -236,39 +236,39 @@ func TestSeqField(t *testing.T) {
 
 func TestComplexDocumentWithFields(t *testing.T) {
 	w := New()
-	
+
 	// Add TOC
 	tocPara := w.AddParagraph()
 	tocPara.AddText("Table of Contents").Bold()
 	tocPara.AddTOCField(3, true, true)
-	
+
 	// Add some headings with bookmarks and references
 	h1 := w.AddParagraph()
 	h1.AddText("1. Introduction")
 	h1.AddTOCBookmark("1. Introduction", 1)
-	
+
 	p1 := w.AddParagraph()
 	p1.AddText("This is the introduction. See section ")
 	p1.AddRefField("_Toc000000002", true)
 	p1.AddText(" for more details.")
-	
+
 	h2 := w.AddParagraph()
 	h2.AddText("2. Background")
 	h2.AddTOCBookmark("2. Background", 2)
-	
+
 	p2 := w.AddParagraph()
 	p2.AddText("This is on page ")
 	p2.AddPageField()
 	p2.AddText(" of ")
 	p2.AddNumPagesField()
 	p2.AddText(".")
-	
+
 	// Add figure caption
 	figPara := w.AddParagraph()
 	figPara.AddText("Figure ")
 	figPara.AddSeqField("Figure", "ARABIC")
 	figPara.AddText(": Sample diagram")
-	
+
 	// Save document
 	f, err := os.Create("test_fields.docx")
 	if err != nil {
@@ -276,12 +276,12 @@ func TestComplexDocumentWithFields(t *testing.T) {
 	}
 	defer f.Close()
 	defer os.Remove("test_fields.docx") // cleanup
-	
+
 	_, err = w.WriteTo(f)
 	if err != nil {
 		t.Fatalf("Failed to write document: %v", err)
 	}
-	
+
 	// Basic validation - check that paragraph contains expected text
 	paraString := p1.String()
 	if !strings.Contains(paraString, "This is the introduction") {

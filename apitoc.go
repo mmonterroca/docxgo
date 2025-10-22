@@ -29,12 +29,12 @@ import (
 
 // TOCOptions contains configuration options for table of contents generation
 type TOCOptions struct {
-	Title         string   // "Table of Contents" 
-	Depth         int      // 1-4 (niveles H1-H4)
-	PageNumbers   bool     // Mostrar números de página
-	Hyperlinks    bool     // Hyperlinks clicables
-	RightAlign    bool     // Alinear números a la derecha
-	TabLeader     string   // "dot", "hyphen", "underscore", "none"
+	Title       string // "Table of Contents"
+	Depth       int    // 1-4 (niveles H1-H4)
+	PageNumbers bool   // Mostrar números de página
+	Hyperlinks  bool   // Hyperlinks clicables
+	RightAlign  bool   // Alinear números a la derecha
+	TabLeader   string // "dot", "hyphen", "underscore", "none"
 }
 
 // DefaultTOCOptions returns sensible defaults for TOC generation
@@ -63,11 +63,11 @@ func (d *Docx) AddTOC(opts TOCOptions) error {
 	titlePara := d.AddParagraph()
 	titlePara.AddText(opts.Title).Bold().Size("28")
 	titlePara.Justification("center")
-	
+
 	// Create the TOC field paragraph
 	tocPara := d.AddParagraph()
 	tocPara.AddTOCField(opts.Depth, opts.Hyperlinks, opts.PageNumbers)
-	
+
 	return nil
 }
 
@@ -80,17 +80,17 @@ func (d *Docx) AddTOCWithEntries(opts TOCOptions, entries []TOCEntry) error {
 		titlePara.AddText(opts.Title).Bold().Size("28")
 		titlePara.Justification("center")
 	}
-	
+
 	// Add TOC field
 	tocFieldPara := d.AddParagraph()
 	tocFieldPara.AddTOCField(opts.Depth, opts.Hyperlinks, opts.PageNumbers)
-	
+
 	// Add sample entries (Word will regenerate these)
 	for _, entry := range entries {
 		entryPara := d.AddParagraph()
 		entryPara.AddTOCEntry(entry.Level, entry.Text, entry.BookmarkID, entry.PageNumber, opts)
 	}
-	
+
 	return nil
 }
 
@@ -98,22 +98,22 @@ func (d *Docx) AddTOCWithEntries(opts TOCOptions, entries []TOCEntry) error {
 func (p *Paragraph) AddTOCEntry(level int, text string, bookmarkID string, pageNum string, opts TOCOptions) {
 	// Set indentation based on level (each level indented more)
 	indentValue := (level - 1) * 360 // 0.25 inch per level in twentieths of a point
-	
+
 	if p.Properties == nil {
 		p.Properties = &ParagraphProperties{}
 	}
-	
+
 	// Add indentation
 	p.Properties.Ind = &Ind{
 		Left: indentValue,
 	}
-	
+
 	// Add the text with hyperlink to bookmark
 	if opts.Hyperlinks && bookmarkID != "" {
 		// Create hyperlink run
 		textRun := &Run{
 			RunProperties: &RunProperties{
-				Color: &Color{Val: "0000FF"}, // Blue for hyperlinks
+				Color:     &Color{Val: "0000FF"}, // Blue for hyperlinks
 				Underline: &Underline{Val: "single"},
 			},
 			file: p.file,
@@ -124,14 +124,14 @@ func (p *Paragraph) AddTOCEntry(level int, text string, bookmarkID string, pageN
 		// Regular text
 		p.AddText(text)
 	}
-	
+
 	// Add tab with leader and page number
 	if opts.PageNumbers {
 		// Add tab
 		tabRun := &Run{file: p.file}
 		tabRun.AddTab()
 		p.Children = append(p.Children, tabRun)
-		
+
 		// Add page number (or PAGEREF field)
 		if bookmarkID != "" {
 			pageRefRun := &Run{file: p.file}
@@ -155,10 +155,10 @@ func GenerateHeadingBookmark(headingText string, level int, index int) string {
 func (d *Docx) AddHeadingWithTOC(text string, level int, tocIndex int) *Paragraph {
 	para := d.AddParagraph()
 	para.AddText(text)
-	
+
 	// Generate bookmark for TOC
 	para.AddTOCBookmark(text, tocIndex)
-	
+
 	return para
 }
 
@@ -167,7 +167,7 @@ func (d *Docx) AddHeadingWithTOC(text string, level int, tocIndex int) *Paragrap
 func (d *Docx) ScanForHeadings(maxLevel int) []TOCEntry {
 	entries := make([]TOCEntry, 0)
 	tocIndex := 1
-	
+
 	for _, item := range d.Document.Body.Items {
 		if para, ok := item.(*Paragraph); ok {
 			// Check if paragraph has heading style or looks like a heading
@@ -176,12 +176,12 @@ func (d *Docx) ScanForHeadings(maxLevel int) []TOCEntry {
 				text := para.String()
 				if text != "" {
 					bookmarkID := GenerateHeadingBookmark(text, level, tocIndex)
-					
+
 					// Add bookmark if not present
 					if !para.HasBookmark(bookmarkID) {
 						para.AddTOCBookmark(text, tocIndex)
 					}
-					
+
 					entries = append(entries, TOCEntry{
 						Level:      level,
 						Text:       text,
@@ -193,7 +193,7 @@ func (d *Docx) ScanForHeadings(maxLevel int) []TOCEntry {
 			}
 		}
 	}
-	
+
 	return entries
 }
 
@@ -211,26 +211,26 @@ func (d *Docx) detectHeadingLevel(para *Paragraph) int {
 			return 4
 		}
 	}
-	
+
 	// Fallback: detect based on text formatting (bold, size, etc.)
 	text := strings.TrimSpace(para.String())
 	if text == "" {
 		return 0
 	}
-	
+
 	// Simple heuristics for heading detection
 	if len(text) < 100 && // Short text
 		!strings.Contains(text, ".") && // No sentences
 		(strings.HasPrefix(text, "1.") || // Numbered
 			strings.HasPrefix(text, "Chapter") || // Chapter
 			strings.ToUpper(text[0:1]) == text[0:1]) { // Starts with capital
-		
+
 		// Check if paragraph has bold formatting
 		if d.paragraphHasBoldFormatting(para) {
 			return 1 // Default to level 1
 		}
 	}
-	
+
 	return 0
 }
 
@@ -250,11 +250,11 @@ func (d *Docx) paragraphHasBoldFormatting(para *Paragraph) bool {
 func (d *Docx) RegenerateTOC(opts TOCOptions) error {
 	// Scan document for headings
 	entries := d.ScanForHeadings(opts.Depth)
-	
+
 	if len(entries) == 0 {
 		return fmt.Errorf("no headings found in document")
 	}
-	
+
 	// Find existing TOC and replace it, or add new one at the beginning
 	// For now, just add at the beginning
 	return d.AddTOCWithEntries(opts, entries)
@@ -262,10 +262,10 @@ func (d *Docx) RegenerateTOC(opts TOCOptions) error {
 
 // TOCConfiguration stores TOC settings for a document
 type TOCConfiguration struct {
-	AutoGenerate    bool       // Automatically generate TOC when adding headings
-	Options         TOCOptions // TOC generation options
-	UpdateOnSave    bool       // Update TOC when saving document
-	InsertPosition  string     // "beginning", "end", "after_title"
+	AutoGenerate   bool       // Automatically generate TOC when adding headings
+	Options        TOCOptions // TOC generation options
+	UpdateOnSave   bool       // Update TOC when saving document
+	InsertPosition string     // "beginning", "end", "after_title"
 }
 
 // WithTOCConfiguration sets up automatic TOC generation for the document
@@ -278,18 +278,18 @@ func (d *Docx) WithTOCConfiguration(config TOCConfiguration) *Docx {
 // AddSmartHeading adds a heading that automatically participates in TOC generation
 func (d *Docx) AddSmartHeading(text string, level int) *Paragraph {
 	para := d.AddParagraph()
-	
+
 	// Set heading style
 	styleName := fmt.Sprintf("Heading%d", level)
 	para.Style(styleName)
-	
+
 	// Add text
 	para.AddText(text)
-	
+
 	// Add TOC bookmark
 	// Generate a unique index - in a real implementation this would be tracked
 	tocIndex := len(d.Document.Body.Items) // Simple approximation
 	para.AddTOCBookmark(text, tocIndex)
-	
+
 	return para
 }

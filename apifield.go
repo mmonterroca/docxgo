@@ -42,11 +42,11 @@ type InstrText struct {
 // Field represents a complete Word field with all its components
 // A field consists of: fldChar(begin) -> instrText -> fldChar(separate) -> result text -> fldChar(end)
 type Field struct {
-	Begin     *Run  // Run with fldChar type="begin"
-	InstrText *Run  // Run with instrText containing the field instruction
-	Separate  *Run  // Run with fldChar type="separate"  
-	Result    *Run  // Run with the field result text
-	End       *Run  // Run with fldChar type="end"
+	Begin     *Run // Run with fldChar type="begin"
+	InstrText *Run // Run with instrText containing the field instruction
+	Separate  *Run // Run with fldChar type="separate"
+	Result    *Run // Run with the field result text
+	End       *Run // Run with fldChar type="end"
 }
 
 // NewFldChar creates a new field character
@@ -84,27 +84,27 @@ func (p *Paragraph) AddField(instrText string, resultText string) *Field {
 	beginRun := &Run{file: p.file}
 	beginRun.AddFldChar("begin")
 	p.Children = append(p.Children, beginRun)
-	
+
 	// Instruction text
 	instrRun := &Run{file: p.file}
 	instrRun.AddInstrText(instrText)
 	p.Children = append(p.Children, instrRun)
-	
+
 	// Separate field and result
 	sepRun := &Run{file: p.file}
 	sepRun.AddFldChar("separate")
 	p.Children = append(p.Children, sepRun)
-	
+
 	// Result text (what's displayed before field is updated)
 	resultRun := &Run{file: p.file}
 	resultRun.AddText(resultText)
 	p.Children = append(p.Children, resultRun)
-	
+
 	// End field
 	endRun := &Run{file: p.file}
 	endRun.AddFldChar("end")
 	p.Children = append(p.Children, endRun)
-	
+
 	return &Field{
 		Begin:     beginRun,
 		InstrText: instrRun,
@@ -117,22 +117,22 @@ func (p *Paragraph) AddField(instrText string, resultText string) *Field {
 // AddTOCField adds a Table of Contents field
 func (p *Paragraph) AddTOCField(depth int, useHyperlinks bool, usePageNumbers bool) *Field {
 	instrText := "TOC"
-	
+
 	// Add outline levels (e.g., \o "1-3" for levels 1-3)
 	if depth > 0 {
 		instrText += " \\o \"1-" + string(rune('0'+depth)) + "\""
 	}
-	
+
 	// Add hyperlinks flag
 	if useHyperlinks {
 		instrText += " \\h"
 	}
-	
+
 	// Add page numbers formatting
 	if usePageNumbers {
 		instrText += " \\z \\u"
 	}
-	
+
 	return p.AddField(instrText, "Table of Contents")
 }
 

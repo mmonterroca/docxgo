@@ -72,26 +72,26 @@ func generateBookmarkID() string {
 // This will add both bookmarkStart and bookmarkEnd elements to the paragraph
 func (p *Paragraph) AddBookmark(name string) *Bookmark {
 	bookmark := NewBookmark(name, "")
-	
+
 	// Add bookmark start to the beginning of paragraph children
 	p.Children = append([]interface{}{bookmark.Start}, p.Children...)
-	
+
 	// Add bookmark end to the end of paragraph children
 	p.Children = append(p.Children, bookmark.End)
-	
+
 	return bookmark
 }
 
 // AddBookmarkWithID adds a bookmark with a specific ID to a paragraph
 func (p *Paragraph) AddBookmarkWithID(name string, id string) *Bookmark {
 	bookmark := NewBookmark(name, id)
-	
+
 	// Add bookmark start to the beginning of paragraph children
 	p.Children = append([]interface{}{bookmark.Start}, p.Children...)
-	
+
 	// Add bookmark end to the end of paragraph children
 	p.Children = append(p.Children, bookmark.End)
-	
+
 	return bookmark
 }
 
