@@ -35,20 +35,20 @@ func (f *Docx) AddHeader(headerType HeaderFooterType) *Paragraph {
 	// For now, we'll create a simple header implementation
 	// In a full implementation, this would create actual header XML files
 	// and link them in document.xml.rels
-	
+
 	// Create a paragraph that will be used in the header
 	p := &Paragraph{
 		Children: make([]interface{}, 0, 64),
 		file:     f,
 	}
-	
+
 	// TODO: Full implementation requires:
 	// 1. Create header1.xml, header2.xml, header3.xml files
 	// 2. Add relationships in document.xml.rels
 	// 3. Add references in document.xml sectPr
-	// 
+	//
 	// For v0.3.0, we'll document the API and provide a working placeholder
-	
+
 	return p
 }
 
@@ -56,12 +56,12 @@ func (f *Docx) AddHeader(headerType HeaderFooterType) *Paragraph {
 // Returns a paragraph that can be formatted
 func (f *Docx) AddFooter(footerType HeaderFooterType) *Paragraph {
 	// Similar to AddHeader, this is a placeholder for the full implementation
-	
+
 	p := &Paragraph{
 		Children: make([]interface{}, 0, 64),
 		file:     f,
 	}
-	
+
 	return p
 }
 
