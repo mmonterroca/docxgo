@@ -1,8 +1,30 @@
-# Docx library
+# go-docx - SlideLang Enhanced Fork
 
-One of the most functional libraries to read and write .docx (a.k.a. Microsoft Word documents or ECMA-376 Office Open XML) files in Go.
+Professional DOCX generation library for Go with advanced features for technical documentation.
 
-This is a variant optimized and expanded by fumiama. The original repo is [gonfva/docxlib](https://github.com/gonfva/docxlib).
+**Fork of**: [fumiama/go-docx](https://github.com/fumiama/go-docx) | **Original**: [gonfva/docxlib](https://github.com/gonfva/docxlib)
+
+## ✨ SlideLang Enhancements
+
+This fork adds professional document generation features needed for **DocLang** and **SlideLang** exporters:
+
+- ✅ **Dynamic Table of Contents** with hyperlinks and page numbers
+- ✅ **Bookmarks** for cross-references and TOC navigation
+- ✅ **Field Codes** (TOC, PAGEREF, PAGE, NUMPAGES, REF, SEQ)
+- ✅ **Native Heading Styles** (H1-H4) with proper outline levels
+- ✅ **Auto-numbering** for figures, tables, and sections
+- ✅ **Cross-references** between sections
+- ✅ **Navigation Pane** support in Microsoft Word
+
+### Why This Fork?
+
+Original library is excellent for basic DOCX manipulation but lacks:
+- No Table of Contents support
+- No bookmark functionality
+- No Word field codes
+- No native heading styles with outline levels
+
+This fork completes those gaps for **professional technical documentation**.
 
 ## Introduction
 
@@ -24,8 +46,9 @@ This is a variant optimized and expanded by fumiama. The original repo is [gonfv
 > 
 > In the mean time, shared as an example in case somebody finds it useful.
 
-The Introduction above is copied from the original repo. I had evolved that repo again to fit my needs. Here are the supported functions now.
+## 🎯 Features
 
+### Core Features (from upstream)
 - [x] Parse and save document
 - [x] Edit text (color, size, alignment, link, ...)
 - [x] Edit picture
@@ -33,6 +56,15 @@ The Introduction above is copied from the original repo. I had evolved that repo
 - [x] Edit shape
 - [x] Edit canvas
 - [x] Edit group
+
+### SlideLang Enhanced Features
+- [x] **Dynamic Table of Contents** - Auto-generated with F9 update support
+- [x] **Bookmarks** - Named references and TOC anchors
+- [x] **Field Codes** - TOC, PAGEREF, PAGE, NUMPAGES, REF, SEQ
+- [x] **Native Heading Styles** - H1-H4 with proper formatting and outline levels
+- [x] **Cross-references** - Link between sections with automatic updates
+- [x] **Auto-numbering** - Figures, tables, and equations
+- [x] **Navigation Pane** - Word document structure support
 
 ## Quick Start
 ```bash
@@ -51,41 +83,81 @@ And you will see two files generated under `pwd` with the same contents as below
 	</tr>
 </table>
 
-## Use Package in your Project
+## 📦 Installation
+
 ```bash
-go get -d github.com/fumiama/go-docx@latest
+go get -d github.com/SlideLang/go-docx@latest
 ```
-### Generate Document
+
+Or use in your `go.mod`:
+```go
+require github.com/SlideLang/go-docx v0.1.0-slidelang
+```
+
+## 🚀 Quick Start
+
+### Professional Document with TOC
+
 ```go
 package main
 
 import (
 	"os"
-	"strings"
-
 	"github.com/fumiama/go-docx"
 )
 
 func main() {
-	w := docx.New().WithDefaultTheme()
-	// add new paragraph
-	para1 := w.AddParagraph()
-	// add text
-	para1.AddText("test").AddTab()
-	para1.AddText("size").Size("44").AddTab()
-	f, err := os.Create("generated.docx")
-	// save to file
-	if err != nil {
-		panic(err)
-	}
-	_, err = w.WriteTo(f)
-	if err != nil {
-		panic(err)
-	}
-	err = f.Close()
-	if err != nil {
-		panic(err)
-	}
+	// Create document with default theme
+	doc := docx.New().WithDefaultTheme()
+	
+	// Add title
+	title := doc.AddParagraph()
+	title.AddText("Professional Document").Bold().Size("32").Color("2E75B6")
+	title.Justification("center")
+	
+	// Add Table of Contents
+	opts := docx.DefaultTOCOptions()
+	opts.Title = "Table of Contents"
+	opts.Depth = 3
+	opts.PageNumbers = true
+	opts.Hyperlinks = true
+	doc.AddTOC(opts)
+	
+	// Page break after TOC
+	doc.AddParagraph().AddPageBreaks()
+	
+	// Add content with headings
+	h1 := doc.AddHeadingWithTOC("1. Introduction", 1, 1)
+	h1.Style("Heading1")
+	
+	doc.AddParagraph().AddText("This is the introduction content...")
+	
+	h2 := doc.AddHeadingWithTOC("1.1 Background", 2, 2)
+	h2.Style("Heading2")
+	
+	doc.AddParagraph().AddText("Background information...")
+	
+	// Add figure with auto-numbering
+	fig := doc.AddParagraph()
+	fig.AddText("Figure ")
+	fig.AddSeqField("Figure", "ARABIC")
+	fig.AddText(": System diagram")
+	
+	// Add page numbers in footer
+	footer := doc.AddParagraph()
+	footer.AddText("Page ")
+	footer.AddPageField()
+	footer.AddText(" of ")
+	footer.AddNumPagesField()
+	footer.Justification("center")
+	
+	// IMPORTANT: Add page size at the END
+	doc.WithA4Page()
+	
+	// Save document
+	f, _ := os.Create("professional.docx")
+	defer f.Close()
+	doc.WriteTo(f)
 }
 ```
 ### Parse Document
@@ -124,6 +196,107 @@ func main() {
 }
 ```
 
-## License
+## 📚 API Reference
+
+### Table of Contents
+
+```go
+// Create TOC with options
+opts := docx.DefaultTOCOptions()
+opts.Title = "Contents"
+opts.Depth = 3              // Levels H1-H3
+opts.PageNumbers = true     // Show page numbers
+opts.Hyperlinks = true      // Clickable links
+doc.AddTOC(opts)
+
+// Smart heading with TOC entry
+h1 := doc.AddHeadingWithTOC("Section Title", level, tocId)
+h1.Style("Heading1")
+```
+
+### Bookmarks
+
+```go
+// Add simple bookmark
+para.AddBookmark("section_intro")
+
+// Add TOC-format bookmark
+para.AddTOCBookmark(1)  // Creates _Toc000000001
+
+// Generate heading bookmark name
+name := GenerateHeadingBookmark("Introduction")
+```
+
+### Field Codes
+
+```go
+// TOC field
+para.AddTOCField(depth, hyperlinks, pageNumbers)
+
+// Page reference
+para.AddPageRefField("_Toc000000001", true)
+
+// Page numbers
+para.AddPageField()        // Current page
+para.AddNumPagesField()    // Total pages
+
+// Sequences (figures, tables)
+para.AddSeqField("Figure", "ARABIC")
+para.AddSeqField("Table", "ARABIC")
+
+// Cross-references
+para.AddRefField("bookmark_name", true)
+```
+
+### Heading Styles
+
+```go
+// Apply native Word styles
+para.Style("Heading1")  // 16pt, Blue, Bold
+para.Style("Heading2")  // 13pt, Blue, Bold
+para.Style("Heading3")  // 12pt, Dark Blue, Bold
+para.Style("Heading4")  // 11pt, Blue, Bold+Italic
+
+// All include proper outlineLevel for TOC
+```
+
+## 🎓 Examples
+
+See [`demo_test.go`](demo_test.go) for a comprehensive example with:
+- Dynamic TOC
+- Multiple heading levels
+- Bookmarks and cross-references
+- Field codes (PAGE, NUMPAGES, SEQ)
+- Professional formatting
+
+## 📖 Documentation
+
+- [Initial Plan](docs/initial-plan.md) - Design and implementation roadmap
+- [Enhancement Spec](GO_DOCX_ENHANCEMENTS.md) - Detailed feature specifications
+
+## 🔧 Usage in Word
+
+After generating your document:
+
+1. **Update TOC**: Click on TOC → Press F9 → Select "Update entire table"
+2. **View Structure**: View → Navigation Pane (shows heading hierarchy)
+3. **Update Fields**: Select all (Ctrl+A) → F9 to update all fields
+4. **View Field Codes**: Alt+F9 (toggle between codes and results)
+
+## 🤝 Contributing
+
+This is an active fork maintained for SlideLang/DocLang projects. PRs welcome for:
+- Bug fixes
+- Performance improvements
+- Additional field codes
+- Extended style support
+
+## 📄 License
 
 AGPL-3.0. See [LICENSE](LICENSE)
+
+## 🙏 Credits
+
+- Original: [gonfva/docxlib](https://github.com/gonfva/docxlib)
+- Upstream: [fumiama/go-docx](https://github.com/fumiama/go-docx)
+- Enhanced by: [SlideLang Team](https://github.com/SlideLang)

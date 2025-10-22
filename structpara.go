@@ -201,6 +201,14 @@ func (p *Paragraph) String() string {
 	}
 	for _, c := range p.Children {
 		switch o := c.(type) {
+		case *BookmarkStart:
+			// Bookmarks are usually invisible in text representation
+			// but we can add a marker for debugging
+			// sb.WriteString(fmt.Sprintf("[BOOKMARK:%s]", o.Name))
+			continue
+		case *BookmarkEnd:
+			// Bookmark end is also invisible
+			continue
 		case *Hyperlink:
 			id := o.ID
 			text := o.Run.InstrText
@@ -307,6 +315,25 @@ func (p *Paragraph) UnmarshalXML(d *xml.Decoder, _ xml.StartElement) error {
 				}
 				p.Properties = &value
 				continue
+			case "bookmarkStart":
+				var value BookmarkStart
+				err = d.DecodeElement(&value, &tt)
+				if err != nil && !strings.HasPrefix(err.Error(), "expected") {
+					return err
+				}
+				// Extract attributes manually
+				value.ID = getAtt(tt.Attr, "id")
+				value.Name = getAtt(tt.Attr, "name")
+				elem = &value
+			case "bookmarkEnd":
+				var value BookmarkEnd
+				err = d.DecodeElement(&value, &tt)
+				if err != nil && !strings.HasPrefix(err.Error(), "expected") {
+					return err
+				}
+				// Extract attributes manually
+				value.ID = getAtt(tt.Attr, "id")
+				elem = &value
 			default:
 				err = d.Skip() // skip unsupported tags
 				if err != nil {

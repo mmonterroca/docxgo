@@ -97,8 +97,19 @@ func (r *Run) parse(d *xml.Decoder, tt xml.StartElement) (child interface{}, err
 		if err != nil && !strings.HasPrefix(err.Error(), "expected") {
 			return nil, err
 		}
+		// Store in both the Run field and as a child element
 		r.InstrText = value
-		return nil, nil
+		instrTextElem := &InstrText{Text: value}
+		child = instrTextElem
+	case "fldChar":
+		var value FldChar
+		err = d.DecodeElement(&value, &tt)
+		if err != nil && !strings.HasPrefix(err.Error(), "expected") {
+			return nil, err
+		}
+		// Extract fldCharType attribute manually
+		value.FldCharType = getAtt(tt.Attr, "fldCharType")
+		child = &value
 	case "t":
 		var value Text
 		err = d.DecodeElement(&value, &tt)

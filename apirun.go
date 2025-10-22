@@ -125,3 +125,12 @@ func (r *Run) Font(ascii, eastAsia, hansi, hint string) *Run {
 	}
 	return r
 }
+
+// AddText adds text directly to a run
+func (r *Run) AddText(text string) *Run {
+	// NOTE: Do NOT initialize RunProperties if empty
+	// An empty <w:rPr/> element can cause Word to reject the document
+	// RunProperties should only be created when actually setting properties
+	r.Children = append(r.Children, &Text{Text: text})
+	return r
+}
