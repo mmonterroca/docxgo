@@ -172,3 +172,26 @@ func (p *Paragraph) AddSeqField(identifier string, format string) *Field {
 	}
 	return p.AddField(instrText, "1")
 }
+
+// AddHyperlinkField adds a HYPERLINK field for external or internal links
+// url: the target URL (http://...) or internal anchor (#bookmark_name)
+// displayText: the text to display for the link
+// tooltip: optional tooltip text (pass empty string to skip)
+func (p *Paragraph) AddHyperlinkField(url string, displayText string, tooltip string) *Field {
+	instrText := "HYPERLINK \"" + url + "\""
+	if tooltip != "" {
+		instrText += " \\o \"" + tooltip + "\""
+	}
+	return p.AddField(instrText, displayText)
+}
+
+// AddStyleRefField adds a STYLEREF field for dynamic header text from document headings
+// styleName: the style name to reference (e.g., "Heading 1")
+// options: additional field switches (e.g., "\\l" for last instance, "\\n" for paragraph number)
+func (p *Paragraph) AddStyleRefField(styleName string, options string) *Field {
+	instrText := "STYLEREF \"" + styleName + "\""
+	if options != "" {
+		instrText += " " + options
+	}
+	return p.AddField(instrText, styleName)
+}
