@@ -260,6 +260,22 @@ para.Style("Heading4")  // 11pt, Blue, Bold+Italic
 // All include proper outlineLevel for TOC
 ```
 
+### Paragraph Formatting
+
+```go
+// Indentation (in twips: 1440 = 1 inch, 720 = 0.5 inch)
+para.Indent(720, 0, 0)      // Left indent only
+para.Indent(0, 360, 0)      // First line indent
+para.Indent(720, 0, 360)    // Hanging indent (bullets)
+
+// Alignment
+para.Justification("left")    // or "center", "right", "both"
+
+// Example: Professional bullet list
+bullet := doc.AddParagraph()
+bullet.AddText("•  Item text")
+bullet.Indent(720, 0, 0)  // 0.5 inch indent
+```
 ## 🎓 Examples
 
 See [`demo_test.go`](demo_test.go) for a comprehensive example with:
