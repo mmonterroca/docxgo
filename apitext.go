@@ -58,9 +58,10 @@ func (p *Paragraph) AddText(text string) *Run {
 			}
 		}
 	}
+	// NOTE: Do NOT initialize RunProperties if empty
+	// An empty <w:rPr/> element can cause spacing issues and Word compatibility problems
 	run := &Run{
-		RunProperties: &RunProperties{},
-		Children:      c,
+		Children: c,
 	}
 	p.Children = append(p.Children, run)
 	return run
