@@ -285,11 +285,66 @@ After generating your document:
 
 ## 🤝 Contributing
 
-This is an active fork maintained for SlideLang/DocLang projects. PRs welcome for:
-- Bug fixes
-- Performance improvements
-- Additional field codes
-- Extended style support
+This is an active fork maintained for SlideLang/DocLang projects. We welcome contributions!
+
+### Git Flow Workflow
+
+We use a simplified Git Flow branching strategy:
+
+- **`master`**: Stable releases only. Tagged with semantic versions (e.g., `v0.1.0-slidelang`)
+- **`dev`**: Integration branch for testing features before release
+- **Feature branches**: Short-lived branches for specific features or fixes
+
+#### Contributing Process
+
+1. **Fork** the repository to your GitHub account
+2. **Clone** your fork:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/go-docx.git
+   cd go-docx
+   ```
+3. **Add upstream** remote (if not already added):
+   ```bash
+   git remote add upstream https://github.com/SlideLang/go-docx.git
+   ```
+4. **Create feature branch** from `dev`:
+   ```bash
+   git checkout dev
+   git pull upstream dev
+   git checkout -b feature/your-feature-name
+   ```
+5. **Make changes** and commit with descriptive messages:
+   ```bash
+   git add .
+   git commit -m "feat: add support for STYLEREF field"
+   ```
+6. **Push** to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+7. **Open PR** to `dev` branch (not `master`)
+8. **Wait for review** and address feedback
+9. Once approved, maintainers will merge to `dev`
+10. Periodically, `dev` is merged to `master` and tagged
+
+#### Commit Message Convention
+
+We follow conventional commits:
+- `feat:` New features
+- `fix:` Bug fixes
+- `docs:` Documentation changes
+- `test:` Test additions/changes
+- `refactor:` Code refactoring
+- `perf:` Performance improvements
+
+#### What We're Looking For
+
+- ✅ Bug fixes
+- ✅ Performance improvements
+- ✅ Additional field codes (STYLEREF, HYPERLINK, IF, etc.)
+- ✅ Extended style support
+- ✅ Test coverage improvements
+- ✅ Documentation enhancements
 
 ## 📄 License
 
