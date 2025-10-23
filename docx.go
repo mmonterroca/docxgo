@@ -41,6 +41,7 @@ type Docx struct {
 	// Headers and footers
 	headers map[HeaderFooterType]*Header
 	footers map[HeaderFooterType]*Footer
+	sectPr  *SectPr // Section properties (added at end of document)
 
 	media        []Media
 	mediaNameIdx map[string]int

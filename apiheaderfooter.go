@@ -58,31 +58,31 @@ func (f *Docx) AddHeader(headerType HeaderFooterType) *Paragraph {
 	if f.headers == nil {
 		f.headers = make(map[HeaderFooterType]*Header)
 	}
-	
+
 	// Create header structure
 	header := &Header{
 		XMLW:  XMLNS_W,
 		XMLR:  XMLNS_R,
 		Items: make([]interface{}, 0, 8),
 	}
-	
+
 	// Store header
 	f.headers[headerType] = header
-	
+
 	// Create and return a paragraph that will be added to this header
 	p := &Paragraph{
 		Children: make([]interface{}, 0, 64),
 		file:     f,
 	}
-	
+
 	header.Items = append(header.Items, p)
-	
+
 	// Add relationship for this header
 	rID := f.addHeaderRelationship(headerType)
-	
+
 	// Add sectPr reference to document body if not exists
 	f.addHeaderReference(headerType, rID)
-	
+
 	return p
 }
 
@@ -93,38 +93,38 @@ func (f *Docx) AddFooter(footerType HeaderFooterType) *Paragraph {
 	if f.footers == nil {
 		f.footers = make(map[HeaderFooterType]*Footer)
 	}
-	
+
 	// Create footer structure
 	footer := &Footer{
 		XMLW:  XMLNS_W,
 		XMLR:  XMLNS_R,
 		Items: make([]interface{}, 0, 8),
 	}
-	
+
 	// Store footer
 	f.footers[footerType] = footer
-	
+
 	// Create and return a paragraph
 	p := &Paragraph{
 		Children: make([]interface{}, 0, 64),
 		file:     f,
 	}
-	
+
 	footer.Items = append(footer.Items, p)
-	
+
 	// Add relationship for this footer
 	rID := f.addFooterRelationship(footerType)
-	
+
 	// Add sectPr reference to document body if not exists
 	f.addFooterReference(footerType, rID)
-	
+
 	return p
 }
 
 // addHeaderRelationship adds a header relationship and returns the rID
 func (f *Docx) addHeaderRelationship(headerType HeaderFooterType) string {
 	rID := "rId" + strconv.Itoa(int(atomic.AddUintptr(&f.rID, 1)))
-	
+
 	filename := "header1.xml"
 	switch headerType {
 	case HeaderFooterFirst:
@@ -132,20 +132,20 @@ func (f *Docx) addHeaderRelationship(headerType HeaderFooterType) string {
 	case HeaderFooterEven:
 		filename = "header3.xml"
 	}
-	
+
 	f.docRelation.Relationship = append(f.docRelation.Relationship, Relationship{
 		ID:     rID,
 		Type:   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
 		Target: filename,
 	})
-	
+
 	return rID
 }
 
 // addFooterRelationship adds a footer relationship and returns the rID
 func (f *Docx) addFooterRelationship(footerType HeaderFooterType) string {
 	rID := "rId" + strconv.Itoa(int(atomic.AddUintptr(&f.rID, 1)))
-	
+
 	filename := "footer1.xml"
 	switch footerType {
 	case HeaderFooterFirst:
@@ -153,13 +153,13 @@ func (f *Docx) addFooterRelationship(footerType HeaderFooterType) string {
 	case HeaderFooterEven:
 		filename = "footer3.xml"
 	}
-	
+
 	f.docRelation.Relationship = append(f.docRelation.Relationship, Relationship{
 		ID:     rID,
 		Type:   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
 		Target: filename,
 	})
-	
+
 	return rID
 }
 
@@ -167,7 +167,7 @@ func (f *Docx) addFooterRelationship(footerType HeaderFooterType) string {
 func (f *Docx) addHeaderReference(headerType HeaderFooterType, rID string) {
 	// Get or create sectPr
 	sectPr := f.getSectPr()
-	
+
 	// Determine type string
 	typeStr := "default"
 	switch headerType {
@@ -176,7 +176,7 @@ func (f *Docx) addHeaderReference(headerType HeaderFooterType, rID string) {
 	case HeaderFooterEven:
 		typeStr = "even"
 	}
-	
+
 	// Add header reference
 	sectPr.HeaderReference = append(sectPr.HeaderReference, HeaderReference{
 		Type: typeStr,
@@ -188,7 +188,7 @@ func (f *Docx) addHeaderReference(headerType HeaderFooterType, rID string) {
 func (f *Docx) addFooterReference(footerType HeaderFooterType, rID string) {
 	// Get or create sectPr
 	sectPr := f.getSectPr()
-	
+
 	// Determine type string
 	typeStr := "default"
 	switch footerType {
@@ -197,7 +197,7 @@ func (f *Docx) addFooterReference(footerType HeaderFooterType, rID string) {
 	case HeaderFooterEven:
 		typeStr = "even"
 	}
-	
+
 	// Add footer reference
 	sectPr.FooterReference = append(sectPr.FooterReference, FooterReference{
 		Type: typeStr,
@@ -205,19 +205,12 @@ func (f *Docx) addFooterReference(footerType HeaderFooterType, rID string) {
 	})
 }
 
-// getSectPr gets or creates the sectPr element in the document body
+// getSectPr gets or creates the sectPr element (stored separately, added at end during pack)
 func (f *Docx) getSectPr() *SectPr {
-	// Check if last item is already a sectPr
-	if len(f.Document.Body.Items) > 0 {
-		if sectPr, ok := f.Document.Body.Items[len(f.Document.Body.Items)-1].(*SectPr); ok {
-			return sectPr
-		}
+	if f.sectPr == nil {
+		f.sectPr = &SectPr{}
 	}
-	
-	// Create new sectPr
-	sectPr := &SectPr{}
-	f.Document.Body.Items = append(f.Document.Body.Items, sectPr)
-	return sectPr
+	return f.sectPr
 }
 
 // AddPageNumberFooter is a convenience method to add a simple page number footer

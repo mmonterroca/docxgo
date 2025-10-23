@@ -50,6 +50,11 @@ func (f *Docx) pack(zipWriter *zip.Writer) (err error) {
 		}
 	}
 
+	// Add sectPr at the end of the document body if it exists
+	if f.sectPr != nil {
+		f.Document.Body.Items = append(f.Document.Body.Items, f.sectPr)
+	}
+
 	files["word/_rels/document.xml.rels"] = marshaller{data: &f.docRelation}
 	files["word/document.xml"] = marshaller{data: &f.Document}
 

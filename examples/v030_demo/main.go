@@ -23,41 +23,41 @@ func main() {
 
 	// COVER PAGE
 	fmt.Println("🎨 Creating cover page...")
-	
+
 	// Add spacing
 	doc.AddParagraph()
 	doc.AddParagraph()
-	
+
 	// Logo/Company name
 	logo := doc.AddParagraph()
 	logo.AddText("SLIDELANG").Size("28").Bold().Color("2E75B5")
 	logo.Justification("center")
-	
+
 	doc.AddParagraph()
-	
+
 	// Document title
 	title := doc.AddParagraph()
 	title.AddText("Go-Docx Professional Document").Size("36").Bold().Color("1F4E78")
 	title.Justification("center")
-	
+
 	// Subtitle
 	subtitle := doc.AddParagraph()
 	subtitle.AddText("Enhanced Document Generation Library").Size("18").Color("5B9BD5")
 	subtitle.Justification("center")
-	
+
 	doc.AddParagraph()
 	doc.AddParagraph()
-	
+
 	// Version
 	version := doc.AddParagraph()
 	version.AddText("Version v0.3.0").Size("16")
 	version.Justification("center")
-	
+
 	// Date
 	date := doc.AddParagraph()
 	date.AddText("October 22, 2025").Size("14").Color("7F7F7F")
 	date.Justification("center")
-	
+
 	// Page break after cover
 	doc.AddParagraph().AddPageBreaks()
 

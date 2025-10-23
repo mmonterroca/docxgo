@@ -182,7 +182,21 @@ func (p *Paragraph) AddHyperlinkField(url string, displayText string, tooltip st
 	if tooltip != "" {
 		instrText += " \\o \"" + tooltip + "\""
 	}
-	return p.AddField(instrText, displayText)
+	
+	field := p.AddField(instrText, displayText)
+	
+	// Apply Hyperlink style to make it look like a link (blue, underlined)
+	if field.Result != nil {
+		if field.Result.RunProperties == nil {
+			field.Result.RunProperties = &RunProperties{}
+		}
+		field.Result.RunProperties.RunStyle = &RunStyle{Val: "Hyperlink"}
+		// Also add blue color and underline for compatibility
+		field.Result.Color("0000FF")
+		field.Result.Underline("single")
+	}
+	
+	return field
 }
 
 // AddStyleRefField adds a STYLEREF field for dynamic header text from document headings
