@@ -68,6 +68,8 @@ func newEmptyFile() *Docx {
 		mediaNameIdx: make(map[string]int, 64),
 		rID:          3,
 		slowIDs:      make(map[string]uintptr, 64),
+		headers:      make(map[HeaderFooterType]*Header),
+		footers:      make(map[HeaderFooterType]*Footer),
 	}
 	docx.Document.Body.file = docx
 	return docx

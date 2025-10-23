@@ -53,6 +53,28 @@ func (f *Docx) pack(zipWriter *zip.Writer) (err error) {
 	files["word/_rels/document.xml.rels"] = marshaller{data: &f.docRelation}
 	files["word/document.xml"] = marshaller{data: &f.Document}
 
+	// Add headers
+	if header, ok := f.headers[HeaderFooterDefault]; ok {
+		files["word/header1.xml"] = marshaller{data: header}
+	}
+	if header, ok := f.headers[HeaderFooterFirst]; ok {
+		files["word/header2.xml"] = marshaller{data: header}
+	}
+	if header, ok := f.headers[HeaderFooterEven]; ok {
+		files["word/header3.xml"] = marshaller{data: header}
+	}
+
+	// Add footers
+	if footer, ok := f.footers[HeaderFooterDefault]; ok {
+		files["word/footer1.xml"] = marshaller{data: footer}
+	}
+	if footer, ok := f.footers[HeaderFooterFirst]; ok {
+		files["word/footer2.xml"] = marshaller{data: footer}
+	}
+	if footer, ok := f.footers[HeaderFooterEven]; ok {
+		files["word/footer3.xml"] = marshaller{data: footer}
+	}
+
 	for _, m := range f.media {
 		files[m.String()] = bytes.NewReader(m.Data)
 	}

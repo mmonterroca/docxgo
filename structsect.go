@@ -26,11 +26,25 @@ import (
 
 // SectPr show the properties of the document, like paper size
 type SectPr struct {
-	XMLName xml.Name `xml:"w:sectPr,omitempty"` // properties of the document, including paper size
-	PgSz    *PgSz    `xml:"w:pgSz,omitempty"`
-	PgMar   *PgMar   `xml:"w:pgMar,omitempty"`
-	Cols    *Cols    `xml:"w:cols,omitempty"`
-	DocGrid *DocGrid `xml:"w:docGrid,omitempty"`
+	XMLName         xml.Name          `xml:"w:sectPr,omitempty"` // properties of the document, including paper size
+	HeaderReference []HeaderReference `xml:"w:headerReference,omitempty"`
+	FooterReference []FooterReference `xml:"w:footerReference,omitempty"`
+	PgSz            *PgSz             `xml:"w:pgSz,omitempty"`
+	PgMar           *PgMar            `xml:"w:pgMar,omitempty"`
+	Cols            *Cols             `xml:"w:cols,omitempty"`
+	DocGrid         *DocGrid          `xml:"w:docGrid,omitempty"`
+}
+
+// HeaderReference references a header part in the document
+type HeaderReference struct {
+	Type string `xml:"w:type,attr"`
+	RID  string `xml:"r:id,attr"`
+}
+
+// FooterReference references a footer part in the document
+type FooterReference struct {
+	Type string `xml:"w:type,attr"`
+	RID  string `xml:"r:id,attr"`
 }
 
 // PgSz show the paper size
@@ -73,6 +87,36 @@ func (sect *SectPr) UnmarshalXML(d *xml.Decoder, _ xml.StartElement) error {
 		}
 		if tt, ok := t.(xml.StartElement); ok {
 			switch tt.Name.Local {
+			case "headerReference":
+				var value HeaderReference
+				for _, attr := range tt.Attr {
+					switch attr.Name.Local {
+					case "type":
+						value.Type = attr.Value
+					case "id":
+						value.RID = attr.Value
+					}
+				}
+				sect.HeaderReference = append(sect.HeaderReference, value)
+				err = d.Skip()
+				if err != nil {
+					return err
+				}
+			case "footerReference":
+				var value FooterReference
+				for _, attr := range tt.Attr {
+					switch attr.Name.Local {
+					case "type":
+						value.Type = attr.Value
+					case "id":
+						value.RID = attr.Value
+					}
+				}
+				sect.FooterReference = append(sect.FooterReference, value)
+				err = d.Skip()
+				if err != nil {
+					return err
+				}
 			case "pgSz":
 				var value PgSz
 				err = d.DecodeElement(&value, &tt)
