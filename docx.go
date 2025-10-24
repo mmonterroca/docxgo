@@ -141,15 +141,15 @@ func LoadBodyItems(items []interface{}, media []Media) *Docx {
 			},
 		},
 		media:        media,
-		mediaNameIdx: make(map[string]int, 64),
-		rID:          3,
-		slowIDs:      make(map[string]uintptr, 64),
+		mediaNameIdx: make(map[string]int, DefaultMediaIndexCapacity),
+		rID:          DefaultRelationshipIDStart,
+		slowIDs:      make(map[string]uintptr, DefaultSlowIDCapacity),
 	}
 	doc.Document.Body.file = doc
 	for i, m := range media {
 		doc.mediaNameIdx[m.Name] = i
 	}
-	doc.slowIDs["图片"] = uintptr(len(media) + 1)
+	doc.slowIDs[IDTypeImage] = uintptr(len(media) + 1)
 	return doc
 }
 

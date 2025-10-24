@@ -20,11 +20,16 @@
 
 package docx
 
-// Color allows to set run color
-func (r *Run) Color(color string) *Run {
+// ensureRunProperties ensures RunProperties is initialized
+func (r *Run) ensureRunProperties() {
 	if r.RunProperties == nil {
 		r.RunProperties = &RunProperties{}
 	}
+}
+
+// Color allows to set run color
+func (r *Run) Color(color string) *Run {
+	r.ensureRunProperties()
 	r.RunProperties.Color = &Color{
 		Val: color,
 	}
@@ -33,9 +38,7 @@ func (r *Run) Color(color string) *Run {
 
 // Size allows to set run size
 func (r *Run) Size(size string) *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.Size = &Size{
 		Val: size,
 	}
@@ -44,9 +47,7 @@ func (r *Run) Size(size string) *Run {
 
 // SizeCs allows to set run sizecs
 func (r *Run) SizeCs(size string) *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.SizeCs = &SizeCs{
 		Val: size,
 	}
@@ -55,9 +56,7 @@ func (r *Run) SizeCs(size string) *Run {
 
 // Shade allows to set run shade
 func (r *Run) Shade(val, color, fill string) *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.Shade = &Shade{
 		Val:   val,
 		Color: color,
@@ -68,9 +67,7 @@ func (r *Run) Shade(val, color, fill string) *Run {
 
 // Spacing allows to set run spacing
 func (r *Run) Spacing(line int) *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.Spacing = &Spacing{
 		Line: line,
 	}
@@ -79,18 +76,14 @@ func (r *Run) Spacing(line int) *Run {
 
 // Bold ...
 func (r *Run) Bold() *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.Bold = &Bold{}
 	return r
 }
 
 // Italic ...
 func (r *Run) Italic() *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.Italic = &Italic{}
 	return r
 }
@@ -110,27 +103,21 @@ func (r *Run) Italic() *Run {
 //	dashLong: Specifies a long dash underline.
 //	wavyDouble: Specifies a double wavy underline.
 func (r *Run) Underline(val string) *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.Underline = &Underline{Val: val}
 	return r
 }
 
 // Highlight ...
 func (r *Run) Highlight(val string) *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.Highlight = &Highlight{Val: val}
 	return r
 }
 
 // Strike ...
 func (r *Run) Strike(val bool) *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	trueFalseStr := "false"
 	if val {
 		trueFalseStr = "true"
@@ -147,9 +134,7 @@ func (r *Run) AddTab() *Run {
 
 // Font sets the font of the run
 func (r *Run) Font(ascii, eastAsia, hansi, hint string) *Run {
-	if r.RunProperties == nil {
-		r.RunProperties = &RunProperties{}
-	}
+	r.ensureRunProperties()
 	r.RunProperties.Fonts = &RunFonts{
 		ASCII:    ascii,
 		EastAsia: eastAsia,

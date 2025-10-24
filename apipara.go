@@ -20,10 +20,25 @@
 
 package docx
 
+// ensureParagraphProperties ensures ParagraphProperties is initialized
+func (p *Paragraph) ensureParagraphProperties() {
+	if p.Properties == nil {
+		p.Properties = &ParagraphProperties{}
+	}
+}
+
+// ensureRunProperties ensures RunProperties within ParagraphProperties is initialized
+func (p *Paragraph) ensureRunProperties() {
+	p.ensureParagraphProperties()
+	if p.Properties.RunProperties == nil {
+		p.Properties.RunProperties = &RunProperties{}
+	}
+}
+
 // AddParagraph adds a new paragraph
 func (f *Docx) AddParagraph() *Paragraph {
 	p := &Paragraph{
-		Children: make([]interface{}, 0, 64),
+		Children: make([]interface{}, 0, DefaultParagraphCapacity),
 		file:     f,
 	}
 	f.Document.Body.Items = append(f.Document.Body.Items, p)
@@ -33,7 +48,7 @@ func (f *Docx) AddParagraph() *Paragraph {
 // AddParagraph adds a new paragraph
 func (c *WTableCell) AddParagraph() *Paragraph {
 	c.Paragraphs = append(c.Paragraphs, &Paragraph{
-		Children: make([]interface{}, 0, 64),
+		Children: make([]interface{}, 0, DefaultParagraphCapacity),
 		file:     c.file,
 	})
 
@@ -49,18 +64,16 @@ func (c *WTableCell) AddParagraph() *Paragraph {
 //		both：两端对齐。
 //		distribute：分散对齐。
 func (p *Paragraph) Justification(val string) *Paragraph {
-	if p.Properties == nil {
-		p.Properties = &ParagraphProperties{}
-	}
+	p.ensureParagraphProperties()
 	p.Properties.Justification = &Justification{Val: val}
 	return p
 }
 
 // AddPageBreaks adds a pagebreaks
 func (p *Paragraph) AddPageBreaks() *Run {
-	c := make([]interface{}, 1, 64)
+	c := make([]interface{}, 1, DefaultParagraphCapacity)
 	c[0] = &BarterRabbet{
-		Type: "page",
+		Type: PageBreakType,
 	}
 	run := &Run{
 		RunProperties: &RunProperties{},
@@ -72,22 +85,15 @@ func (p *Paragraph) AddPageBreaks() *Run {
 
 // Style name
 func (p *Paragraph) Style(val string) *Paragraph {
-	if p.Properties == nil {
-		p.Properties = &ParagraphProperties{}
-	}
+	p.ensureParagraphProperties()
 	p.Properties.Style = &Style{Val: val}
 	return p
 }
 
 // NumPr number properties
 func (p *Paragraph) NumPr(numID, ilvl string) *Paragraph {
-	if p.Properties == nil {
-		p.Properties = &ParagraphProperties{}
-	}
-	// Initialize run properties if not exist
-	if p.Properties.RunProperties == nil {
-		p.Properties.RunProperties = &RunProperties{}
-	}
+	p.ensureParagraphProperties()
+	p.ensureRunProperties()
 	p.Properties.NumProperties = &NumProperties{
 		NumID: &NumID{
 			Val: numID,
@@ -101,12 +107,8 @@ func (p *Paragraph) NumPr(numID, ilvl string) *Paragraph {
 
 // NumFont sets the font for numbering
 func (p *Paragraph) NumFont(ascii, eastAsia, hansi, hint string) *Paragraph {
-	if p.Properties == nil {
-		p.Properties = &ParagraphProperties{}
-	}
-	if p.Properties.RunProperties == nil {
-		p.Properties.RunProperties = &RunProperties{}
-	}
+	p.ensureParagraphProperties()
+	p.ensureRunProperties()
 	p.Properties.RunProperties.Fonts = &RunFonts{
 		ASCII:    ascii,
 		EastAsia: eastAsia,
@@ -118,12 +120,8 @@ func (p *Paragraph) NumFont(ascii, eastAsia, hansi, hint string) *Paragraph {
 
 // NumSize sets the size for numbering
 func (p *Paragraph) NumSize(size string) *Paragraph {
-	if p.Properties == nil {
-		p.Properties = &ParagraphProperties{}
-	}
-	if p.Properties.RunProperties == nil {
-		p.Properties.RunProperties = &RunProperties{}
-	}
+	p.ensureParagraphProperties()
+	p.ensureRunProperties()
 	p.Properties.RunProperties.Size = &Size{Val: size}
 	return p
 }
@@ -132,10 +130,11 @@ func (p *Paragraph) NumSize(size string) *Paragraph {
 // left: left indentation in twips (1440 = 1 inch, 720 = 0.5 inch)
 // firstLine: first line indentation in twips (optional, use 0 for none)
 // hanging: hanging indentation in twips (optional, use 0 for none)
+//
+// Note: You cannot specify both firstLine and hanging indents simultaneously.
+// Valid range: -31680 to 31680 twips (-22 to 22 inches)
 func (p *Paragraph) Indent(left, firstLine, hanging int) *Paragraph {
-	if p.Properties == nil {
-		p.Properties = &ParagraphProperties{}
-	}
+	p.ensureParagraphProperties()
 	ind := &Ind{
 		Left: left,
 	}

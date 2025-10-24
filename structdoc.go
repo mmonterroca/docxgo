@@ -222,8 +222,8 @@ newdoclop:
 		ndoc := new(Docx)
 
 		// migrate base data
-		ndoc.mediaNameIdx = make(map[string]int, 64)
-		ndoc.slowIDs = make(map[string]uintptr, 64)
+		ndoc.mediaNameIdx = make(map[string]int, DefaultMediaIndexCapacity)
+		ndoc.slowIDs = make(map[string]uintptr, DefaultSlowIDCapacity)
 		ndoc.template = f.template
 		ndoc.tmplfs = f.tmplfs
 		ndoc.tmpfslst = f.tmpfslst
@@ -263,7 +263,7 @@ newdoclop:
 			},
 		}
 
-		ndoc.rID = 3
+		ndoc.rID = DefaultRelationshipIDStart
 
 		for i, item := range items {
 			switch o := item.(type) {

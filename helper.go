@@ -23,22 +23,31 @@ package docx
 import (
 	"fmt"
 	"strconv"
-	"unsafe"
 )
 
-// BytesToString 没有内存开销的转换
+// BytesToString converts a byte slice to a string.
+//
+// DEPRECATED: This function previously used unsafe.Pointer for zero-copy conversion,
+// which could lead to data races and undefined behavior when the underlying byte slice
+// is modified. Use standard string(b) conversion instead for safety.
+//
+// For performance-critical code where profiling shows this conversion is a bottleneck,
+// consider using strings.Builder or sync.Pool to reduce allocations rather than
+// relying on unsafe operations.
 func BytesToString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	return string(b)
 }
 
-// StringToBytes 没有内存开销的转换
-func StringToBytes(s string) (b []byte) {
-	bh := (*slice)(unsafe.Pointer(&b))
-	sh := (*slice)(unsafe.Pointer(&s))
-	bh.data = sh.data
-	bh.len = sh.len
-	bh.cap = sh.len
-	return b
+// StringToBytes converts a string to a byte slice.
+//
+// DEPRECATED: This function previously used unsafe.Pointer for zero-copy conversion,
+// which violates Go's memory safety guarantees and can cause crashes if the string's
+// backing array is deallocated. Use standard []byte(s) conversion instead.
+//
+// For performance-critical code, consider reusing byte slices with sync.Pool or
+// using io.Writer interfaces to avoid unnecessary copies.
+func StringToBytes(s string) []byte {
+	return []byte(s)
 }
 
 // GetInt64 from string

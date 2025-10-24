@@ -32,7 +32,7 @@ import (
 // and writes the relevant files. Some of them come from the empty_constants file,
 // others from the actual in-memory structure
 func (f *Docx) pack(zipWriter *zip.Writer) (err error) {
-	files := make(map[string]io.Reader, 64)
+	files := make(map[string]io.Reader, DefaultFileMapCapacity)
 
 	if f.template != "" {
 		for _, name := range f.tmpfslst {
