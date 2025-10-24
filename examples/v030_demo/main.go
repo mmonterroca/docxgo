@@ -235,7 +235,32 @@ para.AddHyperlinkField("https://github.com/SlideLang/go-docx",
 	ref3 := doc.AddParagraph()
 	ref3.AddText("[3] ")
 	ref3.AddText("Go Language: ").Bold()
-	ref3.AddHyperlinkField("https://go.dev", "go.dev", "Official Go website")
+	ref3.AddHyperlinkField("https://go.dev", "Go Programming Language", "Official Go website")
+
+	ref4 := doc.AddParagraph()
+	ref4.AddText("[4] ")
+	ref4.AddText("Google: ").Bold()
+	ref4.AddHyperlinkField("https://www.google.com", "Google Search", "")
+
+	ref5 := doc.AddParagraph()
+	ref5.AddText("[5] ")
+	ref5.AddText("Apple: ").Bold()
+	ref5.AddHyperlinkField("https://www.apple.com", "Apple", "")
+
+	ref6 := doc.AddParagraph()
+	ref6.AddText("[6] ")
+	ref6.AddText("Wikipedia: ").Bold()
+	ref6.AddHyperlinkField("https://en.wikipedia.org", "Wikipedia", "")
+
+	ref7 := doc.AddParagraph()
+	ref7.AddText("[7] ")
+	ref7.AddText("Amazon: ").Bold()
+	ref7.AddHyperlinkField("https://www.amazon.com", "Amazon", "")
+
+	ref8 := doc.AddParagraph()
+	ref8.AddText("[8] ")
+	ref8.AddText("Stack Overflow: ").Bold()
+	ref8.AddHyperlinkField("https://stackoverflow.com", "Stack Overflow", "")
 
 	doc.AddParagraph()
 	doc.AddParagraph()

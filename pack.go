@@ -36,6 +36,10 @@ func (f *Docx) pack(zipWriter *zip.Writer) (err error) {
 
 	if f.template != "" {
 		for _, name := range f.tmpfslst {
+			// Skip [Content_Types].xml - we'll generate it dynamically
+			if name == "[Content_Types].xml" {
+				continue
+			}
 			files[name], err = f.tmplfs.Open("xml/" + f.template + "/" + name)
 			if err != nil {
 				return
@@ -43,6 +47,10 @@ func (f *Docx) pack(zipWriter *zip.Writer) (err error) {
 		}
 	} else {
 		for _, name := range f.tmpfslst {
+			// Skip [Content_Types].xml - we'll generate it dynamically
+			if name == "[Content_Types].xml" {
+				continue
+			}
 			files[name], err = f.tmplfs.Open(name)
 			if err != nil {
 				return
@@ -50,9 +58,18 @@ func (f *Docx) pack(zipWriter *zip.Writer) (err error) {
 		}
 	}
 
-	// Add sectPr at the end of the document body if it exists
+	// Add sectPr at the end of the document body if it exists and not already present
 	if f.sectPr != nil {
-		f.Document.Body.Items = append(f.Document.Body.Items, f.sectPr)
+		// Check if sectPr is already at the end
+		hasSectPr := false
+		if len(f.Document.Body.Items) > 0 {
+			_, hasSectPr = f.Document.Body.Items[len(f.Document.Body.Items)-1].(*SectPr)
+		}
+
+		// Only append if not already there
+		if !hasSectPr {
+			f.Document.Body.Items = append(f.Document.Body.Items, f.sectPr)
+		}
 	}
 
 	files["word/_rels/document.xml.rels"] = marshaller{data: &f.docRelation}
@@ -83,6 +100,10 @@ func (f *Docx) pack(zipWriter *zip.Writer) (err error) {
 	for _, m := range f.media {
 		files[m.String()] = bytes.NewReader(m.Data)
 	}
+
+	// Generate [Content_Types].xml dynamically to include headers/footers
+	contentTypes := f.generateContentTypes()
+	files["[Content_Types].xml"] = bytes.NewReader(contentTypes)
 
 	for path, r := range files {
 		w, err := zipWriter.Create(path)
@@ -118,4 +139,73 @@ func (m marshaller) WriteTo(w io.Writer) (n int64, err error) {
 	}
 	err = xml.NewEncoder(w).Encode(m.data)
 	return
+}
+
+// generateContentTypes creates the [Content_Types].xml file dynamically
+// including entries for headers and footers if they exist
+func (f *Docx) generateContentTypes() []byte {
+	var buf bytes.Buffer
+	buf.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	buf.WriteString("\n")
+	buf.WriteString(`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`)
+	buf.WriteString("\n")
+
+	// Default extensions
+	buf.WriteString(`    <Default Extension="jpeg" ContentType="image/jpeg"/>`)
+	buf.WriteString("\n")
+	buf.WriteString(`    <Default Extension="png" ContentType="image/png"/>`)
+	buf.WriteString("\n")
+	buf.WriteString(`    <Default Extension="webp" ContentType="image/webp"/>`)
+	buf.WriteString("\n")
+	buf.WriteString(`    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`)
+	buf.WriteString("\n")
+	buf.WriteString(`    <Default Extension="xml" ContentType="application/xml"/>`)
+	buf.WriteString("\n")
+
+	// Core document parts
+	buf.WriteString(`    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>`)
+	buf.WriteString("\n")
+	buf.WriteString(`    <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>`)
+	buf.WriteString("\n")
+	buf.WriteString(`    <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>`)
+	buf.WriteString("\n")
+	buf.WriteString(`    <Override PartName="/word/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>`)
+	buf.WriteString("\n")
+
+	// Headers
+	if _, ok := f.headers[HeaderFooterDefault]; ok {
+		buf.WriteString(`    <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>`)
+		buf.WriteString("\n")
+	}
+	if _, ok := f.headers[HeaderFooterFirst]; ok {
+		buf.WriteString(`    <Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>`)
+		buf.WriteString("\n")
+	}
+	if _, ok := f.headers[HeaderFooterEven]; ok {
+		buf.WriteString(`    <Override PartName="/word/header3.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>`)
+		buf.WriteString("\n")
+	}
+
+	// Footers
+	if _, ok := f.footers[HeaderFooterDefault]; ok {
+		buf.WriteString(`    <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>`)
+		buf.WriteString("\n")
+	}
+	if _, ok := f.footers[HeaderFooterFirst]; ok {
+		buf.WriteString(`    <Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>`)
+		buf.WriteString("\n")
+	}
+	if _, ok := f.footers[HeaderFooterEven]; ok {
+		buf.WriteString(`    <Override PartName="/word/footer3.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>`)
+		buf.WriteString("\n")
+	}
+
+	// Document properties
+	buf.WriteString(`    <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>`)
+	buf.WriteString("\n")
+	buf.WriteString(`    <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>`)
+	buf.WriteString("\n")
+
+	buf.WriteString(`</Types>`)
+	return buf.Bytes()
 }

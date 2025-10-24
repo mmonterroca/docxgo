@@ -52,9 +52,14 @@ func (p *Paragraph) AddText(text string) *Run {
 				c = append(c, &Tab{})
 			}
 			if k != "" {
-				c = append(c, &Text{
+				t := &Text{
 					Text: k,
-				})
+				}
+				// Preserve spaces if text starts or ends with whitespace
+				if len(k) > 0 && (k[0] == ' ' || k[len(k)-1] == ' ') {
+					t.XMLSpace = "preserve"
+				}
+				c = append(c, t)
 			}
 		}
 	}

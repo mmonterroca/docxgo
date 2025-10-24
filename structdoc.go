@@ -322,7 +322,7 @@ func (p *Paragraph) copymedia(to *Docx) (np Paragraph) {
 			rid := to.addLinkRelation(tgt)
 			np.Children = append(np.Children, &Hyperlink{
 				ID:  rid,
-				Run: *h.Run.copymedia(to),
+				Run: h.Run.copymedia(to),
 			})
 			continue
 		}

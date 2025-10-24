@@ -173,30 +173,41 @@ func (p *Paragraph) AddSeqField(identifier string, format string) *Field {
 	return p.AddField(instrText, "1")
 }
 
-// AddHyperlinkField adds a HYPERLINK field for external or internal links
+// AddHyperlinkField adds a hyperlink element for external or internal links
 // url: the target URL (http://...) or internal anchor (#bookmark_name)
 // displayText: the text to display for the link
-// tooltip: optional tooltip text (pass empty string to skip)
-func (p *Paragraph) AddHyperlinkField(url string, displayText string, tooltip string) *Field {
-	instrText := "HYPERLINK \"" + url + "\""
-	if tooltip != "" {
-		instrText += " \\o \"" + tooltip + "\""
+// tooltip: optional tooltip text (currently not used with hyperlink elements)
+func (p *Paragraph) AddHyperlinkField(url string, displayText string, tooltip string) *Hyperlink {
+	// Get the document to access docRelation
+	doc := p.file
+
+	// Create external relationship for the hyperlink
+	rId := doc.docRelation.AddExternalLink(url, "hyperlink")
+
+	// Create hyperlink element
+	hyperlink := &Hyperlink{
+		ID:      rId,
+		History: "1",
+		Tooltip: tooltip,
+		Run: &Run{
+			RunProperties: &RunProperties{
+				RunStyle:  &RunStyle{Val: "Hyperlink"},
+				Color:     &Color{Val: "0563C1"},
+				Underline: &Underline{Val: "single"},
+			},
+			Children: []interface{}{
+				&Text{
+					XMLSpace: "preserve",
+					Text:     displayText,
+				},
+			},
+		},
 	}
-	
-	field := p.AddField(instrText, displayText)
-	
-	// Apply Hyperlink style to make it look like a link (blue, underlined)
-	if field.Result != nil {
-		if field.Result.RunProperties == nil {
-			field.Result.RunProperties = &RunProperties{}
-		}
-		field.Result.RunProperties.RunStyle = &RunStyle{Val: "Hyperlink"}
-		// Also add blue color and underline for compatibility
-		field.Result.Color("0000FF")
-		field.Result.Underline("single")
-	}
-	
-	return field
+
+	// Add hyperlink to paragraph children
+	p.Children = append(p.Children, hyperlink)
+
+	return hyperlink
 }
 
 // AddStyleRefField adds a STYLEREF field for dynamic header text from document headings

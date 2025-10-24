@@ -621,4 +621,15 @@
             <w:szCs w:val="22"/>
         </w:rPr>
     </w:style>
+    <w:style w:type="character" w:styleId="Hyperlink">
+        <w:name w:val="Hyperlink"/>
+        <w:basedOn w:val="a0"/>
+        <w:uiPriority w:val="99"/>
+        <w:unhideWhenUsed/>
+        <w:rsid w:val="00A12B34"/>
+        <w:rPr>
+            <w:color w:val="0563C1" w:themeColor="hyperlink"/>
+            <w:u w:val="single"/>
+        </w:rPr>
+    </w:style>
 </w:styles>

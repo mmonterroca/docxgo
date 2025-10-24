@@ -211,17 +211,17 @@ func (r *Run) KeepElements(name ...string) {
 
 // RunProperties encapsulates visual properties of a run
 type RunProperties struct {
-	XMLName   xml.Name `xml:"w:rPr,omitempty"`
+	XMLName   xml.Name  `xml:"w:rPr,omitempty"`
+	RunStyle  *RunStyle // Must be first per OOXML spec
 	Fonts     *RunFonts
 	Bold      *Bold
 	ICs       *struct{} `xml:"w:iCs,omitempty"`
 	Italic    *Italic
-	Highlight *Highlight
 	Color     *Color
+	Highlight *Highlight
 	Size      *Size
 	SizeCs    *SizeCs
 	Spacing   *Spacing
-	RunStyle  *RunStyle
 	Style     *Style
 	Shade     *Shade
 	Kern      *Kern

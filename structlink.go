@@ -29,8 +29,11 @@ import (
 // Hyperlink element contains links
 type Hyperlink struct {
 	XMLName xml.Name `xml:"w:hyperlink,omitempty"`
-	ID      string   `xml:"r:id,attr"`
-	Run     Run
+	ID      string   `xml:"r:id,attr,omitempty"`
+	Anchor  string   `xml:"w:anchor,attr,omitempty"`
+	Tooltip string   `xml:"w:tooltip,attr,omitempty"`
+	History string   `xml:"w:history,attr,omitempty"`
+	Run     *Run     `xml:"w:r"`
 }
 
 // UnmarshalXML ...
