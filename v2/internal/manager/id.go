@@ -1,4 +1,3 @@
-package manager
 /*
    Copyright (c) 2025 SlideLang
 
