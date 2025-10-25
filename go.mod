@@ -1,5 +1,3 @@
-module github.com/fumiama/go-docx
+module github.com/SlideLang/go-docx
 
-go 1.20
-
-require github.com/fumiama/imgsz v0.0.2
+go 1.25.2

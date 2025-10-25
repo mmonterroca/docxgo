@@ -1,8 +1,10 @@
 # go-docx v2.0 - Clean Architecture Design
 
-**Status**: 🚧 Planning Phase  
+**Status**: 🚧 Pre-Alpha Development (Phase 5 Complete)  
 **Target**: Q1 2026  
 **Breaking Changes**: Yes (major version bump)
+
+> **Project Transition Note**: This project is being restructured from a fork of `fumiama/go-docx` to an independent project under `SlideLang/go-docx`. v2 represents a complete architectural rewrite and will become the main codebase, with v1 archived as legacy code.
 
 ---
 
@@ -59,11 +61,25 @@
 
 ## 📦 Package Structure
 
+### Current Structure (Pre-Transition)
 ```
-github.com/SlideLang/go-docx/v2/
-├── docx.go                     # Main entry point
+github.com/SlideLang/go-docx/
+├── v2/                         # New architecture (will become root)
+│   ├── domain/
+│   ├── internal/
+│   ├── pkg/
+│   └── examples/
+└── (root)                      # v1 legacy code (will move to legacy/v1/)
+```
+
+### Target Structure (Post-Transition)
+```
+github.com/SlideLang/go-docx/
+├── docx.go                     # Main entry point (v2)
 ├── builder.go                  # Builder pattern implementation
 ├── options.go                  # Functional options
+├── CREDITS.md                  # Project history & attribution
+├── MIGRATION.md                # v1 → v2 migration guide
 │
 ├── domain/                     # Domain models (interfaces)
 │   ├── document.go            # Document interface
@@ -103,13 +119,27 @@ github.com/SlideLang/go-docx/v2/
 │   │   ├── underline.go
 │   │   └── measurements.go
 │   │
-│   └── errors/                # Error types
-│       └── errors.go
+│   ├── errors/                # Error types
+│   │   └── errors.go
+│   │
+│   └── color/                 # Color utilities
+│       └── color.go
 │
-└── examples/                   # Examples for v2
-    ├── basic/
-    ├── advanced/
-    └── migration_from_v1/
+├── examples/                   # Examples for v2
+│   ├── basic/
+│   ├── advanced/
+│   └── migration_from_v1/
+│
+├── docs/                       # Documentation
+│   ├── V2_DESIGN.md           # This file
+│   ├── ARCHITECTURE.md        # Architecture deep-dive
+│   └── API_DOCUMENTATION.md   # API reference
+│
+└── legacy/                     # Archived v1 code
+    └── v1/                    # Original fork code
+        ├── README.md          # "This version is deprecated"
+        ├── DEPRECATION.md     # Why and how to migrate
+        └── ...                # All v1 code
 ```
 
 ---
@@ -371,8 +401,8 @@ func NewDocxDocument(config *Config) *docxDocument {
 ### Example: v1 Code
 
 ```go
-// v1 (old)
-import "github.com/fumiama/go-docx"
+// v1 (old - legacy)
+import "github.com/fumiama/go-docx"  // OLD namespace
 
 doc := docx.New()
 para := doc.AddParagraph()
@@ -386,8 +416,8 @@ doc.WriteTo(file)
 ### Example: v2 Code
 
 ```go
-// v2 (new)
-import docx "github.com/SlideLang/go-docx/v2"
+// v2 (new - current)
+import docx "github.com/SlideLang/go-docx"  // NEW namespace (no /v2 suffix in root)
 
 // Builder pattern with error handling
 doc := docx.NewDocument(
@@ -417,40 +447,51 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 
 ## 📊 Implementation Phases
 
-### Phase 1: Foundation (Weeks 1-2)
-- [ ] Set up v2 module (`go mod init github.com/SlideLang/go-docx/v2`)
-- [ ] Define core interfaces (`domain/`)
-- [ ] Create package structure
-- [ ] Set up testing framework
-- [ ] Design error handling strategy
+### ✅ Phase 1: Foundation (Weeks 1-2) - COMPLETE
+- [x] Set up v2 module (`go mod init github.com/SlideLang/go-docx`)
+- [x] Define core interfaces (`domain/`)
+- [x] Create package structure
+- [x] Set up testing framework
+- [x] Design error handling strategy
 
-### Phase 2: Core Domain (Weeks 3-4)
-- [ ] Implement Document interface
-- [ ] Implement Paragraph interface
-- [ ] Implement Run interface
-- [ ] Implement Table interface
-- [ ] Add basic validation
+### ✅ Phase 2: Core Domain (Weeks 3-4) - COMPLETE
+- [x] Implement Document interface
+- [x] Implement Paragraph interface
+- [x] Implement Run interface
+- [x] Implement Table interface
+- [x] Add basic validation
 
-### Phase 3: Managers (Weeks 5-6)
-- [ ] Implement RelationshipManager
-- [ ] Implement MediaManager
-- [ ] Implement IDGenerator
-- [ ] Implement StyleManager
-- [ ] Add comprehensive tests
+### ✅ Phase 3: Managers (Weeks 5-6) - COMPLETE
+- [x] Implement RelationshipManager
+- [x] Implement MediaManager
+- [x] Implement IDGenerator
+- [x] Implement StyleManager (partial)
+- [x] Add comprehensive tests
 
-### Phase 4: Builders (Weeks 7-8)
-- [ ] Implement DocumentBuilder
-- [ ] Implement ParagraphBuilder
-- [ ] Implement TableBuilder
-- [ ] Add fluent API with error handling
-- [ ] Integration tests
+### ✅ Phase 4: Builders (Weeks 7-8) - COMPLETE
+- [x] Implement DocumentBuilder
+- [x] Implement ParagraphBuilder
+- [x] Implement TableBuilder
+- [x] Add fluent API with error handling
+- [x] Integration tests
 
-### Phase 5: Serialization (Weeks 9-10)
-- [ ] Refactor pack/unpack
-- [ ] Implement Serializer service
-- [ ] OOXML generation
-- [ ] Parsing existing documents
-- [ ] Validation
+### ✅ Phase 5: Serialization (Weeks 9-10) - COMPLETE
+- [x] Refactor pack/unpack
+- [x] Implement Serializer service
+- [x] OOXML generation
+- [x] Parsing existing documents
+- [x] Validation
+
+### 🚧 Phase 5.5: Project Restructuring (Current)
+**Goal**: Transform from fork to independent project
+- [ ] Create CREDITS.md with complete project history
+- [ ] Move v2 to root, archive v1 to legacy/
+- [ ] Update namespace from `fumiama/go-docx` to `SlideLang/go-docx`
+- [ ] Rewrite README for v2 as main version
+- [ ] Update LICENSE with proper attributions
+- [ ] Create comprehensive MIGRATION.md guide
+- [ ] Update all documentation (CONTRIBUTING.md, etc.)
+- [ ] Clean up project root structure
 
 ### Phase 6: Advanced Features (Weeks 11-12)
 - [ ] Headers/Footers (proper)
@@ -461,10 +502,17 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 
 ### Phase 7: Documentation & Release (Weeks 13-14)
 - [ ] Complete API documentation
-- [ ] Migration guide from v1
-- [ ] Examples
+- [ ] Finalize migration guide from v1
+- [ ] Complete examples
 - [ ] Benchmarks
-- [ ] v2.0.0 release
+- [ ] v2.0.0-beta release
+
+### Phase 8: Beta Testing & Polish (Weeks 15-16)
+- [ ] Community feedback integration
+- [ ] Bug fixes
+- [ ] Performance tuning
+- [ ] Final documentation review
+- [ ] v2.0.0 stable release
 
 ---
 
@@ -648,32 +696,28 @@ if err != nil {
 
 ## 📅 Timeline
 
-- **Planning**: October 2025 (Current)
-- **Development**: November 2025 - January 2026
-- **Testing**: February 2026
-- **Release**: March 2026
+- **Planning**: October 2025 ✅
+- **Core Development** (Phases 1-5): October-December 2025 ✅
+- **Project Restructuring** (Phase 5.5): October 2025 (Current) 🚧
+- **Advanced Features** (Phase 6): November-December 2025
+- **Documentation & Beta**: January 2026
+- **Testing & Polish**: February 2026
+- **Stable Release**: March 2026
 
 ---
 
-## 🤝 Team Responsibilities
+## 🤝 Credits & Authorship
 
-### Architecture Lead
-- Define interfaces
-- Review PRs
-- Ensure consistency
+### Current Development (v2)
+- **Author**: Misael Monterroca (misael@monterroca.com)
+- **Organization**: SlideLang
+- **Role**: Complete architectural rewrite, clean architecture implementation
 
-### Domain Developer
-- Implement core interfaces
-- Write unit tests
+### Previous Contributions
+- **fumiama** (2022-2024): Original fork with enhanced features
+- **Gonzalo Fernández-Victorio** (2020-2022): Original `gonfva/docxlib` library
 
-### Infrastructure Developer
-- Implement managers/services
-- Performance optimization
-
-### QA/Testing
-- Write integration tests
-- Validate in Microsoft Word
-- Performance benchmarks
+See [CREDITS.md](../CREDITS.md) for complete project history.
 
 ---
 
@@ -687,10 +731,11 @@ if err != nil {
 ---
 
 **Next Steps:**
-1. ✅ Review this design doc
-2. Create proof-of-concept
-3. Define all interfaces
-4. Start implementation
+1. ✅ Complete Phase 5 (Serialization)
+2. 🚧 Execute Phase 5.5 (Project Restructuring)
+3. Begin Phase 6 (Advanced Features)
+4. Prepare beta release
 
-**Last Updated**: October 24, 2025  
-**Status**: 📝 Design Phase
+**Last Updated**: October 25, 2025  
+**Status**: ✅ Phase 5 Complete | � Restructuring in Progress  
+**Progress**: ~70% to beta release

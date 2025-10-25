@@ -1,6 +1,18 @@
-# Contributing to go-docx (SlideLang Fork)
+# Contributing to go-docx
 
-Thank you for your interest in contributing to the SlideLang fork of go-docx! This document provides guidelines and workflow information for contributors.
+Thank you for your interest in contributing to go-docx! This document provides guidelines and workflow information for contributors.
+
+> **Note**: This project recently completed a major restructuring. v2 is now the main codebase (in root), and v1 code has been archived to `legacy/v1/`. See [CREDITS.md](CREDITS.md) for project history.
+
+## Quick Start for Contributors
+
+1. **Read the docs**: [README.md](README.md), [V2_DESIGN.md](docs/V2_DESIGN.md)
+2. **Check issues**: Look for `good-first-issue` or `help-wanted` labels
+3. **Follow Git Flow**: Branch from `dev`, PR back to `dev`
+4. **Write tests**: Aim for 95%+ coverage
+5. **Update docs**: Keep README and examples in sync
+
+---
 
 ## Git Flow Workflow
 
@@ -128,33 +140,69 @@ Periodically, maintainers will:
 
 ## What We're Looking For
 
-We welcome contributions in these areas:
+Current priorities for v2 development:
 
 ### High Priority
-- ✅ **Bug fixes**: Resolve issues or Word compatibility problems
-- ✅ **Additional field codes**: STYLEREF, HYPERLINK, IF, DATE, etc.
-- ✅ **Extended style support**: More heading levels, custom styles
-- ✅ **Test coverage**: Improve code reliability
+- ✅ **Complete file I/O**: Finish XML serialization and .docx writing
+- ✅ **Headers/Footers**: Proper section support
+- ✅ **Styles**: Complete styles management
+- ✅ **Fields**: TOC, page numbers, cross-references
+- ✅ **Bug fixes**: Any issues in current implementation
+- ✅ **Test coverage**: Maintain 95%+ coverage
 
 ### Medium Priority
-- ✅ **Performance improvements**: Optimize parsing or generation
-- ✅ **Documentation**: Better examples, API docs, tutorials
-- ✅ **Headers/Footers API**: Enhanced section properties
+- ✅ **Images & Drawings**: Media file handling
+- ✅ **Builder Pattern**: Fluent API (planned for v2.1)
+- ✅ **Performance**: Optimization opportunities
+- ✅ **Documentation**: Better examples, tutorials
+- ✅ **Migration Tools**: Help users migrate from v1
 
-### Future Enhancements
+### Future / Nice to Have
 - ✅ **Advanced formatting**: SmartArt, equations, charts
-- ✅ **Section management**: Multiple sections, page layout
-- ✅ **Cross-references**: Figure numbers, table references
+- ✅ **Comments & Tracking**: Change tracking support
+- ✅ **Custom XML**: Custom XML parts
+- ✅ **Template Support**: Document templates
+
+### v1 Legacy (Low Priority)
+- ⚠️ **Critical bugs only**: v1 is in maintenance mode
+- ⚠️ **No new features**: Focus efforts on v2
+- ⚠️ **End of life**: December 2025
 
 ## Development Guidelines
 
 ### Code Quality
 
-- **Go Idioms**: Follow Go best practices and idioms
-- **Error Handling**: Always handle errors properly
+- **Clean Architecture**: Follow the established pattern (domain → internal → pkg)
+- **Interfaces First**: Define interfaces in `domain/`, implementations in `internal/`
+- **Error Handling**: All public methods return errors
 - **Naming**: Use clear, descriptive names
-- **Comments**: Document exported functions and complex logic
-- **Tests**: Aim for >60% coverage
+- **Comments**: Document all exported functions
+- **Tests**: Aim for 95%+ coverage (current standard)
+
+### v2 Architecture Guidelines
+
+When contributing to v2:
+
+1. **Domain Layer** (`domain/`) - Interfaces only, no implementations
+2. **Internal Layer** (`internal/`) - Core implementations, managers, services
+3. **Package Layer** (`pkg/`) - Public utilities, helpers, constants
+4. **No `interface{}`** - Use concrete types or generic constraints
+5. **Dependency Injection** - Pass dependencies via constructors
+6. **Thread-Safe** - Use mutexes/atomics where needed
+
+### Legacy v1 Code
+
+v1 code in `legacy/v1/` is deprecated and in maintenance mode:
+- **Critical bugs only** - No new features
+- **End of support**: December 2025
+- **Migration help**: See [MIGRATION.md](MIGRATION.md)
+
+If fixing a v1 bug:
+1. Consider if it exists in v2 too
+2. Fix in both if applicable
+3. Mark PR with `legacy-v1` label
+
+---
 
 ### Testing
 
