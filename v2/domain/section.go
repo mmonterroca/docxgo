@@ -59,11 +59,11 @@ type PageSize struct {
 
 // Common page sizes (in twips: 1440 = 1 inch)
 var (
-	PageSizeA4       = PageSize{Width: 11906, Height: 16838} // 210mm x 297mm
-	PageSizeLetter   = PageSize{Width: 12240, Height: 15840} // 8.5" x 11"
-	PageSizeLegal    = PageSize{Width: 12240, Height: 20160} // 8.5" x 14"
-	PageSizeA3       = PageSize{Width: 16838, Height: 23811} // 297mm x 420mm
-	PageSizeTableid  = PageSize{Width: 15840, Height: 24480} // 11" x 17"
+	PageSizeA4      = PageSize{Width: 11906, Height: 16838} // 210mm x 297mm
+	PageSizeLetter  = PageSize{Width: 12240, Height: 15840} // 8.5" x 11"
+	PageSizeLegal   = PageSize{Width: 12240, Height: 20160} // 8.5" x 14"
+	PageSizeA3      = PageSize{Width: 16838, Height: 23811} // 297mm x 420mm
+	PageSizeTableid = PageSize{Width: 15840, Height: 24480} // 11" x 17"
 )
 
 // Margins represents page margins in twips.

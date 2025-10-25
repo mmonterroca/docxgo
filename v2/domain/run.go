@@ -89,17 +89,6 @@ type Color struct {
 	B uint8
 }
 
-// Hex returns the color as a hex string (e.g., "FF0000" for red).
-func (c Color) Hex() string {
-	return sprintf("%02X%02X%02X", c.R, c.G, c.B)
-}
-
-// NewColorFromHex creates a color from a hex string.
-func NewColorFromHex(hex string) (Color, error) {
-	// Implementation would parse hex string
-	return Color{}, nil
-}
-
 // Common colors
 var (
 	ColorBlack = Color{0, 0, 0}
@@ -142,9 +131,3 @@ const (
 	HighlightDarkGray
 	HighlightLightGray
 )
-
-// Helper function placeholder (would be in a separate package)
-func sprintf(format string, args ...interface{}) string {
-	// Real implementation would use fmt.Sprintf
-	return ""
-}

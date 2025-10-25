@@ -146,7 +146,7 @@ type TableBorders struct {
 // BorderStyle represents a border's appearance.
 type BorderStyle struct {
 	Style BorderLineStyle
-	Width int   // Width in eighths of a point
+	Width int // Width in eighths of a point
 	Color Color
 }
 

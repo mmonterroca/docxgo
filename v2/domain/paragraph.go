@@ -105,9 +105,9 @@ type LineSpacing struct {
 type LineSpacingRule int
 
 const (
-	LineSpacingAuto LineSpacingRule = iota // Auto (value = 240 = single spacing)
-	LineSpacingExact                       // Exact (value in twips)
-	LineSpacingAtLeast                     // At least (value in twips)
+	LineSpacingAuto    LineSpacingRule = iota // Auto (value = 240 = single spacing)
+	LineSpacingExact                          // Exact (value in twips)
+	LineSpacingAtLeast                        // At least (value in twips)
 )
 
 // FieldType represents different field types in Word.
