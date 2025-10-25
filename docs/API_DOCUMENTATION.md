@@ -23,6 +23,13 @@
 - [Practical Examples](#practical-examples)
 - [How to Test and Run](#how-to-test-and-run)
 - [Advanced Use Cases](#advanced-use-cases)
+- [Phase 6: Advanced Features (v2.0)](#-phase-6-advanced-features-v20)
+  - [Sections and Page Layout](#sections-and-page-layout)
+  - [Headers and Footers](#headers-and-footers)
+  - [Fields System](#fields-system)
+  - [Style Management](#style-management)
+  - [Complete Example: Professional Document](#complete-example-professional-document)
+  - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -45,11 +52,22 @@
 - Images (inline and anchored)
 - Shapes and vector drawings
 
-✅ **Advanced Functionality**
+✅ **Advanced Functionality (v2.0+)**
+- **Sections**: Different page layouts in one document
+- **Headers/Footers**: Default, first page, and even page variants
+- **Fields**: PAGE, NUMPAGES, TOC, HYPERLINK, STYLEREF, etc.
+- **Style Management**: 40+ built-in styles + custom styles
+- **Page Layout**: Custom page sizes, margins, orientation, columns
 - Word fields (PAGE, NUMPAGES, TOC, PAGEREF, SEQ, REF)
 - Automatic numbering for figures and tables
 - Paragraph indentation and alignment
-- Headers and footers
+
+✅ **Clean Architecture (v2.0)**
+- Interface-based design for testability
+- Thread-safe operations (RWMutex)
+- Comprehensive error handling
+- 95%+ test coverage
+- Type-safe API
 
 ✅ **ECMA-376 (Office Open XML) Compliant**
 
@@ -1339,7 +1357,451 @@ func TestGenerateDocument(t *testing.T) {
 
 ---
 
-## 📚 Additional Resources
+## � Phase 6: Advanced Features (v2.0)
+
+### Sections and Page Layout
+
+**Sections** allow different page layouts within the same document. Each section can have its own headers, footers, page size, margins, and column settings.
+
+#### Creating Sections
+
+```go
+import "github.com/SlideLang/go-docx/domain"
+
+// Get default section
+section, err := doc.DefaultSection()
+if err != nil {
+    log.Fatal(err)
+}
+
+// Configure page size (A4, Letter, Legal)
+section.SetPageSize(domain.PageSizeA4)
+
+// Set custom page size (width, height in twips)
+customSize := domain.PageSize{
+    Width:  12240, // 8.5 inches
+    Height: 15840, // 11 inches
+}
+section.SetPageSize(customSize)
+
+// Configure margins (in twips: 1440 = 1 inch)
+margins := domain.Margins{
+    Top:    1440,  // 1 inch
+    Right:  1440,
+    Bottom: 1440,
+    Left:   1440,
+    Header: 720,   // 0.5 inch from top
+    Footer: 720,   // 0.5 inch from bottom
+}
+section.SetMargins(margins)
+
+// Set orientation
+section.SetOrientation(domain.OrientationLandscape)
+
+// Configure columns (1-10 columns)
+section.SetColumns(2) // Two-column layout
+```
+
+#### Headers and Footers
+
+```go
+// Get header for section
+header, err := section.Header(domain.HeaderDefault)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Add content to header
+headerPara, err := header.AddParagraph()
+if err != nil {
+    log.Fatal(err)
+}
+headerPara.SetAlignment(domain.AlignmentRight)
+
+run, _ := headerPara.AddRun()
+run.AddText("Company Name")
+run.SetBold(true)
+
+// Get footer for section
+footer, err := section.Footer(domain.FooterDefault)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Add page numbers to footer
+footerPara, _ := footer.AddParagraph()
+footerPara.SetAlignment(domain.AlignmentCenter)
+
+// "Page X of Y" format
+run1, _ := footerPara.AddRun()
+run1.AddText("Page ")
+
+run2, _ := footerPara.AddRun()
+pageField := docx.NewPageNumberField()
+run2.AddField(pageField)
+
+run3, _ := footerPara.AddRun()
+run3.AddText(" of ")
+
+run4, _ := footerPara.AddRun()
+totalField := docx.NewPageCountField()
+run4.AddField(totalField)
+```
+
+#### Header/Footer Types
+
+```go
+// Different headers for first page, even pages
+headerFirst, _ := section.Header(domain.HeaderFirst)
+headerEven, _ := section.Header(domain.HeaderEven)
+
+// Same for footers
+footerFirst, _ := section.Footer(domain.FooterFirst)
+footerEven, _ := section.Footer(domain.FooterEven)
+```
+
+### Fields System
+
+**Fields** are dynamic elements that Word calculates automatically. They update when the document is opened or when the user presses F9.
+
+#### Page Number Fields
+
+```go
+// Simple page number
+pageField := docx.NewPageNumberField()
+run.AddField(pageField)
+
+// Total page count
+totalPages := docx.NewPageCountField()
+run.AddField(totalPages)
+```
+
+#### Table of Contents
+
+```go
+// Basic TOC
+tocField := docx.NewTOCField(nil)
+tocPara.AddRun().AddField(tocField)
+
+// Custom TOC with options
+tocOptions := map[string]string{
+    "levels":          "1-5",    // Include heading levels 1-5
+    "hyperlinks":      "true",   // Enable hyperlinks
+    "hidePageNumbers": "false",  // Show page numbers
+}
+tocField := docx.NewTOCField(tocOptions)
+```
+
+#### Hyperlinks
+
+```go
+// Create hyperlink
+url := "https://github.com/SlideLang/go-docx"
+displayText := "go-docx Repository"
+linkField := docx.NewHyperlinkField(url, displayText)
+
+// Apply hyperlink styling
+run.SetColor(docx.ColorBlue)
+run.SetUnderline(docx.UnderlineSingle)
+run.AddField(linkField)
+```
+
+#### Style References
+
+```go
+// STYLEREF for running headers (chapter titles)
+styleRef := docx.NewStyleRefField("Heading 1")
+run.AddField(styleRef)
+```
+
+#### Field Types Available
+
+- `FieldTypePageNumber` - Current page number (PAGE)
+- `FieldTypePageCount` - Total pages (NUMPAGES)
+- `FieldTypeTOC` - Table of Contents
+- `FieldTypeHyperlink` - Hyperlinks
+- `FieldTypeRef` - Cross-references
+- `FieldTypeStyleRef` - Style references
+- `FieldTypeDate` - Date/time
+- `FieldTypeSeq` - Sequence numbering
+- `FieldTypeCustom` - Custom field codes
+
+#### Custom Field Codes
+
+```go
+// Create custom field
+field := docx.NewField(docx.FieldTypeCustom)
+field.SetCode(`AUTHOR \* Upper`)
+field.Update()
+
+run.AddField(field)
+```
+
+### Style Management
+
+**Styles** provide consistent formatting across documents. go-docx v2 includes 40+ built-in styles and supports custom styles.
+
+#### Using Built-in Styles
+
+```go
+// Apply paragraph style
+para.SetStyle(domain.StyleIDHeading1)
+para.SetStyle(domain.StyleIDNormal)
+para.SetStyle(domain.StyleIDQuote)
+
+// Built-in paragraph styles:
+// - Normal, Heading1-9
+// - Title, Subtitle
+// - Quote, IntenseQuote
+// - ListParagraph, Caption
+// - TOC1-9
+// - Header, Footer
+// - BodyText, NoSpacing
+```
+
+#### Character Styles
+
+```go
+// Apply character style to run
+run.SetStyle(domain.StyleIDEmphasis)  // Italic
+run.SetStyle(domain.StyleIDStrong)    // Bold
+run.SetStyle(domain.StyleIDHyperlink) // Blue, underlined
+```
+
+#### Custom Styles
+
+```go
+// Get style manager
+styleMgr := doc.StyleManager()
+
+// Create custom paragraph style
+customStyle := &ParagraphStyle{
+    ID:   "CustomHeading",
+    Name: "My Custom Heading",
+}
+customStyle.SetFont(domain.Font{Name: "Arial"})
+customStyle.SetAlignment(domain.AlignmentCenter)
+customStyle.SetSpacingBefore(240) // 12pt
+customStyle.SetSpacingAfter(120)  // 6pt
+customStyle.SetOutlineLevel(1)    // Heading level 1
+
+// Add to style manager
+err := styleMgr.AddStyle(customStyle)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Use custom style
+para.SetStyle("CustomHeading")
+```
+
+#### Style Properties
+
+**Paragraph Style Properties:**
+- `Alignment` - left, center, right, justified, distributed
+- `SpacingBefore/After` - spacing in twips
+- `LineSpacing` - line spacing value
+- `Indentation` - left, right, first line, hanging
+- `OutlineLevel` - 0-9 (for TOC and navigation)
+- `KeepNext` - keep with next paragraph
+- `KeepLines` - keep lines together
+- `PageBreakBefore` - insert page break before
+
+**Character Style Properties:**
+- `Bold`, `Italic`, `Strike`
+- `Underline` - none, single, double, dotted, etc.
+- `Color` - RGB color
+- `Size` - font size in half-points
+- `Font` - font family
+
+#### Style Inheritance
+
+```go
+// Styles can inherit from other styles
+heading2 := &ParagraphStyle{
+    ID:   "Heading2",
+    Name: "Heading 2",
+}
+heading2.SetBasedOn(domain.StyleIDNormal)
+
+// Next paragraph style (auto-flow)
+heading1.SetNext(domain.StyleIDNormal)
+```
+
+#### Querying Styles
+
+```go
+styleMgr := doc.StyleManager()
+
+// Check if style exists
+if styleMgr.HasStyle("Heading1") {
+    // Use style
+}
+
+// Get style details
+style, err := styleMgr.GetStyle("Heading1")
+if err == nil {
+    fmt.Println(style.Name())
+    fmt.Println(style.Type())
+}
+
+// List all paragraph styles
+paraStyles := styleMgr.ListStylesByType(domain.StyleTypeParagraph)
+for _, s := range paraStyles {
+    fmt.Printf("%s: %s\n", s.ID(), s.Name())
+}
+
+// Get default style
+defaultStyle, _ := styleMgr.DefaultStyle(domain.StyleTypeParagraph)
+```
+
+### Complete Example: Professional Document
+
+```go
+package main
+
+import (
+    "log"
+    "github.com/SlideLang/go-docx"
+    "github.com/SlideLang/go-docx/domain"
+)
+
+func main() {
+    // Create document
+    doc, err := docx.New()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Configure section
+    section, _ := doc.DefaultSection()
+    section.SetPageSize(domain.PageSizeA4)
+    section.SetMargins(domain.DefaultMargins)
+
+    // Add header
+    header, _ := section.Header(domain.HeaderDefault)
+    headerPara, _ := header.AddParagraph()
+    headerPara.SetAlignment(domain.AlignmentRight)
+    headerRun, _ := headerPara.AddRun()
+    headerRun.AddText("Technical Documentation")
+    headerRun.SetColor(domain.Color{R: 128, G: 128, B: 128})
+
+    // Add footer with page numbers
+    footer, _ := section.Footer(domain.FooterDefault)
+    footerPara, _ := footer.AddParagraph()
+    footerPara.SetAlignment(domain.AlignmentCenter)
+    
+    r1, _ := footerPara.AddRun()
+    r1.AddText("Page ")
+    r2, _ := footerPara.AddRun()
+    r2.AddField(docx.NewPageNumberField())
+    r3, _ := footerPara.AddRun()
+    r3.AddText(" of ")
+    r4, _ := footerPara.AddRun()
+    r4.AddField(docx.NewPageCountField())
+
+    // Add title
+    title, _ := doc.AddParagraph()
+    title.SetStyle(domain.StyleIDTitle)
+    titleRun, _ := title.AddRun()
+    titleRun.AddText("System Architecture Guide")
+
+    // Add TOC
+    tocHeading, _ := doc.AddParagraph()
+    tocHeading.SetStyle(domain.StyleIDHeading1)
+    tocRun, _ := tocHeading.AddRun()
+    tocRun.AddText("Table of Contents")
+
+    tocPara, _ := doc.AddParagraph()
+    tocField := docx.NewTOCField(map[string]string{
+        "levels": "1-3",
+        "hyperlinks": "true",
+    })
+    tocRun2, _ := tocPara.AddRun()
+    tocRun2.AddField(tocField)
+
+    doc.AddPageBreak()
+
+    // Add content
+    h1, _ := doc.AddParagraph()
+    h1.SetStyle(domain.StyleIDHeading1)
+    h1Run, _ := h1.AddRun()
+    h1Run.AddText("Introduction")
+
+    content, _ := doc.AddParagraph()
+    content.SetStyle(domain.StyleIDNormal)
+    cRun, _ := content.AddRun()
+    cRun.AddText("This document describes the system architecture...")
+
+    // Add hyperlink
+    linkPara, _ := doc.AddParagraph()
+    lRun1, _ := linkPara.AddRun()
+    lRun1.AddText("For more information, visit ")
+    
+    lRun2, _ := linkPara.AddRun()
+    lRun2.SetColor(docx.ColorBlue)
+    lRun2.SetUnderline(docx.UnderlineSingle)
+    link := docx.NewHyperlinkField("https://example.com", "our website")
+    lRun2.AddField(link)
+
+    // Save document
+    if err := doc.SaveToFile("professional.docx"); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+### Best Practices
+
+#### 1. Field Updates
+```go
+// Fields show placeholder values until updated in Word
+// Instruct users to press F9 to update all fields
+// Or right-click → Update Field
+
+// Mark fields as dirty if needed
+field.MarkDirty() // Will recalculate on next update
+```
+
+#### 2. Style Consistency
+```go
+// Use styles instead of direct formatting
+// Bad:
+run.SetBold(true)
+run.SetSize(32)
+run.SetColor(docx.ColorBlue)
+
+// Good:
+para.SetStyle(domain.StyleIDHeading1)
+```
+
+#### 3. Section Management
+```go
+// Create new section for different page layout
+newSection := doc.AddSection()
+newSection.SetOrientation(domain.OrientationLandscape)
+newSection.SetColumns(2)
+```
+
+#### 4. Thread Safety
+```go
+// All operations are thread-safe
+// Safe for concurrent access with RWMutex protection
+var wg sync.WaitGroup
+for i := 0; i < 100; i++ {
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        para, _ := doc.AddParagraph()
+        para.AddRun().AddText("Concurrent text")
+    }()
+}
+wg.Wait()
+```
+
+---
+
+## �📚 Additional Resources
 
 ### Official Documentation
 
