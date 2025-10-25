@@ -36,6 +36,10 @@ type Document interface {
 	// Sections allow different page layouts within the same document.
 	AddSection() (Section, error)
 
+	// DefaultSection returns the default (first) section of the document.
+	// Every document has at least one section.
+	DefaultSection() (Section, error)
+
 	// Paragraphs returns all paragraphs in the document.
 	// The returned slice is a copy and modifications won't affect the document.
 	Paragraphs() []Paragraph

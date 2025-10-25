@@ -36,6 +36,7 @@ type run struct {
 	underline domain.UnderlineStyle
 	strike    bool
 	highlight domain.HighlightColor
+	fields    []domain.Field // Fields embedded in this run
 }
 
 // NewRun creates a new Run.
@@ -165,4 +166,35 @@ func (r *run) SetHighlight(color domain.HighlightColor) error {
 	}
 	r.highlight = color
 	return nil
+}
+
+// AddText is a convenience method that appends text to the run.
+func (r *run) AddText(text string) error {
+	r.text += text
+	return nil
+}
+
+// AddField adds a field to this run (e.g., page number, TOC, hyperlink).
+func (r *run) AddField(field domain.Field) error {
+	if field == nil {
+		return errors.InvalidArgument("Run.AddField", "field", nil, "field cannot be nil")
+	}
+	
+	if r.fields == nil {
+		r.fields = make([]domain.Field, 0, 2)
+	}
+	
+	r.fields = append(r.fields, field)
+	return nil
+}
+
+// Fields returns all fields in this run.
+func (r *run) Fields() []domain.Field {
+	if r.fields == nil {
+		return nil
+	}
+	// Return a defensive copy
+	result := make([]domain.Field, len(r.fields))
+	copy(result, r.fields)
+	return result
 }

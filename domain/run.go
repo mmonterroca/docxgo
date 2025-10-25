@@ -73,6 +73,12 @@ type Run interface {
 
 	// SetHighlight sets the highlight color.
 	SetHighlight(color HighlightColor) error
+
+	// AddText is a convenience method that appends text to the run.
+	AddText(text string) error
+
+	// AddField adds a field to this run (e.g., page number, TOC, hyperlink).
+	AddField(field Field) error
 }
 
 // Font represents font settings.
