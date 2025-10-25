@@ -211,6 +211,10 @@ const (
 	MinTableCols = 1
 	MaxTableCols = 63
 
+	// Page columns
+	MinColumns = 1
+	MaxColumns = 10 // Maximum columns per page
+
 	// Color component limits
 	MinColorValue = 0
 	MaxColorValue = 255

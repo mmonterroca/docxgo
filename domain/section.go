@@ -172,3 +172,18 @@ type Field interface {
 	// Update recalculates the field result.
 	Update() error
 }
+
+// FieldType represents the type of field.
+type FieldType int
+
+const (
+	FieldTypeTOC         FieldType = iota // Table of Contents
+	FieldTypePageNumber                   // Page number
+	FieldTypePageCount                    // Total page count
+	FieldTypeHyperlink                    // Hyperlink
+	FieldTypeRef                          // Cross-reference
+	FieldTypeStyleRef                     // Style reference
+	FieldTypeDate                         // Date/time
+	FieldTypeSeq                          // Sequence numbering
+	FieldTypeCustom                       // Custom field
+)
