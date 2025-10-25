@@ -548,6 +548,201 @@ If you need a feature that's not ready, you can:
 
 ---
 
+## Advanced Features Migration (Phase 6)
+
+### Sections and Page Layout
+
+#### v1 - Limited section support
+```go
+// v1 had basic page size methods
+doc.WithA4Page()
+doc.WithLetterPage()
+// No direct section access
+```
+
+#### v2 - Full section control
+```go
+// v2 provides complete section management
+section, err := doc.DefaultSection()
+if err != nil {
+    return err
+}
+
+// Custom page size
+section.SetPageSize(domain.PageSize{
+    Width:  12240,  // 8.5 inches in twips
+    Height: 15840,  // 11 inches
+})
+
+// Or use predefined sizes
+section.SetPageSize(domain.PageSizeA4)
+section.SetPageSize(domain.PageSizeLetter)
+section.SetPageSize(domain.PageSizeLegal)
+
+// Margins (in twips: 1440 = 1 inch)
+margins := domain.Margins{
+    Top:    1440,
+    Right:  1440,
+    Bottom: 1440,
+    Left:   1440,
+    Header: 720,
+    Footer: 720,
+}
+section.SetMargins(margins)
+
+// Orientation
+section.SetOrientation(domain.OrientationLandscape)
+section.SetOrientation(domain.OrientationPortrait)
+
+// Columns
+section.SetColumns(2) // Two-column layout
+section.SetColumns(3) // Three-column layout
+```
+
+### Headers and Footers
+
+#### v1 - Basic headers/footers
+```go
+// v1 had limited header/footer support
+// Methods varied by implementation
+```
+
+#### v2 - Comprehensive header/footer system
+```go
+// Get section
+section, _ := doc.DefaultSection()
+
+// Access headers by type
+headerDefault, _ := section.Header(domain.HeaderDefault)
+headerFirst, _ := section.Header(domain.HeaderFirst)
+headerEven, _ := section.Header(domain.HeaderEven)
+
+// Access footers by type
+footerDefault, _ := section.Footer(domain.FooterDefault)
+footerFirst, _ := section.Footer(domain.FooterFirst)
+footerEven, _ := section.Footer(domain.FooterEven)
+
+// Add content to header
+para, _ := headerDefault.AddParagraph()
+para.SetAlignment(domain.AlignmentRight)
+run, _ := para.AddRun()
+run.AddText("Document Title")
+run.SetBold(true)
+
+// Add page numbers to footer
+footerPara, _ := footerDefault.AddParagraph()
+footerPara.SetAlignment(domain.AlignmentCenter)
+
+// "Page X of Y" format
+r1, _ := footerPara.AddRun()
+r1.AddText("Page ")
+
+r2, _ := footerPara.AddRun()
+pageField := docx.NewPageNumberField()
+r2.AddField(pageField)
+
+r3, _ := footerPara.AddRun()
+r3.AddText(" of ")
+
+r4, _ := footerPara.AddRun()
+totalField := docx.NewPageCountField()
+r4.AddField(totalField)
+```
+
+### Fields
+
+#### v1 - Limited field support
+```go
+// v1 had basic TOC support
+doc.AddTOC()
+
+// Page numbers were manual
+para.AddText("Page 1")
+```
+
+#### v2 - Complete field system
+```go
+// Page numbers
+pageField := docx.NewPageNumberField()
+run.AddField(pageField)
+
+totalPages := docx.NewPageCountField()
+run.AddField(totalPages)
+
+// Table of Contents with options
+tocOptions := map[string]string{
+    "levels":          "1-5",    // Heading levels
+    "hyperlinks":      "true",   // Enable hyperlinks
+    "hidePageNumbers": "false",  // Show page numbers
+}
+tocField := docx.NewTOCField(tocOptions)
+tocRun.AddField(tocField)
+
+// Hyperlinks
+linkField := docx.NewHyperlinkField(
+    "https://github.com/SlideLang/go-docx",
+    "go-docx Repository",
+)
+linkRun.SetColor(docx.ColorBlue)
+linkRun.SetUnderline(docx.UnderlineSingle)
+linkRun.AddField(linkField)
+
+// Style references (for running headers)
+styleRef := docx.NewStyleRefField("Heading 1")
+run.AddField(styleRef)
+
+// Custom field codes
+customField := docx.NewField(docx.FieldTypeCustom)
+customField.SetCode(`AUTHOR \* Upper`)
+customField.Update()
+run.AddField(customField)
+```
+
+### Styles
+
+#### v1 - String-based styles
+```go
+// v1 used string style names
+para.Style("Heading1")
+para.Style("Normal")
+// No validation, no discovery
+```
+
+#### v2 - Complete style management
+```go
+// Built-in style constants (type-safe)
+para.SetStyle(domain.StyleIDHeading1)
+para.SetStyle(domain.StyleIDNormal)
+para.SetStyle(domain.StyleIDQuote)
+
+// Access style manager
+styleMgr := doc.StyleManager()
+
+// Check if style exists
+if styleMgr.HasStyle("Heading1") {
+    para.SetStyle("Heading1")
+}
+
+// Create custom style
+customStyle := &manager.ParagraphStyle{}
+customStyle.SetAlignment(domain.AlignmentCenter)
+styleMgr.AddStyle(customStyle)
+```
+
+### Migration Checklist for Phase 6 Features
+
+- [ ] Replace basic page setup with Section configuration
+- [ ] Migrate headers/footers to new Section-based API
+- [ ] Convert manual page numbers to Field system
+- [ ] Update TOC generation to use TOCField
+- [ ] Replace hardcoded hyperlinks with HyperlinkField
+- [ ] Convert string style names to StyleID constants
+- [ ] Use StyleManager for style queries
+- [ ] Add error handling for all new APIs
+- [ ] Test field updates (press F9 in Word)
+
+---
+
 ## Getting Help
 
 ### Resources
