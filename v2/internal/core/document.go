@@ -29,12 +29,12 @@ import (
 
 // document implements the domain.Document interface.
 type document struct {
-	paragraphs []domain.Paragraph
-	tables     []domain.Table
-	sections   []domain.Section
-	metadata   *domain.Metadata
-	idGen      *manager.IDGenerator
-	relManager *manager.RelationshipManager
+	paragraphs   []domain.Paragraph
+	tables       []domain.Table
+	sections     []domain.Section
+	metadata     *domain.Metadata
+	idGen        *manager.IDGenerator
+	relManager   *manager.RelationshipManager
 	mediaManager *manager.MediaManager
 }
 

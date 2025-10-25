@@ -34,17 +34,17 @@ type IDGenerator interface {
 
 // paragraph implements the domain.Paragraph interface.
 type paragraph struct {
-	id             string
-	runs           []domain.Run
-	fields         []domain.Field
-	styleName      string
-	alignment      domain.Alignment
-	indent         domain.Indentation
-	spacingBefore  int
-	spacingAfter   int
-	lineSpacing    domain.LineSpacing
-	idGen          IDGenerator
-	relManager     *manager.RelationshipManager
+	id            string
+	runs          []domain.Run
+	fields        []domain.Field
+	styleName     string
+	alignment     domain.Alignment
+	indent        domain.Indentation
+	spacingBefore int
+	spacingAfter  int
+	lineSpacing   domain.LineSpacing
+	idGen         IDGenerator
+	relManager    *manager.RelationshipManager
 }
 
 // NewParagraph creates a new Paragraph.

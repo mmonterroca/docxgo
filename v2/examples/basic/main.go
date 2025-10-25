@@ -1,3 +1,4 @@
+package main
 /*
    Copyright (c) 2025 SlideLang
 

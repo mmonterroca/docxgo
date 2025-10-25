@@ -1,3 +1,4 @@
+package color
 /*
    Copyright (c) 2025 SlideLang
 

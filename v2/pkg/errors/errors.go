@@ -1,3 +1,4 @@
+package errors
 /*
    Copyright (c) 2025 SlideLang
 
