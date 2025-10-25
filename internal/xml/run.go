@@ -23,10 +23,17 @@ import "encoding/xml"
 type Run struct {
 	XMLName    xml.Name       `xml:"w:r"`
 	Properties *RunProperties `xml:"w:rPr,omitempty"`
+	
+	// Content can be text, fields, tabs, breaks, or drawings
+	// Using interface{} with custom marshaling for flexibility
 	Text       *Text          `xml:"w:t,omitempty"`
 	Tab        *struct{}      `xml:"w:tab,omitempty"`
 	Break      *Break         `xml:"w:br,omitempty"`
 	Drawing    *Drawing       `xml:"w:drawing,omitempty"`
+	
+	// Field support - complex fields use multiple runs
+	FieldChar  *FieldChar     `xml:"w:fldChar,omitempty"`
+	InstrText  *InstrText     `xml:"w:instrText,omitempty"`
 }
 
 // RunProperties represents w:rPr element (run properties).
