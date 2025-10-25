@@ -1,4 +1,5 @@
 package serializer
+
 /*
    Copyright (c) 2025 SlideLang
 
@@ -15,9 +16,6 @@ package serializer
    You should have received a copy of the GNU Affero General Public License
    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-
-// Package serializer converts domain objects to OOXML structures.
-package serializer
 
 import (
 	"fmt"
@@ -231,7 +229,7 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 	before := para.SpacingBefore()
 	after := para.SpacingAfter()
 	lineSpacing := para.LineSpacing()
-	
+
 	if before != 0 || after != 0 || lineSpacing.Value != constants.DefaultLineSpacing {
 		props.Spacing = &xml.Spacing{
 			Before:   intPtrIfNotZero(before),
@@ -563,6 +561,6 @@ func (s *DocumentSerializer) SerializeAppProperties(doc domain.Document) *xml.Ap
 
 // Debug method for testing
 func (s *DocumentSerializer) DebugPrint(doc domain.Document) {
-	fmt.Printf("Document has %d paragraphs and %d tables\n", 
+	fmt.Printf("Document has %d paragraphs and %d tables\n",
 		len(doc.Paragraphs()), len(doc.Tables()))
 }

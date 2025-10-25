@@ -1,4 +1,5 @@
 package xml
+
 /*
    Copyright (c) 2025 SlideLang
 
@@ -16,19 +17,16 @@ package xml
    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-// Package xml provides OOXML struct definitions for XML marshaling/unmarshaling.
-package xml
-
 import "encoding/xml"
 
 // Run represents a w:r element (run of text with properties).
 type Run struct {
-	XMLName    xml.Name        `xml:"w:r"`
-	Properties *RunProperties  `xml:"w:rPr,omitempty"`
-	Text       *Text           `xml:"w:t,omitempty"`
-	Tab        *struct{}       `xml:"w:tab,omitempty"`
-	Break      *Break          `xml:"w:br,omitempty"`
-	Drawing    *Drawing        `xml:"w:drawing,omitempty"`
+	XMLName    xml.Name       `xml:"w:r"`
+	Properties *RunProperties `xml:"w:rPr,omitempty"`
+	Text       *Text          `xml:"w:t,omitempty"`
+	Tab        *struct{}      `xml:"w:tab,omitempty"`
+	Break      *Break         `xml:"w:br,omitempty"`
+	Drawing    *Drawing       `xml:"w:drawing,omitempty"`
 }
 
 // RunProperties represents w:rPr element (run properties).
@@ -47,9 +45,9 @@ type RunProperties struct {
 
 // Text represents w:t element (text content).
 type Text struct {
-	XMLName   xml.Name `xml:"w:t"`
-	Space     string   `xml:"xml:space,attr,omitempty"`
-	Content   string   `xml:",chardata"`
+	XMLName xml.Name `xml:"w:t"`
+	Space   string   `xml:"xml:space,attr,omitempty"`
+	Content string   `xml:",chardata"`
 }
 
 // BoolValue represents a boolean property.

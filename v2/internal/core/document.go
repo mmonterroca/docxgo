@@ -23,6 +23,9 @@ import (
 
 	"github.com/SlideLang/go-docx/v2/domain"
 	"github.com/SlideLang/go-docx/v2/internal/manager"
+	"github.com/SlideLang/go-docx/v2/internal/serializer"
+	"github.com/SlideLang/go-docx/v2/internal/writer"
+	xmlstructs "github.com/SlideLang/go-docx/v2/internal/xml"
 	"github.com/SlideLang/go-docx/v2/pkg/constants"
 	"github.com/SlideLang/go-docx/v2/pkg/errors"
 )
@@ -107,8 +110,32 @@ func (d *document) Sections() []domain.Section {
 
 // WriteTo writes the document to the provided writer in .docx format.
 func (d *document) WriteTo(w io.Writer) (int64, error) {
-	// TODO: Implement XML serialization and ZIP creation
-	return 0, errors.Unsupported("Document.WriteTo", "serialization not yet implemented")
+	// Serialize domain objects to XML structures
+	ser := serializer.NewDocumentSerializer()
+	xmlDoc := ser.SerializeDocument(d)
+
+	// Create ZIP writer
+	zipWriter := writer.NewZipWriter(w)
+	defer zipWriter.Close()
+
+	// Build relationships
+	rels := &xmlstructs.Relationships{
+		Xmlns:         constants.NamespacePackageRels,
+		Relationships: []*xmlstructs.Relationship{},
+	}
+
+	// TODO: Add relationships from relManager
+
+	// Write document structure
+	var coreProps *xmlstructs.CoreProperties // TODO: Add metadata support
+	var appProps *xmlstructs.AppProperties   // TODO: Add metadata support
+
+	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps); err != nil {
+		return 0, errors.WrapWithCode(err, errors.ErrCodeIO, "Document.WriteTo")
+	}
+
+	// TODO: Return actual byte count
+	return 0, nil
 }
 
 // SaveAs saves the document to the specified file path.
