@@ -26,16 +26,16 @@ import (
 
 // run implements the domain.Run interface.
 type run struct {
-	id         string
-	text       string
-	font       domain.Font
-	color      domain.Color
-	size       int // in half-points
-	bold       bool
-	italic     bool
-	underline  domain.UnderlineStyle
-	strike     bool
-	highlight  domain.HighlightColor
+	id        string
+	text      string
+	font      domain.Font
+	color     domain.Color
+	size      int // in half-points
+	bold      bool
+	italic    bool
+	underline domain.UnderlineStyle
+	strike    bool
+	highlight domain.HighlightColor
 }
 
 // NewRun creates a new Run.

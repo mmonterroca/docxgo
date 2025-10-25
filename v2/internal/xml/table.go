@@ -21,18 +21,18 @@ import "encoding/xml"
 
 // Table represents w:tbl element.
 type Table struct {
-	XMLName    xml.Name          `xml:"w:tbl"`
-	Properties *TableProperties  `xml:"w:tblPr,omitempty"`
-	Grid       *TableGrid        `xml:"w:tblGrid,omitempty"`
-	Rows       []*TableRow       `xml:"w:tr"`
+	XMLName    xml.Name         `xml:"w:tbl"`
+	Properties *TableProperties `xml:"w:tblPr,omitempty"`
+	Grid       *TableGrid       `xml:"w:tblGrid,omitempty"`
+	Rows       []*TableRow      `xml:"w:tr"`
 }
 
 // TableProperties represents w:tblPr element.
 type TableProperties struct {
-	XMLName xml.Name      `xml:"w:tblPr"`
-	Width   *TableWidth   `xml:"w:tblW,omitempty"`
+	XMLName xml.Name       `xml:"w:tblPr"`
+	Width   *TableWidth    `xml:"w:tblW,omitempty"`
 	Jc      *Justification `xml:"w:jc,omitempty"`
-	Style   *Style        `xml:"w:tblStyle,omitempty"`
+	Style   *Style         `xml:"w:tblStyle,omitempty"`
 }
 
 // TableWidth represents w:tblW element.
@@ -43,8 +43,8 @@ type TableWidth struct {
 
 // TableGrid represents w:tblGrid element.
 type TableGrid struct {
-	XMLName xml.Name      `xml:"w:tblGrid"`
-	Cols    []*GridCol    `xml:"w:gridCol"`
+	XMLName xml.Name   `xml:"w:tblGrid"`
+	Cols    []*GridCol `xml:"w:gridCol"`
 }
 
 // GridCol represents w:gridCol element.
@@ -61,8 +61,8 @@ type TableRow struct {
 
 // TableRowProperties represents w:trPr element.
 type TableRowProperties struct {
-	XMLName xml.Name         `xml:"w:trPr"`
-	Height  *TableRowHeight  `xml:"w:trHeight,omitempty"`
+	XMLName xml.Name        `xml:"w:trPr"`
+	Height  *TableRowHeight `xml:"w:trHeight,omitempty"`
 }
 
 // TableRowHeight represents w:trHeight element.
@@ -80,11 +80,11 @@ type TableCell struct {
 
 // TableCellProperties represents w:tcPr element.
 type TableCellProperties struct {
-	XMLName  xml.Name          `xml:"w:tcPr"`
-	Width    *TableWidth       `xml:"w:tcW,omitempty"`
-	VAlign   *VerticalAlign    `xml:"w:vAlign,omitempty"`
-	Borders  *TableBorders     `xml:"w:tcBorders,omitempty"`
-	Shading  *Shading          `xml:"w:shd,omitempty"`
+	XMLName xml.Name       `xml:"w:tcPr"`
+	Width   *TableWidth    `xml:"w:tcW,omitempty"`
+	VAlign  *VerticalAlign `xml:"w:vAlign,omitempty"`
+	Borders *TableBorders  `xml:"w:tcBorders,omitempty"`
+	Shading *Shading       `xml:"w:shd,omitempty"`
 }
 
 // VerticalAlign represents w:vAlign element.

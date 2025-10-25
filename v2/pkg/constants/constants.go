@@ -113,30 +113,30 @@ const (
 
 // Content Types
 const (
-	ContentTypeDocument            = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
-	ContentTypeStyles              = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"
-	ContentTypeNumbering           = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"
-	ContentTypeFontTable           = "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"
-	ContentTypeSettings            = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"
-	ContentTypeWebSettings         = "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"
-	ContentTypeTheme               = "application/vnd.openxmlformats-officedocument.theme+xml"
-	ContentTypeHeader              = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
-	ContentTypeFooter              = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
-	ContentTypeFootnotes           = "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"
-	ContentTypeEndnotes            = "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"
-	ContentTypeComments            = "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"
-	ContentTypeCoreProperties      = "application/vnd.openxmlformats-package.core-properties+xml"
-	ContentTypeExtendedProperties  = "application/vnd.openxmlformats-officedocument.extended-properties+xml"
-	ContentTypeCustomProperties    = "application/vnd.openxmlformats-officedocument.custom-properties+xml"
-	ContentTypeCustomXML           = "application/xml"
-	ContentTypeRelationships       = "application/vnd.openxmlformats-package.relationships+xml"
-	ContentTypePNG                 = "image/png"
-	ContentTypeJPEG                = "image/jpeg"
-	ContentTypeGIF                 = "image/gif"
-	ContentTypeBMP                 = "image/bmp"
-	ContentTypeTIFF                = "image/tiff"
-	ContentTypeWMF                 = "image/x-wmf"
-	ContentTypeEMF                 = "image/x-emf"
+	ContentTypeDocument           = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+	ContentTypeStyles             = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"
+	ContentTypeNumbering          = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"
+	ContentTypeFontTable          = "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"
+	ContentTypeSettings           = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"
+	ContentTypeWebSettings        = "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"
+	ContentTypeTheme              = "application/vnd.openxmlformats-officedocument.theme+xml"
+	ContentTypeHeader             = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
+	ContentTypeFooter             = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
+	ContentTypeFootnotes          = "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"
+	ContentTypeEndnotes           = "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"
+	ContentTypeComments           = "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"
+	ContentTypeCoreProperties     = "application/vnd.openxmlformats-package.core-properties+xml"
+	ContentTypeExtendedProperties = "application/vnd.openxmlformats-officedocument.extended-properties+xml"
+	ContentTypeCustomProperties   = "application/vnd.openxmlformats-officedocument.custom-properties+xml"
+	ContentTypeCustomXML          = "application/xml"
+	ContentTypeRelationships      = "application/vnd.openxmlformats-package.relationships+xml"
+	ContentTypePNG                = "image/png"
+	ContentTypeJPEG               = "image/jpeg"
+	ContentTypeGIF                = "image/gif"
+	ContentTypeBMP                = "image/bmp"
+	ContentTypeTIFF               = "image/tiff"
+	ContentTypeWMF                = "image/x-wmf"
+	ContentTypeEMF                = "image/x-emf"
 )
 
 // File paths within .docx archive
@@ -161,12 +161,12 @@ const (
 
 // Default font sizes (in half-points)
 const (
-	DefaultFontSize        = 22  // 11pt
-	DefaultTitleSize       = 32  // 16pt
-	DefaultHeading1Size    = 32  // 16pt
-	DefaultHeading2Size    = 26  // 13pt
-	DefaultHeading3Size    = 24  // 12pt
-	DefaultSmallFontSize   = 18  // 9pt
+	DefaultFontSize         = 22 // 11pt
+	DefaultTitleSize        = 32 // 16pt
+	DefaultHeading1Size     = 32 // 16pt
+	DefaultHeading2Size     = 26 // 13pt
+	DefaultHeading3Size     = 24 // 12pt
+	DefaultSmallFontSize    = 18 // 9pt
 	DefaultFootnoteFontSize = 20 // 10pt
 )
 

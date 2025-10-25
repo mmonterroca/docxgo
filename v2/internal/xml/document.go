@@ -71,18 +71,18 @@ type Override struct {
 
 // CoreProperties represents core document properties.
 type CoreProperties struct {
-	XMLName     xml.Name `xml:"cp:coreProperties"`
-	XMLnsCP     string   `xml:"xmlns:cp,attr"`
-	XMLnsDC     string   `xml:"xmlns:dc,attr"`
-	XMLnsDCTerms string  `xml:"xmlns:dcterms,attr"`
-	XMLnsXSI    string   `xml:"xmlns:xsi,attr"`
-	Title       string   `xml:"dc:title,omitempty"`
-	Subject     string   `xml:"dc:subject,omitempty"`
-	Creator     string   `xml:"dc:creator,omitempty"`
-	Keywords    string   `xml:"cp:keywords,omitempty"`
-	Description string   `xml:"dc:description,omitempty"`
-	Created     *DCDate  `xml:"dcterms:created,omitempty"`
-	Modified    *DCDate  `xml:"dcterms:modified,omitempty"`
+	XMLName      xml.Name `xml:"cp:coreProperties"`
+	XMLnsCP      string   `xml:"xmlns:cp,attr"`
+	XMLnsDC      string   `xml:"xmlns:dc,attr"`
+	XMLnsDCTerms string   `xml:"xmlns:dcterms,attr"`
+	XMLnsXSI     string   `xml:"xmlns:xsi,attr"`
+	Title        string   `xml:"dc:title,omitempty"`
+	Subject      string   `xml:"dc:subject,omitempty"`
+	Creator      string   `xml:"dc:creator,omitempty"`
+	Keywords     string   `xml:"cp:keywords,omitempty"`
+	Description  string   `xml:"dc:description,omitempty"`
+	Created      *DCDate  `xml:"dcterms:created,omitempty"`
+	Modified     *DCDate  `xml:"dcterms:modified,omitempty"`
 }
 
 // DCDate represents a Dublin Core date.

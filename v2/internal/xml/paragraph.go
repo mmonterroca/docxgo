@@ -21,10 +21,10 @@ import "encoding/xml"
 
 // Paragraph represents w:p element.
 type Paragraph struct {
-	XMLName    xml.Name              `xml:"w:p"`
-	Properties *ParagraphProperties  `xml:"w:pPr,omitempty"`
-	Runs       []*Run                `xml:"w:r,omitempty"`
-	Hyperlinks []*Hyperlink          `xml:"w:hyperlink,omitempty"`
+	XMLName    xml.Name             `xml:"w:p"`
+	Properties *ParagraphProperties `xml:"w:pPr,omitempty"`
+	Runs       []*Run               `xml:"w:r,omitempty"`
+	Hyperlinks []*Hyperlink         `xml:"w:hyperlink,omitempty"`
 }
 
 // ParagraphProperties represents w:pPr element.
@@ -56,10 +56,10 @@ type Indentation struct {
 
 // Spacing represents w:spacing element.
 type Spacing struct {
-	Before      *int    `xml:"w:before,attr,omitempty"`
-	After       *int    `xml:"w:after,attr,omitempty"`
-	Line        *int    `xml:"w:line,attr,omitempty"`
-	LineRule    *string `xml:"w:lineRule,attr,omitempty"`
+	Before   *int    `xml:"w:before,attr,omitempty"`
+	After    *int    `xml:"w:after,attr,omitempty"`
+	Line     *int    `xml:"w:line,attr,omitempty"`
+	LineRule *string `xml:"w:lineRule,attr,omitempty"`
 }
 
 // Hyperlink represents w:hyperlink element.
