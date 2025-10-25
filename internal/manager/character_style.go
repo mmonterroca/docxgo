@@ -1,0 +1,243 @@
+/*
+   Copyright (c) 2025 SlideLang
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Affero General Public License as published
+   by the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public License
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+package manager
+
+import (
+	"sync"
+
+	"github.com/SlideLang/go-docx/domain"
+	"github.com/SlideLang/go-docx/pkg/constants"
+	"github.com/SlideLang/go-docx/pkg/errors"
+)
+
+// characterStyle implements domain.CharacterStyle.
+type characterStyle struct {
+	mu        sync.RWMutex
+	id        string
+	name      string
+	basedOn   string
+	font      domain.Font
+	isDefault bool
+	isBuiltIn bool
+	bold      bool
+	italic    bool
+	underline domain.UnderlineStyle
+	color     domain.Color
+	size      int // in half-points
+}
+
+// newCharacterStyle creates a new character style.
+func newCharacterStyle(id, name string, builtIn bool) *characterStyle {
+	return &characterStyle{
+		id:        id,
+		name:      name,
+		isBuiltIn: builtIn,
+		font:      domain.Font{Name: constants.DefaultFontName},
+		color:     domain.ColorBlack,
+		size:      constants.DefaultFontSize,
+		underline: domain.UnderlineNone,
+	}
+}
+
+// ID returns the unique style identifier.
+func (cs *characterStyle) ID() string {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.id
+}
+
+// Name returns the style display name.
+func (cs *characterStyle) Name() string {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.name
+}
+
+// Type returns the style type.
+func (cs *characterStyle) Type() domain.StyleType {
+	return domain.StyleTypeCharacter
+}
+
+// BasedOn returns the style ID this style is based on.
+func (cs *characterStyle) BasedOn() string {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.basedOn
+}
+
+// SetBasedOn sets the parent style.
+func (cs *characterStyle) SetBasedOn(styleID string) error {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.basedOn = styleID
+	return nil
+}
+
+// Next returns the style ID for next paragraph (not applicable for character styles).
+func (cs *characterStyle) Next() string {
+	return ""
+}
+
+// SetNext sets next paragraph style (not applicable for character styles).
+func (cs *characterStyle) SetNext(styleID string) error {
+	return errors.NewValidationError(
+		"CharacterStyle.SetNext",
+		"styleID",
+		styleID,
+		"Next property not applicable for character styles",
+	)
+}
+
+// Font returns the font settings.
+func (cs *characterStyle) Font() domain.Font {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.font
+}
+
+// SetFont sets the font settings.
+func (cs *characterStyle) SetFont(font domain.Font) error {
+	if font.Name == "" {
+		return errors.NewValidationError(
+			"CharacterStyle.SetFont",
+			"font.Name",
+			"",
+			"font name cannot be empty",
+		)
+	}
+
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.font = font
+	return nil
+}
+
+// IsDefault returns whether this is a default style.
+func (cs *characterStyle) IsDefault() bool {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.isDefault
+}
+
+// SetDefault marks this style as default.
+func (cs *characterStyle) SetDefault(isDefault bool) error {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.isDefault = isDefault
+	return nil
+}
+
+// IsCustom returns whether this is a custom style.
+func (cs *characterStyle) IsCustom() bool {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return !cs.isBuiltIn
+}
+
+// Bold returns whether the text is bold.
+func (cs *characterStyle) Bold() bool {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.bold
+}
+
+// SetBold sets whether the text is bold.
+func (cs *characterStyle) SetBold(bold bool) error {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.bold = bold
+	return nil
+}
+
+// Italic returns whether the text is italic.
+func (cs *characterStyle) Italic() bool {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.italic
+}
+
+// SetItalic sets whether the text is italic.
+func (cs *characterStyle) SetItalic(italic bool) error {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.italic = italic
+	return nil
+}
+
+// Underline returns the underline style.
+func (cs *characterStyle) Underline() domain.UnderlineStyle {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.underline
+}
+
+// SetUnderline sets the underline style.
+func (cs *characterStyle) SetUnderline(style domain.UnderlineStyle) error {
+	if style < domain.UnderlineNone || style > domain.UnderlineWave {
+		return errors.NewValidationError(
+			"CharacterStyle.SetUnderline",
+			"style",
+			style,
+			"invalid underline style",
+		)
+	}
+
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.underline = style
+	return nil
+}
+
+// Color returns the text color.
+func (cs *characterStyle) Color() domain.Color {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.color
+}
+
+// SetColor sets the text color.
+func (cs *characterStyle) SetColor(color domain.Color) error {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.color = color
+	return nil
+}
+
+// Size returns the font size in half-points.
+func (cs *characterStyle) Size() int {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.size
+}
+
+// SetSize sets the font size in half-points.
+func (cs *characterStyle) SetSize(halfPoints int) error {
+	if halfPoints < constants.MinFontSize || halfPoints > constants.MaxFontSize {
+		return errors.NewValidationError(
+			"CharacterStyle.SetSize",
+			"halfPoints",
+			halfPoints,
+			"font size must be between 2 and 3276 half-points (1pt - 1638pt)",
+		)
+	}
+
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.size = halfPoints
+	return nil
+}

@@ -132,17 +132,41 @@ type Footer interface {
 
 // Style represents a paragraph or character style.
 type Style interface {
-	// Name returns the style name.
+	// ID returns the unique style identifier.
+	ID() string
+
+	// Name returns the style display name.
 	Name() string
 
 	// Type returns the style type (paragraph or character).
 	Type() StyleType
 
-	// BasedOn returns the style this style is based on.
+	// BasedOn returns the style ID this style is based on.
 	BasedOn() string
 
-	// Next returns the style to use for the next paragraph.
+	// SetBasedOn sets the parent style.
+	SetBasedOn(styleID string) error
+
+	// Next returns the style ID to use for the next paragraph.
 	Next() string
+
+	// SetNext sets the next paragraph style.
+	SetNext(styleID string) error
+
+	// Font returns the font settings for this style.
+	Font() Font
+
+	// SetFont sets the font settings.
+	SetFont(font Font) error
+
+	// IsDefault returns whether this is a default style.
+	IsDefault() bool
+
+	// SetDefault marks this style as default for its type.
+	SetDefault(isDefault bool) error
+
+	// IsCustom returns whether this is a custom (user-defined) style.
+	IsCustom() bool
 }
 
 // StyleType represents the type of style.
