@@ -197,6 +197,18 @@ type TableStyle struct {
 	// Could be expanded with more style properties
 }
 
+// Predefined table styles (compatible with Word built-in styles)
+var (
+	TableStyleNormal        = TableStyle{Name: "TableNormal"}
+	TableStyleGrid          = TableStyle{Name: "TableGrid"}
+	TableStylePlain         = TableStyle{Name: "PlainTable1"}
+	TableStyleMediumShading = TableStyle{Name: "MediumShading1"}
+	TableStyleLightShading  = TableStyle{Name: "LightShading"}
+	TableStyleColorful      = TableStyle{Name: "ColorfulList"}
+	TableStyleAccent1       = TableStyle{Name: "MediumShading1Accent1"}
+	TableStyleAccent2       = TableStyle{Name: "MediumShading1Accent2"}
+)
+
 // VerticalMergeType represents vertical merge status for table cells.
 type VerticalMergeType int
 

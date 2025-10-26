@@ -410,6 +410,20 @@ func (tb *TableBuilder) Alignment(align domain.Alignment) *TableBuilder {
 	return tb
 }
 
+// Style sets the table style.
+func (tb *TableBuilder) Style(style domain.TableStyle) *TableBuilder {
+	if tb.err != nil {
+		return tb
+	}
+
+	if err := tb.table.SetStyle(style); err != nil {
+		tb.err = err
+		tb.parent.errors = append(tb.parent.errors, err)
+	}
+
+	return tb
+}
+
 // End returns to the DocumentBuilder.
 func (tb *TableBuilder) End() *DocumentBuilder {
 	return tb.parent
@@ -558,6 +572,22 @@ func (cb *CellBuilder) Shading(color domain.Color) *CellBuilder {
 	}
 
 	if err := cb.cell.SetShading(color); err != nil {
+		cb.err = err
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, err)
+	}
+
+	return cb
+}
+
+// Merge merges this cell with adjacent cells.
+// colspan: number of columns to span (1 = no horizontal merge)
+// rowspan: number of rows to span (1 = no vertical merge)
+func (cb *CellBuilder) Merge(colspan, rowspan int) *CellBuilder {
+	if cb.err != nil {
+		return cb
+	}
+
+	if err := cb.cell.Merge(colspan, rowspan); err != nil {
 		cb.err = err
 		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, err)
 	}

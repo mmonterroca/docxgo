@@ -42,7 +42,12 @@ type TableProperties struct {
 	XMLName xml.Name       `xml:"w:tblPr"`
 	Width   *TableWidth    `xml:"w:tblW,omitempty"`
 	Jc      *Justification `xml:"w:jc,omitempty"`
-	Style   *Style         `xml:"w:tblStyle,omitempty"`
+	Style   *TableStyle    `xml:"w:tblStyle,omitempty"`
+}
+
+// TableStyle represents w:tblStyle element.
+type TableStyle struct {
+	Val string `xml:"w:val,attr"`
 }
 
 // TableWidth represents w:tblW element.

@@ -320,6 +320,13 @@ func (s *TableSerializer) serializeTableProperties(table domain.Table) *xml.Tabl
 		}
 	}
 
+	// Style
+	if style := table.Style(); style.Name != "" {
+		props.Style = &xml.TableStyle{
+			Val: style.Name,
+		}
+	}
+
 	return props
 }
 
