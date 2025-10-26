@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Phase 6.5: Builder Pattern & API Polish
+- **Builder Pattern** (`builder.go`):
+  - `DocumentBuilder`: Fluent API for document creation
+  - `ParagraphBuilder`: Chainable paragraph formatting
+    - Methods: `Text()`, `Bold()`, `Italic()`, `Color()`, `FontSize()`, `Alignment()`, `Underline()`, `End()`
+    - Mixed formatting support in single paragraph
+  - `TableBuilder`: Fluent table construction
+    - Methods: `Width()`, `Alignment()`, `Row()`, `End()`
+  - `RowBuilder`: Row-level control
+    - Methods: `Height()`, `Cell()`, `End()`
+  - `CellBuilder`: Cell formatting
+    - Methods: `Text()`, `Bold()`, `Width()`, `VerticalAlignment()`, `Shading()`, `End()`
+  - Error accumulation pattern for graceful failure
+
+- **Functional Options Pattern** (`options.go`):
+  - `Config` struct with sensible defaults
+  - **9 Option Functions**:
+    - `WithDefaultFont(name, size)`: Set document font
+    - `WithPageSize(PageSize)`: A4, Letter, Legal, A3, Tabloid
+    - `WithMargins(Margins)`: Normal, Narrow, Wide presets
+    - `WithStrictValidation()`: Enable strict mode
+    - `WithMetadata(Metadata)`: Set document metadata
+    - `WithTitle(string)`: Set document title
+    - `WithAuthor(string)`: Set document author
+    - `WithSubject(string)`: Set document subject
+  - Page size constants: `PageSizeA4`, `PageSizeLetter`, etc.
+  - Margin presets: `MarginsNormal`, `MarginsNarrow`, `MarginsWide`
+
+- **Convenience Constants** (exported in `docx.go`):
+  - **12 Color Constants**: `Black`, `White`, `Red`, `Green`, `Blue`, `Yellow`, `Cyan`, `Magenta`, `Orange`, `Purple`, `Gray`, `Silver`
+  - **Alignment Constants**: `AlignmentLeft`, `AlignmentCenter`, `AlignmentRight`, `AlignmentJustify`
+  - **Underline Constants**: `UnderlineSingle`, `UnderlineDouble`, `UnderlineThick`, `UnderlineDotted`, `UnderlineDashed`, `UnderlineWave`
+
+- **Metadata Support**:
+  - Complete metadata serialization in `document.WriteTo()`
+  - `RelationshipManager.ToXML()` for relationship export
+  - Core properties and app properties integration
+
+- **New Examples**:
+  - `01_basic/`: Simple builder pattern demonstration
+  - `02_intermediate/`: Product catalog with tables
+  - Updated `examples/README.md` with builder pattern documentation
+
+- **Comprehensive Tests** (`builder_test.go`):
+  - 25+ test cases covering all builders
+  - Error accumulation tests
+  - Validation tests for options
+  - Chaining and mixed formatting tests
+
 ## [2.0.0-beta] - 2025-01-XX
 
 ### 🎉 Major Release: v2.0.0-beta

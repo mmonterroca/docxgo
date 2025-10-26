@@ -4,14 +4,26 @@ This directory contains comprehensive examples demonstrating the features of go-
 
 ## Example List
 
-### [01 - Basic Document](./basic/)
-**Status**: ✅ Complete  
-**Demonstrates**: Creating a simple document with paragraphs and basic text formatting.
-- Document creation
-- Adding paragraphs
-- Adding text runs
-- Basic text formatting (bold, italic)
-- Saving documents
+### [01 - Basic Builder](./01_basic/)
+**Status**: ✅ Complete (Phase 6.5)  
+**Demonstrates**: Using the builder pattern for simple document creation.
+- DocumentBuilder with fluent API
+- Document options (title, author, font, margins)
+- Predefined color constants
+- Text formatting (bold, italic, color, size)
+- Alignment control
+- Simple table creation
+- Mixed formatting in paragraphs
+
+### [02 - Intermediate Builder](./02_intermediate/)
+**Status**: ✅ Complete (Phase 6.5)  
+**Demonstrates**: Building a professional product catalog with the builder pattern.
+- Professional document layout
+- Multiple sections with headings
+- Product tables with pricing
+- Mixed text formatting
+- Color-coded information
+- Document metadata
 
 ### [04 - Fields](./04_fields/)
 **Status**: ✅ Complete (Phase 6)  
@@ -73,14 +85,14 @@ go run ./basic/main.go
 
 ## Example Categories
 
-### Getting Started
-- **Example 01**: Start here for basic document creation
+### Getting Started - Builder Pattern (Recommended)
+- **Example 01**: Basic builder - Start here for simple documents
+- **Example 02**: Intermediate builder - Product catalog example
 
-### Phase 6 Features (Advanced)
-- **Example 04**: Fields system
+### Advanced API Usage
 - **Example 05**: Style management
 - **Example 06**: Sections and page layout
-- **Example 07**: Complete integration
+- **Example 07**: Complete integration with all features
 
 ## Prerequisites
 
@@ -90,8 +102,8 @@ go run ./basic/main.go
 ## Generated Files
 
 Each example creates a `.docx` file in its directory:
-- `basic/basic_demo.docx`
-- `04_fields/04_fields_demo.docx`
+- `01_basic/01_basic_builder.docx`
+- `02_intermediate/02_intermediate_builder.docx`
 - `05_styles/05_styles_demo.docx`
 - `06_sections/06_sections_demo.docx`
 - `07_advanced/07_advanced_demo.docx`
@@ -114,21 +126,48 @@ Documents with fields (TOC, page numbers) may require updating:
 
 ## Learning Path
 
-**Beginner**:
-1. Start with Example 01 (basic)
-2. Learn text formatting and paragraphs
+**Beginner - Builder Pattern (Recommended)**:
+1. Start with Example 01 (basic builder) - Simple fluent API
+2. Example 02 (intermediate builder) - Product catalog
+3. Learn builder features: colors, alignment, tables
 
-**Intermediate**:
+**Advanced - Direct API**:
 1. Example 05 (styles) - Understanding style system
 2. Example 06 (sections) - Page layout control
-
-**Advanced**:
-1. Example 04 (fields) - Dynamic content
-2. Example 07 (advanced) - Professional documents
+3. Example 07 (advanced) - Professional documents with all features
 
 ## Code Structure
 
-Each example follows this pattern:
+### Builder Pattern (Recommended)
+
+```go
+package main
+
+import docx "github.com/mmonterroca/docxgo"
+
+func main() {
+    // Create document with options
+    doc, err := docx.NewDocumentBuilder(
+        docx.WithTitle("My Document"),
+        docx.WithDefaultFont("Arial", 11),
+        docx.WithPageSize(docx.PageSizeA4),
+    ).Build()
+    
+    // Add content using fluent API
+    doc.AddParagraph().
+        Text("Hello, World!").
+        Bold().
+        Color(docx.Blue).
+        FontSize(14).
+        Alignment(docx.AlignmentCenter).
+        End()
+    
+    // Save
+    doc.SaveToFile("output.docx")
+}
+```
+
+### Direct API (Advanced)
 
 ```go
 package main
@@ -158,7 +197,50 @@ func main() {
 
 ## Common Patterns
 
-### Adding Styled Headings
+### Builder Pattern
+
+#### Simple Paragraph with Formatting
+
+```go
+doc.AddParagraph().
+    Text("Important Notice").
+    Bold().
+    Color(docx.Red).
+    FontSize(14).
+    End()
+```
+
+#### Mixed Formatting in One Paragraph
+
+```go
+doc.AddParagraph().
+    Text("This is ").
+    Text("bold").Bold().
+    Text(" and this is ").
+    Text("red").Color(docx.Red).
+    Text(".").
+    End()
+```
+
+#### Simple Table
+
+```go
+doc.AddTable().
+    Width(5000).
+    Row().
+        Cell().Text("Header 1").Bold().End().
+        Cell().Text("Header 2").Bold().End().
+    End().
+    Row().
+        Cell().Text("Data 1").End().
+        Cell().Text("Data 2").End().
+    End().
+End()
+```
+
+### Direct API
+
+#### Adding Styled Headings
 
 ```go
 h1, _ := doc.AddParagraph()
@@ -214,4 +296,4 @@ Found an issue or want to add an example? See [CONTRIBUTING.md](../../CONTRIBUTI
 
 ## License
 
-These examples are part of go-docx v2 and are licensed under AGPL-3.0.
+These examples are part of go-docx v2 and are licensed under MIT.

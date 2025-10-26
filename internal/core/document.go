@@ -139,23 +139,21 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	zipWriter := writer.NewZipWriter(w)
 	defer zipWriter.Close()
 
-	// Build relationships
-	rels := &xmlstructs.Relationships{
-		Xmlns:         constants.NamespacePackageRels,
-		Relationships: []*xmlstructs.Relationship{},
-	}
+	// Build relationships from relationship manager
+	rels := d.relManager.ToXML()
 
-	// TODO: Add relationships from relManager
+	// Serialize metadata
+	coreProps := ser.SerializeCoreProperties(d.metadata)
+	appProps := ser.SerializeAppProperties(d)
 
 	// Write document structure
-	var coreProps *xmlstructs.CoreProperties // TODO: Add metadata support
-	var appProps *xmlstructs.AppProperties   // TODO: Add metadata support
-
 	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps); err != nil {
 		return 0, errors.WrapWithCode(err, errors.ErrCodeIO, "Document.WriteTo")
 	}
 
-	// TODO: Return actual byte count
+	// Get byte count from writer if available
+	// For now, return 0 as ZipWriter doesn't track total bytes
+	// This could be enhanced by wrapping the writer with a counting writer
 	return 0, nil
 }
 

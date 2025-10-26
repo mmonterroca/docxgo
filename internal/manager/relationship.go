@@ -170,3 +170,26 @@ func (rm *RelationshipManager) AddHeader(target string) (string, error) {
 func (rm *RelationshipManager) AddFooter(target string) (string, error) {
 	return rm.Add(constants.RelTypeFooter, target, "Internal")
 }
+
+// ToXML converts relationships to XML structure.
+func (rm *RelationshipManager) ToXML() *xmlstructs.Relationships {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
+	rels := &xmlstructs.Relationships{
+		Xmlns:         constants.NamespacePackageRels,
+		Relationships: make([]*xmlstructs.Relationship, 0, len(rm.relationships)),
+	}
+
+	for _, rel := range rm.relationships {
+		xmlRel := &xmlstructs.Relationship{
+			ID:         rel.ID,
+			Type:       rel.Type,
+			Target:     rel.Target,
+			TargetMode: rel.TargetMode,
+		}
+		rels.Relationships = append(rels.Relationships, xmlRel)
+	}
+
+	return rels
+}
