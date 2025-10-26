@@ -1,0 +1,36 @@
+# Contributors
+
+## Current Maintainer
+
+**Misael Montero** (@mmonterroca)
+- Complete v2 rewrite with clean architecture
+- Phase 1-7 implementation (2025)
+- Email: misael@monterroca.com
+- GitHub: https://github.com/mmonterroca
+
+## Original Authors
+
+**fumiama** (2020-2023)
+- Original go-docx library implementation
+- GitHub: https://github.com/fumiama/go-docx
+
+**Gonzalo Fernández-Victorio** (2020-2022)
+- Initial OOXML library foundation
+
+## Project History
+
+This project (docxgo) is a complete rewrite of the original go-docx library,
+implementing clean architecture principles and comprehensive OOXML support.
+
+While inspired by and crediting the original work, docxgo represents a 
+ground-up redesign focused on:
+- Modern Go practices
+- Clean architecture (domain/internal/pkg)
+- Comprehensive testing (95%+ coverage)
+- Production-ready code quality
+- MIT License for maximum permissiveness
+
+## Acknowledgments
+
+Special thanks to the original go-docx contributors for pioneering Go-based
+OOXML document manipulation.
