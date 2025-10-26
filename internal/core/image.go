@@ -229,7 +229,7 @@ func getImageDimensions(data []byte) (domain.ImageSize, error) {
 		reader := strings.NewReader(string(data))
 		img, format, err = image.DecodeConfig(reader)
 		if err != nil {
-			return domain.ImageSize{}, errors.WrapWithCode(err, errors.ErrCodeInvalidArgument, "getImageDimensions")
+			return domain.ImageSize{}, errors.Wrap(err, "getImageDimensions")
 		}
 	}
 

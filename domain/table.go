@@ -119,6 +119,24 @@ type TableCell interface {
 	// Merge merges this cell with adjacent cells.
 	// cols and rows specify how many cells to merge in each direction.
 	Merge(cols, rows int) error
+
+	// GridSpan returns the number of columns this cell spans.
+	GridSpan() int
+
+	// SetGridSpan sets the number of columns to span (horizontal merge).
+	SetGridSpan(span int) error
+
+	// VMerge returns the vertical merge status.
+	VMerge() VerticalMergeType
+
+	// SetVMerge sets the vertical merge type.
+	SetVMerge(mergeType VerticalMergeType) error
+
+	// AddTable adds a nested table to this cell.
+	AddTable(rows, cols int) (Table, error)
+
+	// Tables returns all nested tables in this cell.
+	Tables() []Table
 }
 
 // TableWidth represents table width settings.
@@ -177,4 +195,21 @@ const (
 type TableStyle struct {
 	Name string
 	// Could be expanded with more style properties
+}
+
+// VerticalMergeType represents vertical merge status for table cells.
+type VerticalMergeType int
+
+const (
+	VMergeNone    VerticalMergeType = iota // No vertical merge
+	VMergeRestart                           // Start of vertical merge
+	VMergeContinue                          // Continuation of vertical merge
+)
+
+// CellMergeInfo represents cell merge information.
+type CellMergeInfo struct {
+	GridSpan int               // Horizontal span (number of columns)
+	VMerge   VerticalMergeType // Vertical merge type
+	RowSpan  int               // Vertical span (number of rows) - calculated
+	ColSpan  int               // Horizontal span (number of columns) - same as GridSpan
 }

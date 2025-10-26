@@ -235,23 +235,29 @@ func (r *tableRow) SetHeight(twips int) error {
 type tableCell struct {
 	id                string
 	paragraphs        []domain.Paragraph
+	tables            []domain.Table
 	width             int
 	verticalAlignment domain.VerticalAlignment
 	borders           domain.TableBorders
 	shading           domain.Color
-	idGen             IDGenerator
+	gridSpan          int
+	vMerge            domain.VerticalMergeType
+	idGen             *manager.IDGenerator
 	relManager        *manager.RelationshipManager
 }
 
 // NewTableCell creates a new TableCell.
-func NewTableCell(id string, idGen IDGenerator, relManager *manager.RelationshipManager) domain.TableCell {
+func NewTableCell(id string, idGen *manager.IDGenerator, relManager *manager.RelationshipManager) domain.TableCell {
 	return &tableCell{
 		id:                id,
 		paragraphs:        make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
+		tables:            make([]domain.Table, 0, 1),
 		width:             0, // Auto width
 		verticalAlignment: domain.VerticalAlignTop,
 		borders:           domain.TableBorders{},
 		shading:           domain.ColorWhite,
+		gridSpan:          1, // Default: no horizontal merge
+		vMerge:            domain.VMergeNone,
 		idGen:             idGen,
 		relManager:        relManager,
 	}
@@ -326,6 +332,76 @@ func (c *tableCell) SetShading(color domain.Color) error {
 
 // Merge merges this cell with adjacent cells.
 func (c *tableCell) Merge(cols, rows int) error {
-	// TODO: Implement cell merging
-	return errors.Unsupported("TableCell.Merge", "cell merging not yet implemented")
+	if cols < 1 {
+		return errors.InvalidArgument("TableCell.Merge", "cols", cols,
+			"cols must be at least 1")
+	}
+	if rows < 1 {
+		return errors.InvalidArgument("TableCell.Merge", "rows", rows,
+			"rows must be at least 1")
+	}
+	
+	// Set horizontal merge (gridSpan)
+	c.gridSpan = cols
+	
+	// Set vertical merge
+	if rows > 1 {
+		c.vMerge = domain.VMergeRestart
+	}
+	
+	return nil
+}
+
+// GridSpan returns the number of grid columns spanned by this cell.
+func (c *tableCell) GridSpan() int {
+	return c.gridSpan
+}
+
+// SetGridSpan sets the horizontal merge span.
+func (c *tableCell) SetGridSpan(span int) error {
+	if span < 1 {
+		return errors.InvalidArgument("TableCell.SetGridSpan", "span", span,
+			"span must be at least 1")
+	}
+	c.gridSpan = span
+	return nil
+}
+
+// VMerge returns the vertical merge type.
+func (c *tableCell) VMerge() domain.VerticalMergeType {
+	return c.vMerge
+}
+
+// SetVMerge sets the vertical merge type.
+func (c *tableCell) SetVMerge(mergeType domain.VerticalMergeType) error {
+	if mergeType < domain.VMergeNone || mergeType > domain.VMergeContinue {
+		return errors.InvalidArgument("TableCell.SetVMerge", "mergeType", mergeType,
+			"invalid vertical merge type")
+	}
+	c.vMerge = mergeType
+	return nil
+}
+
+// AddTable adds a nested table to this cell.
+func (c *tableCell) AddTable(rows, cols int) (domain.Table, error) {
+	if rows < 1 {
+		return nil, errors.InvalidArgument("TableCell.AddTable", "rows", rows,
+			"rows must be at least 1")
+	}
+	if cols < 1 {
+		return nil, errors.InvalidArgument("TableCell.AddTable", "cols", cols,
+			"cols must be at least 1")
+	}
+	
+	table := NewTable(c.idGen.GenerateID("table"), rows, cols, c.idGen, c.relManager)
+	c.tables = append(c.tables, table)
+	return table, nil
+}
+
+// Tables returns all nested tables in this cell.
+func (c *tableCell) Tables() []domain.Table {
+	// Return a defensive copy
+	result := make([]domain.Table, len(c.tables))
+	copy(result, c.tables)
+	return result
 }

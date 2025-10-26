@@ -30,6 +30,7 @@ package manager
 import (
 	"sync"
 
+	"github.com/mmonterroca/docxgo/internal/xml"
 	"github.com/mmonterroca/docxgo/pkg/constants"
 	"github.com/mmonterroca/docxgo/pkg/errors"
 )
@@ -172,17 +173,17 @@ func (rm *RelationshipManager) AddFooter(target string) (string, error) {
 }
 
 // ToXML converts relationships to XML structure.
-func (rm *RelationshipManager) ToXML() *xmlstructs.Relationships {
+func (rm *RelationshipManager) ToXML() *xml.Relationships {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	rels := &xmlstructs.Relationships{
+	rels := &xml.Relationships{
 		Xmlns:         constants.NamespacePackageRels,
-		Relationships: make([]*xmlstructs.Relationship, 0, len(rm.relationships)),
+		Relationships: make([]*xml.Relationship, 0, len(rm.relationships)),
 	}
 
 	for _, rel := range rm.relationships {
-		xmlRel := &xmlstructs.Relationship{
+		xmlRel := &xml.Relationship{
 			ID:         rel.ID,
 			Type:       rel.Type,
 			Target:     rel.Target,

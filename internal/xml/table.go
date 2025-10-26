@@ -86,15 +86,28 @@ type TableCell struct {
 	XMLName    xml.Name             `xml:"w:tc"`
 	Properties *TableCellProperties `xml:"w:tcPr,omitempty"`
 	Paragraphs []*Paragraph         `xml:"w:p"`
+	Tables     []*Table             `xml:"w:tbl,omitempty"` // Nested tables
 }
 
 // TableCellProperties represents w:tcPr element.
 type TableCellProperties struct {
-	XMLName xml.Name       `xml:"w:tcPr"`
-	Width   *TableWidth    `xml:"w:tcW,omitempty"`
-	VAlign  *VerticalAlign `xml:"w:vAlign,omitempty"`
-	Borders *TableBorders  `xml:"w:tcBorders,omitempty"`
-	Shading *Shading       `xml:"w:shd,omitempty"`
+	XMLName  xml.Name       `xml:"w:tcPr"`
+	Width    *TableWidth    `xml:"w:tcW,omitempty"`
+	GridSpan *GridSpan      `xml:"w:gridSpan,omitempty"`
+	VMerge   *VMerge        `xml:"w:vMerge,omitempty"`
+	VAlign   *VerticalAlign `xml:"w:vAlign,omitempty"`
+	Borders  *TableBorders  `xml:"w:tcBorders,omitempty"`
+	Shading  *Shading       `xml:"w:shd,omitempty"`
+}
+
+// GridSpan represents w:gridSpan element for horizontal cell merging.
+type GridSpan struct {
+	Val int `xml:"w:val,attr"`
+}
+
+// VMerge represents w:vMerge element for vertical cell merging.
+type VMerge struct {
+	Val string `xml:"w:val,attr,omitempty"` // "restart" or omitted for "continue"
 }
 
 // VerticalAlign represents w:vAlign element.

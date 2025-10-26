@@ -40,6 +40,8 @@ import (
 type IDGenerator interface {
 	NextParagraphID() string
 	NextRunID() string
+	NextImageID() string
+	GenerateID(prefix string) string
 }
 
 // paragraph implements the domain.Paragraph interface.

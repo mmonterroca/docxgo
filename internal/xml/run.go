@@ -93,8 +93,3 @@ type Highlight struct {
 type Break struct {
 	Type string `xml:"w:type,attr,omitempty"`
 }
-
-// Drawing represents w:drawing element (for images).
-type Drawing struct {
-	// TODO: Implement drawing structure
-}

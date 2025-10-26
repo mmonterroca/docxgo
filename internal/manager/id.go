@@ -129,6 +129,14 @@ func (g *IDGenerator) NextEndnoteID() string {
 	return fmt.Sprintf("%s%d", constants.IDPrefixEndnote, id)
 }
 
+// GenerateID generates an ID with a custom prefix.
+// This is a generic method for any element type.
+func (g *IDGenerator) GenerateID(prefix string) string {
+	// Use table counter for generic IDs
+	id := g.tableCounter.Add(1)
+	return fmt.Sprintf("%s%d", prefix, id)
+}
+
 // Reset resets all counters to zero.
 // This should only be used when starting a new document.
 func (g *IDGenerator) Reset() {

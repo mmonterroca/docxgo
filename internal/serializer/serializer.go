@@ -362,6 +362,7 @@ func (s *TableSerializer) serializeCell(cell domain.TableCell) *xml.TableCell {
 	xmlCell := &xml.TableCell{
 		Properties: s.serializeCellProperties(cell),
 		Paragraphs: make([]*xml.Paragraph, 0, len(cell.Paragraphs())),
+		Tables:     make([]*xml.Table, 0, len(cell.Tables())),
 	}
 
 	// Serialize paragraphs
@@ -369,8 +370,13 @@ func (s *TableSerializer) serializeCell(cell domain.TableCell) *xml.TableCell {
 		xmlCell.Paragraphs = append(xmlCell.Paragraphs, s.paraSerializer.Serialize(para))
 	}
 
-	// Add empty paragraph if cell has no paragraphs
-	if len(xmlCell.Paragraphs) == 0 {
+	// Serialize nested tables
+	for _, table := range cell.Tables() {
+		xmlCell.Tables = append(xmlCell.Tables, s.Serialize(table))
+	}
+
+	// Add empty paragraph if cell has no content
+	if len(xmlCell.Paragraphs) == 0 && len(xmlCell.Tables) == 0 {
 		xmlCell.Paragraphs = append(xmlCell.Paragraphs, &xml.Paragraph{})
 	}
 
@@ -386,6 +392,23 @@ func (s *TableSerializer) serializeCellProperties(cell domain.TableCell) *xml.Ta
 			Type: constants.WidthTypeDXA,
 			W:    cell.Width(),
 		}
+	}
+
+	// GridSpan (horizontal merge)
+	if cell.GridSpan() > 1 {
+		props.GridSpan = &xml.GridSpan{
+			Val: cell.GridSpan(),
+		}
+	}
+
+	// VMerge (vertical merge)
+	if cell.VMerge() != domain.VMergeNone {
+		vMerge := &xml.VMerge{}
+		if cell.VMerge() == domain.VMergeRestart {
+			vMerge.Val = "restart"
+		}
+		// VMergeContinue uses empty Val (omitted)
+		props.VMerge = vMerge
 	}
 
 	// Vertical alignment

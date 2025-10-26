@@ -35,7 +35,6 @@ import (
 	"github.com/mmonterroca/docxgo/internal/manager"
 	"github.com/mmonterroca/docxgo/internal/serializer"
 	"github.com/mmonterroca/docxgo/internal/writer"
-	xmlstructs "github.com/mmonterroca/docxgo/internal/xml"
 	"github.com/mmonterroca/docxgo/pkg/constants"
 	"github.com/mmonterroca/docxgo/pkg/errors"
 )
