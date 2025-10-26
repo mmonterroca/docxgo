@@ -586,45 +586,72 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - Package-level godoc with 200+ lines of examples
 - All field creation functions exported with documentation
 
-### 🚧 Phase 8: Images & Media (Current - Week 14)
+### ✅ Phase 8: Images & Media (Week 14) - COMPLETE
 **Goal**: Implement image insertion and media management
 
-**Status**: 50% Complete - Domain & Core implemented
+**Status**: 100% Complete (commits 15cc7ce, 44c102e)
 - [x] Domain interfaces (image.go) (~172 lines)
   - [x] Image interface with dimensions, format, data
   - [x] ImageFormat enum (PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP)
   - [x] ImageSize struct with width/height in pixels and EMUs
   - [x] ImagePosition with inline/floating support
 - [x] Core implementation (internal/core/image.go) (~270 lines)
-  - [x] AddImage(path string) method
-  - [x] AddImageWithSize(path string, width, height)
+  - [x] NewImage(id, path) - load from file
+  - [x] NewImageWithSize(id, path, size) - custom dimensions
+  - [x] NewImageWithPosition(id, path, size, pos) - floating images
+  - [x] ReadImageFromReader(id, reader, format) - io.Reader support
   - [x] Image format detection
-  - [x] Image dimension reading
-- [x] Paragraph integration (~80 lines added to paragraph.go)
+  - [x] Image dimension reading with image.DecodeConfig
+- [x] Paragraph integration (~95 lines added to paragraph.go)
   - [x] AddImage, AddImageWithSize, AddImageWithPosition methods
   - [x] Images() accessor
   - [x] RelationshipManager integration
 - [x] XML serialization (internal/xml/drawing.go) (~460 lines)
   - [x] Drawing element serialization (30+ structs)
-  - [x] Picture element serialization
-  - [x] Extent and position handling
-  - [x] Helper functions for inline/floating drawings
-- [ ] Builder integration (builder.go) (~50 lines)
-  - [ ] ParagraphBuilder.Image(path) method
-  - [ ] ParagraphBuilder.ImageWithSize(path, width, height)
-- [ ] Tests (image_test.go) (~300 lines)
-  - [ ] Image insertion tests
-  - [ ] Format detection tests
-  - [ ] Size calculation tests
-  - [ ] Media relationship tests
-- [ ] Example (v2/examples/08_images/) (~200 lines)
-  - [ ] Basic image insertion
-  - [ ] Image sizing and positioning
-  - [ ] Multiple images in document
+  - [x] Inline and Anchor (floating) support
+  - [x] Picture/BlipFill/GraphicData elements
+  - [x] Position and extent handling
+  - [x] Helper functions: NewInlineDrawing, NewFloatingDrawing
+- [x] Builder integration (builder.go) (~40 lines)
+  - [x] ParagraphBuilder.AddImage(path) method
+  - [x] ParagraphBuilder.AddImageWithSize(path, size)
+  - [x] ParagraphBuilder.AddImageWithPosition(path, size, pos)
+- [x] Tests (image_test.go) (~420 lines, 18 test cases)
+  - [x] TestNewImage (3 variations)
+  - [x] TestNewImageWithSize
+  - [x] TestNewImageWithPosition
+  - [x] TestReadImageFromReader
+  - [x] TestImageSetSize
+  - [x] TestImageDescription
+  - [x] TestImageRelationshipID
+  - [x] TestDetectImageFormat (11 formats)
+  - [x] TestImageSizeConversions
+  - [x] TestNewImageSizeInches
+  - [x] TestDefaultImagePosition
+  - [x] All tests passing ✅
+- [x] Example (v2/examples/08_images/) (~267 lines)
+  - [x] Example 1: Inline image (default size)
+  - [x] Example 2: Custom sized image (pixels)
+  - [x] Example 3: Image sized in inches
+  - [x] Example 4: Floating image (center aligned)
+  - [x] Example 5: Floating image (left with text wrap)
+  - [x] Example 6: Floating image (right aligned)
+  - [x] Example 7: Multiple images in one paragraph
+  - [x] Creates sample images programmatically
+  - [x] Builds and runs successfully ✅
 
-**Completed**: ~900 lines (domain, core, XML)
-**Remaining**: ~550 lines (builder, tests, example)
-**Priority**: HIGH - Major feature for v2.0.0
+**Completed**: ~1,600 lines across 7 files
+- domain/image.go: 172 lines
+- internal/core/image.go: 270 lines
+- internal/xml/drawing.go: 280 lines
+- internal/xml/drawing_helper.go: 180 lines
+- internal/core/paragraph.go: +95 lines
+- builder.go: +40 lines
+- internal/core/image_test.go: 420 lines
+- v2/examples/08_images/main.go: 267 lines
+
+**Actual effort**: 10 hours (estimated 12-15)
+**Priority**: ✅ COMPLETE - Production ready
 
 ### 🚧 Phase 9: Advanced Tables (Week 15)
 **Goal**: Implement advanced table features
