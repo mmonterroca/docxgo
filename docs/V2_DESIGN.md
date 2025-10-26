@@ -1,6 +1,7 @@
 # go-docx v2.0 - Clean Architecture Design
 
-**Status**: ✅ Phase 6.5 Complete - Builder Pattern & API Polish Implemented  
+**Status**: ✅ Phase 9 Complete - Advanced Tables with Cell Merging, Nested Tables & Styles  
+**Progress**: ~92% (Phases 1-9 complete)  
 **Target**: Q1 2026  
 **Breaking Changes**: Yes (major version bump)
 
@@ -653,10 +654,10 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 **Actual effort**: 10 hours (estimated 12-15)
 **Priority**: ✅ COMPLETE - Production ready
 
-### 🚧 Phase 9: Advanced Tables (Week 15)
+### ✅ Phase 9: Advanced Tables (Week 15)
 **Goal**: Implement advanced table features
 
-**Status**: 80% Complete (commit 34c439b)
+**Status**: 100% Complete (commits 34c439b, 38a08b1, e78d809)
 - [x] Cell merging (table.go enhancement) (~200 lines)
   - [x] Merge(cols, rows) method
   - [x] GridSpan() and SetGridSpan() for horizontal merge
@@ -666,38 +667,72 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
   - [x] Cell.AddTable(rows, cols) method
   - [x] Nested table serialization
   - [x] Proper relationship handling
-- [ ] Table styles (table.go) (~150 lines)
-  - [ ] TableStyle interface
-  - [ ] Built-in table styles (Grid, List, etc.)
-  - [ ] SetTableStyle(styleID) method
-  - [ ] Style serialization
-- [ ] Table builder enhancement (builder.go) (~100 lines)
-  - [ ] TableBuilder.Style(styleID)
-  - [ ] CellBuilder.Merge(colspan, rowspan)
-  - [ ] RowBuilder.Height(value, rule)
-- [ ] Tests (table_advanced_test.go) (~400 lines)
-  - [ ] Cell merging tests (horizontal, vertical, both)
-  - [ ] Nested table tests
-  - [ ] Table style tests
-  - [ ] Complex table scenarios
-- [ ] Example (v2/examples/09_advanced_tables/) (~300 lines)
-  - [ ] Cell merging demonstration
-  - [ ] Nested tables
-  - [ ] Styled tables
-  - [ ] Complex layouts (calendar, invoice, etc.)
+- [x] Table styles (table.go) (~150 lines)
+  - [x] TableStyle struct with Name field
+  - [x] 8 predefined table styles (Normal, Grid, Plain, MediumShading, LightShading, Colorful, Accent1, Accent2)
+  - [x] Style() and SetStyle() methods
+  - [x] Style serialization (TableStyle XML struct)
+- [x] Table builder enhancement (builder.go) (~100 lines)
+  - [x] TableBuilder.Style(styleID)
+  - [x] CellBuilder.Merge(colspan, rowspan)
+  - [x] RowBuilder.Height(value, rule) - already existed
+- [x] Tests (table_advanced_test.go) (~400 lines)
+  - [x] Cell merging tests (horizontal, vertical, both)
+  - [x] Nested table tests (single and multiple)
+  - [x] Table style tests (predefined and custom)
+  - [x] Complex table scenarios
+  - [x] Error handling tests (InvalidArguments)
+- [x] Example (v2/examples/09_advanced_tables/) (~400 lines)
+  - [x] Horizontal cell merging demonstration
+  - [x] Vertical cell merging demonstration
+  - [x] Combined 2D merging
+  - [x] Calendar layout (7x7 table)
+  - [x] Nested tables example
+  - [x] Invoice-style layout
 
-**Completed**:
+**Completed Files**:
+
+Part 1 (commits 34c439b, 38a08b1):
 - domain/table.go: +30 lines (GridSpan, VMerge, AddTable methods, VerticalMergeType enum)
 - internal/core/table.go: +80 lines (cell merge implementation)
 - internal/xml/table.go: +15 lines (GridSpan, VMerge XML structs)
 - internal/serializer/serializer.go: +20 lines (merge serialization)
 - internal/manager/id.go: +8 lines (GenerateID method)
-- Fixed package naming conflicts and interface definitions
 
-**Known Issues**:
-- w:tblStyle vs w:style XML tag conflict (TODO: resolve)
+Part 2 (commit e78d809):
+- domain/table.go: +12 lines (8 predefined styles)
+- builder.go: +30 lines (Style, Merge methods)
+- internal/xml/table.go: +6 lines (TableStyle struct)
+- internal/serializer/serializer.go: +7 lines (style integration)
+- internal/core/table_advanced_test.go: 360 lines (10 test cases, 100% passing)
+- v2/examples/09_advanced_tables/main.go: 393 lines (6 use cases)
 
-**Estimated effort**: 12-15 hours (9 hours completed)
+**Tests**: 10 test cases (100% passing)
+- TestTableCellMerge_Horizontal ✅
+- TestTableCellMerge_Vertical ✅
+- TestTableCellMerge_Both ✅
+- TestTableCellSetGridSpan ✅
+- TestTableCellSetVMerge ✅
+- TestTableCellNestedTable ✅
+- TestTableCellMultipleNestedTables ✅
+- TestTableStyle ✅
+- TestTableCellMerge_InvalidArguments ✅ (6 subcases)
+- TestTableCellAddTable_InvalidArguments ✅ (6 subcases)
+
+**Statistics**:
+- Total lines: ~1,000 lines
+- Part 1: ~153 lines (cell merging, nested tables)
+- Part 2: ~808 lines (styles, builder, tests, example)
+- Tests: 360 lines (10 test cases)
+- Example: 393 lines (6 use cases)
+
+**Resolved Issues**:
+- ✅ Fixed w:tblStyle vs w:style XML tag conflict by creating separate TableStyle struct
+- ✅ Fixed package naming conflicts and interface definitions
+- ✅ All tests passing (100% success rate)
+- ✅ Example verified working (generates 4.8KB document)
+
+**Actual effort**: 15 hours
 **Priority**: HIGH - Essential for professional documents
 
 ### Phase 10: Document Reading (Week 16)
