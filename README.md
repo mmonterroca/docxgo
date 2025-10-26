@@ -27,9 +27,7 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 **Stability**: Development  
 **Target Stable Release**: Q1 2026
 
-> **Note**: This library recently underwent a complete architectural rewrite. If you're looking for the legacy v1 code, see [`legacy/v1/`](legacy/v1/) directory.
-
----
+> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices.
 
 ---
 
@@ -145,8 +143,6 @@ github.com/mmonterroca/docxgo/
 │
 └── examples/        # Usage examples
     └── basic/       # Basic example
-
-└── legacy/v1/       # Deprecated v1 code (see DEPRECATION.md)
 ```
 
 ### Design Principles
@@ -280,27 +276,7 @@ Typical document creation: **< 1ms** for simple documents
 
 ---
 
-## Migration from v1
-
-If you're using the legacy v1 API, see:
-
-- **[v1 Legacy Code](legacy/v1/)** - Archived v1 codebase
-- **[Deprecation Notice](legacy/v1/DEPRECATION.md)** - Why v1 is deprecated and migration timeline
-- **[Migration Guide](MIGRATION.md)** - Step-by-step migration instructions (coming soon)
-
-### Key Differences
-
-| Aspect | v1 (Legacy) | v2 (Current) |
-|--------|-------------|--------------|
-| Error Handling | Silent failures | Explicit errors |
-| Type Safety | `interface{}` | Concrete types |
-| Architecture | God objects | Clean architecture |
-| Testability | Difficult | Interface-based, easy to mock |
-| Performance | Baseline | 10%+ faster |
-| Test Coverage | ~60% | 95%+ |
-| Maintenance | ❌ Deprecated | ✅ Active |
-
----
+## Migration from v1---
 
 ## Contributing
 

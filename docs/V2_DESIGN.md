@@ -5,7 +5,7 @@
 **Target**: Q1 2026  
 **Breaking Changes**: Yes (major version bump)
 
-> **Project Transition Note**: This project is being restructured from a fork of `fumiama/go-docx` to an independent project under `SlideLang/go-docx`. v2 represents a complete architectural rewrite and will become the main codebase, with v1 archived as legacy code.
+> **Project Note**: This project originated as a fork of `fumiama/go-docx` but has been completely rewritten with a clean architecture design. The current version represents a ground-up rebuild focused on maintainability, type safety, and modern Go practices.
 
 ---
 
@@ -62,21 +62,10 @@
 
 ## 📦 Package Structure
 
-### Current Structure (Pre-Transition)
+### Current Structure
 ```
 github.com/mmonterroca/docxgo/
-├── v2/                         # New architecture (will become root)
-│   ├── domain/
-│   ├── internal/
-│   ├── pkg/
-│   └── examples/
-└── (root)                      # v1 legacy code (will move to legacy/v1/)
-```
-
-### Target Structure (Post-Transition)
-```
-github.com/mmonterroca/docxgo/
-├── docx.go                     # Main entry point (v2)
+├── docx.go                     # Main entry point
 ├── builder.go                  # Builder pattern implementation
 ├── options.go                  # Functional options
 ├── CREDITS.md                  # Project history & attribution
@@ -131,16 +120,10 @@ github.com/mmonterroca/docxgo/
 │   ├── advanced/
 │   └── migration_from_v1/
 │
-├── docs/                       # Documentation
-│   ├── V2_DESIGN.md           # This file
-│   ├── ARCHITECTURE.md        # Architecture deep-dive
-│   └── API_DOCUMENTATION.md   # API reference
-│
-└── legacy/                     # Archived v1 code
-    └── v1/                    # Original fork code
-        ├── README.md          # "This version is deprecated"
-        ├── DEPRECATION.md     # Why and how to migrate
-        └── ...                # All v1 code
+└── docs/                       # Documentation
+    ├── V2_DESIGN.md           # This file
+    ├── ARCHITECTURE.md        # Architecture deep-dive
+    └── API_DOCUMENTATION.md   # API reference
 ```
 
 ---
@@ -399,11 +382,11 @@ func NewDocxDocument(config *Config) *docxDocument {
 
 ## 🔄 Migration from v1 to v2
 
-### Example: v1 Code
+### Example: Old Approach (Before Rewrite)
 
 ```go
-// v1 (old - legacy)
-import "github.com/fumiama/go-docx"  // OLD namespace
+// Before the clean architecture rewrite
+import "github.com/fumiama/go-docx"  // Original fork
 
 doc := docx.New()
 para := doc.AddParagraph()

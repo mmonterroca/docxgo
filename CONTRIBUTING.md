@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to go-docx! This document provides guidelines and workflow information for contributors.
 
-> **Note**: This project recently completed a major restructuring. v2 is now the main codebase (in root), and v1 code has been archived to `legacy/v1/`. See [CREDITS.md](CREDITS.md) for project history.
+> **Note**: This project was completely rewritten in 2024-2025 with a clean architecture design. All code follows modern Go practices and comprehensive testing standards.
 
 ## Quick Start for Contributors
 
@@ -163,11 +163,6 @@ Current priorities for v2 development:
 - ✅ **Custom XML**: Custom XML parts
 - ✅ **Template Support**: Document templates
 
-### v1 Legacy (Low Priority)
-- ⚠️ **Critical bugs only**: v1 is in maintenance mode
-- ⚠️ **No new features**: Focus efforts on v2
-- ⚠️ **End of life**: December 2025
-
 ## Development Guidelines
 
 ### Code Quality
@@ -179,9 +174,9 @@ Current priorities for v2 development:
 - **Comments**: Document all exported functions
 - **Tests**: Aim for 95%+ coverage (current standard)
 
-### v2 Architecture Guidelines
+### Architecture Guidelines
 
-When contributing to v2:
+When contributing code:
 
 1. **Domain Layer** (`domain/`) - Interfaces only, no implementations
 2. **Internal Layer** (`internal/`) - Core implementations, managers, services
@@ -190,14 +185,7 @@ When contributing to v2:
 5. **Dependency Injection** - Pass dependencies via constructors
 6. **Thread-Safe** - Use mutexes/atomics where needed
 
-### Legacy v1 Code
-
-v1 code in `legacy/v1/` is deprecated and in maintenance mode:
-- **Critical bugs only** - No new features
-- **End of support**: December 2025
-- **Migration help**: See [MIGRATION.md](MIGRATION.md)
-
-If fixing a v1 bug:
+### Submitting Changes
 1. Consider if it exists in v2 too
 2. Fix in both if applicable
 3. Mark PR with `legacy-v1` label
