@@ -44,6 +44,7 @@ package docx
 import (
 	"github.com/mmonterroca/docxgo/domain"
 	"github.com/mmonterroca/docxgo/internal/core"
+	"github.com/mmonterroca/docxgo/pkg/color"
 )
 
 // NewDocument creates a new empty Word document.
@@ -62,6 +63,42 @@ func NewDocument() domain.Document {
 
 // Version is the library version.
 const Version = "2.0.0-beta"
+
+// Common color constants exported for convenience.
+var (
+	Black   = color.Black
+	White   = color.White
+	Red     = color.Red
+	Green   = color.Green
+	Blue    = color.Blue
+	Yellow  = color.Yellow
+	Cyan    = color.Cyan
+	Magenta = color.Magenta
+	Orange  = color.Orange
+	Purple  = color.Purple
+	Gray    = color.Gray
+	Silver  = color.Silver
+)
+
+// Common alignment constants exported for convenience.
+const (
+	AlignmentLeft       = domain.AlignmentLeft
+	AlignmentCenter     = domain.AlignmentCenter
+	AlignmentRight      = domain.AlignmentRight
+	AlignmentJustify    = domain.AlignmentJustify
+	AlignmentDistribute = domain.AlignmentDistribute
+)
+
+// Common underline constants exported for convenience.
+const (
+	UnderlineNone   = domain.UnderlineNone
+	UnderlineSingle = domain.UnderlineSingle
+	UnderlineDouble = domain.UnderlineDouble
+	UnderlineThick  = domain.UnderlineThick
+	UnderlineDotted = domain.UnderlineDotted
+	UnderlineDashed = domain.UnderlineDashed
+	UnderlineWave   = domain.UnderlineWave
+)
 
 // Field creation functions
 

@@ -36,6 +36,22 @@ import (
 	"github.com/mmonterroca/docxgo/pkg/errors"
 )
 
+// Common color constants for convenience.
+var (
+	Black   = domain.Color{R: 0, G: 0, B: 0}
+	White   = domain.Color{R: 255, G: 255, B: 255}
+	Red     = domain.Color{R: 255, G: 0, B: 0}
+	Green   = domain.Color{R: 0, G: 128, B: 0}
+	Blue    = domain.Color{R: 0, G: 0, B: 255}
+	Yellow  = domain.Color{R: 255, G: 255, B: 0}
+	Cyan    = domain.Color{R: 0, G: 255, B: 255}
+	Magenta = domain.Color{R: 255, G: 0, B: 255}
+	Orange  = domain.Color{R: 255, G: 165, B: 0}
+	Purple  = domain.Color{R: 128, G: 0, B: 128}
+	Gray    = domain.Color{R: 128, G: 128, B: 128}
+	Silver  = domain.Color{R: 192, G: 192, B: 192}
+)
+
 // ToHex converts a Color to a hex string (e.g., "FF0000" for red).
 func ToHex(c domain.Color) string {
 	return fmt.Sprintf("%02X%02X%02X", c.R, c.G, c.B)
