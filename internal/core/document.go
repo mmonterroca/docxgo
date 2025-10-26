@@ -96,6 +96,17 @@ func (d *document) AddSection() (domain.Section, error) {
 	return nil, errors.Unsupported("Document.AddSection", "sections not yet implemented")
 }
 
+// DefaultSection returns the default (first) section of the document.
+func (d *document) DefaultSection() (domain.Section, error) {
+	if len(d.sections) == 0 {
+		// Create default section if it doesn't exist
+		section := NewSection(*d.relManager, *d.idGen)
+		d.sections = append(d.sections, section)
+		return section, nil
+	}
+	return d.sections[0], nil
+}
+
 // Paragraphs returns all paragraphs in the document.
 func (d *document) Paragraphs() []domain.Paragraph {
 	// Return a copy to prevent external modification

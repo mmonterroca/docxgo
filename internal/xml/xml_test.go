@@ -223,7 +223,7 @@ func TestStyles_Marshal(t *testing.T) {
 	// Add Heading1 style
 	heading1 := NewParagraphStyle("Heading1", "Heading 1", false)
 	heading1.BasedOn = &BasedOn{Val: "Normal"}
-	heading1.ParaProps = &ParagraphProperties{
+	heading1.ParaProps = &StyleParagraphProperties{
 		OutlineLevel: &OutlineLevel{Val: 1},
 	}
 	styles.AddStyle(heading1)

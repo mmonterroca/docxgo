@@ -127,9 +127,12 @@ const (
 	FieldTypeTOC FieldType = iota
 	FieldTypePageNumber
 	FieldTypeNumPages
+	FieldTypePageCount // Alias for NumPages
 	FieldTypeDate
 	FieldTypeTime
 	FieldTypeStyleRef
 	FieldTypeRef
 	FieldTypeSeq
+	FieldTypeHyperlink
+	FieldTypeCustom // Custom field with user-defined code
 )

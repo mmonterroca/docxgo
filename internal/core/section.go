@@ -217,7 +217,8 @@ func (h *docxHeader) AddParagraph() (domain.Paragraph, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	para := NewParagraph(h.relationMgr, h.idGen)
+	id := h.idGen.NextParagraphID()
+	para := NewParagraph(id, &h.idGen, &h.relationMgr)
 	h.paragraphs = append(h.paragraphs, para)
 	return para, nil
 }
@@ -247,7 +248,8 @@ func (f *docxFooter) AddParagraph() (domain.Paragraph, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	para := NewParagraph(f.relationMgr, f.idGen)
+	id := f.idGen.NextParagraphID()
+	para := NewParagraph(id, &f.idGen, &f.relationMgr)
 	f.paragraphs = append(f.paragraphs, para)
 	return para, nil
 }
