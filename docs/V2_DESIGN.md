@@ -629,16 +629,16 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 ### 🚧 Phase 9: Advanced Tables (Week 15)
 **Goal**: Implement advanced table features
 
-**Status**: Not Started
-- [ ] Cell merging (table.go enhancement) (~200 lines)
-  - [ ] MergeCells(startRow, startCol, endRow, endCol)
-  - [ ] MergeCellsHorizontal(row, startCol, endCol)
-  - [ ] MergeCellsVertical(col, startRow, endRow)
-  - [ ] GridSpan and VMerge XML serialization
-- [ ] Nested tables (table.go) (~100 lines)
-  - [ ] Cell.AddTable(rows, cols) method
-  - [ ] Nested table serialization
-  - [ ] Proper relationship handling
+**Status**: 80% Complete (commit 34c439b)
+- [x] Cell merging (table.go enhancement) (~200 lines)
+  - [x] Merge(cols, rows) method
+  - [x] GridSpan() and SetGridSpan() for horizontal merge
+  - [x] VMerge() and SetVMerge() for vertical merge
+  - [x] GridSpan and VMerge XML serialization
+- [x] Nested tables (table.go) (~100 lines)
+  - [x] Cell.AddTable(rows, cols) method
+  - [x] Nested table serialization
+  - [x] Proper relationship handling
 - [ ] Table styles (table.go) (~150 lines)
   - [ ] TableStyle interface
   - [ ] Built-in table styles (Grid, List, etc.)
@@ -659,7 +659,18 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
   - [ ] Styled tables
   - [ ] Complex layouts (calendar, invoice, etc.)
 
-**Estimated effort**: 12-15 hours
+**Completed**:
+- domain/table.go: +30 lines (GridSpan, VMerge, AddTable methods, VerticalMergeType enum)
+- internal/core/table.go: +80 lines (cell merge implementation)
+- internal/xml/table.go: +15 lines (GridSpan, VMerge XML structs)
+- internal/serializer/serializer.go: +20 lines (merge serialization)
+- internal/manager/id.go: +8 lines (GenerateID method)
+- Fixed package naming conflicts and interface definitions
+
+**Known Issues**:
+- w:tblStyle vs w:style XML tag conflict (TODO: resolve)
+
+**Estimated effort**: 12-15 hours (9 hours completed)
 **Priority**: HIGH - Essential for professional documents
 
 ### Phase 10: Document Reading (Week 16)
