@@ -309,6 +309,48 @@ func (pb *ParagraphBuilder) Underline(style domain.UnderlineStyle) *ParagraphBui
 	return pb
 }
 
+// AddImage adds an image from a file path to the paragraph.
+func (pb *ParagraphBuilder) AddImage(path string) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImage(path); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
+// AddImageWithSize adds an image with custom dimensions.
+func (pb *ParagraphBuilder) AddImageWithSize(path string, size domain.ImageSize) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImageWithSize(path, size); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
+// AddImageWithPosition adds a floating image with custom positioning.
+func (pb *ParagraphBuilder) AddImageWithPosition(path string, size domain.ImageSize, pos domain.ImagePosition) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImageWithPosition(path, size, pos); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
 // End returns to the DocumentBuilder for further operations.
 func (pb *ParagraphBuilder) End() *DocumentBuilder {
 	return pb.parent
