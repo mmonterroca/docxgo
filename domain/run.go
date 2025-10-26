@@ -114,36 +114,38 @@ var (
 	ColorBlue  = Color{0, 0, 255}
 )
 
-// UnderlineStyle represents underline styles.
+// UnderlineStyle represents text underline styles.
 type UnderlineStyle int
 
+// Underline style constants.
 const (
-	UnderlineNone UnderlineStyle = iota
-	UnderlineSingle
-	UnderlineDouble
-	UnderlineThick
-	UnderlineDotted
-	UnderlineDashed
-	UnderlineWave
+	UnderlineNone   UnderlineStyle = iota // No underline
+	UnderlineSingle                       // Single line underline
+	UnderlineDouble                       // Double line underline
+	UnderlineThick                        // Thick line underline
+	UnderlineDotted                       // Dotted line underline
+	UnderlineDashed                       // Dashed line underline
+	UnderlineWave                         // Wavy line underline
 )
 
-// HighlightColor represents highlight colors.
+// HighlightColor represents text highlight/background colors.
 type HighlightColor int
 
+// Highlight color constants.
 const (
-	HighlightNone HighlightColor = iota
-	HighlightYellow
-	HighlightGreen
-	HighlightCyan
-	HighlightMagenta
-	HighlightBlue
-	HighlightRed
-	HighlightDarkBlue
-	HighlightDarkCyan
-	HighlightDarkGreen
-	HighlightDarkMagenta
-	HighlightDarkRed
-	HighlightDarkYellow
-	HighlightDarkGray
-	HighlightLightGray
+	HighlightNone        HighlightColor = iota // No highlight
+	HighlightYellow                            // Yellow highlight
+	HighlightGreen                             // Green highlight
+	HighlightCyan                              // Cyan highlight
+	HighlightMagenta                           // Magenta highlight
+	HighlightBlue                              // Blue highlight
+	HighlightRed                               // Red highlight
+	HighlightDarkBlue                          // Dark blue highlight
+	HighlightDarkCyan                          // Dark cyan highlight
+	HighlightDarkGreen                         // Dark green highlight
+	HighlightDarkMagenta                       // Dark magenta highlight
+	HighlightDarkRed                           // Dark red highlight
+	HighlightDarkYellow                        // Dark yellow highlight
+	HighlightDarkGray                          // Dark gray highlight
+	HighlightLightGray                         // Light gray highlight
 )

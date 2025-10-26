@@ -145,22 +145,24 @@ type TableWidth struct {
 	Value int
 }
 
-// WidthType defines how width is calculated.
+// WidthType defines how table/cell width is calculated.
 type WidthType int
 
+// Width type constants for tables and cells.
 const (
-	WidthAuto WidthType = iota // Auto width
-	WidthDXA                   // Fixed width in twips
-	WidthPct                   // Percentage (value = percentage * 50)
+	WidthAuto WidthType = iota // Auto width (determined by content)
+	WidthDXA                   // Fixed width in twips (twentieths of a point)
+	WidthPct                   // Percentage width (value = percentage * 50)
 )
 
-// VerticalAlignment represents vertical alignment in a cell.
+// VerticalAlignment represents vertical alignment of content within a table cell.
 type VerticalAlignment int
 
+// Vertical alignment constants for table cells.
 const (
-	VerticalAlignTop VerticalAlignment = iota
-	VerticalAlignCenter
-	VerticalAlignBottom
+	VerticalAlignTop    VerticalAlignment = iota // Align to top of cell
+	VerticalAlignCenter                          // Align to center of cell
+	VerticalAlignBottom                          // Align to bottom of cell
 )
 
 // TableBorders represents borders for a table or cell.

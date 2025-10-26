@@ -27,53 +27,55 @@ SOFTWARE.
 
 package domain
 
-// Built-in paragraph style IDs (OOXML standard)
+// Built-in paragraph style IDs (OOXML standard).
+// These style IDs are recognized by Microsoft Word and compatible applications.
 const (
-	StyleIDNormal           = "Normal"
-	StyleIDHeading1         = "Heading1"
-	StyleIDHeading2         = "Heading2"
-	StyleIDHeading3         = "Heading3"
-	StyleIDHeading4         = "Heading4"
-	StyleIDHeading5         = "Heading5"
-	StyleIDHeading6         = "Heading6"
-	StyleIDHeading7         = "Heading7"
-	StyleIDHeading8         = "Heading8"
-	StyleIDHeading9         = "Heading9"
-	StyleIDTitle            = "Title"
-	StyleIDSubtitle         = "Subtitle"
-	StyleIDQuote            = "Quote"
-	StyleIDIntenseQuote     = "IntenseQuote"
-	StyleIDListParagraph    = "ListParagraph"
-	StyleIDCaption          = "Caption"
-	StyleIDTOC1             = "TOC1"
-	StyleIDTOC2             = "TOC2"
-	StyleIDTOC3             = "TOC3"
-	StyleIDTOC4             = "TOC4"
-	StyleIDTOC5             = "TOC5"
-	StyleIDTOC6             = "TOC6"
-	StyleIDTOC7             = "TOC7"
-	StyleIDTOC8             = "TOC8"
-	StyleIDTOC9             = "TOC9"
-	StyleIDHeader           = "Header"
-	StyleIDFooter           = "Footer"
-	StyleIDFootnoteText     = "FootnoteText"
-	StyleIDEndnoteText      = "EndnoteText"
-	StyleIDBodyText         = "BodyText"
-	StyleIDBodyTextIndent   = "BodyTextIndent"
-	StyleIDNoSpacing        = "NoSpacing"
+	StyleIDNormal           = "Normal"           // Default normal paragraph style
+	StyleIDHeading1         = "Heading1"         // Heading level 1
+	StyleIDHeading2         = "Heading2"         // Heading level 2
+	StyleIDHeading3         = "Heading3"         // Heading level 3
+	StyleIDHeading4         = "Heading4"         // Heading level 4
+	StyleIDHeading5         = "Heading5"         // Heading level 5
+	StyleIDHeading6         = "Heading6"         // Heading level 6
+	StyleIDHeading7         = "Heading7"         // Heading level 7
+	StyleIDHeading8         = "Heading8"         // Heading level 8
+	StyleIDHeading9         = "Heading9"         // Heading level 9
+	StyleIDTitle            = "Title"            // Document title style
+	StyleIDSubtitle         = "Subtitle"         // Document subtitle style
+	StyleIDQuote            = "Quote"            // Block quote style
+	StyleIDIntenseQuote     = "IntenseQuote"     // Emphasized block quote style
+	StyleIDListParagraph    = "ListParagraph"    // List paragraph style
+	StyleIDCaption          = "Caption"          // Caption style (for figures/tables)
+	StyleIDTOC1             = "TOC1"             // Table of contents level 1
+	StyleIDTOC2             = "TOC2"             // Table of contents level 2
+	StyleIDTOC3             = "TOC3"             // Table of contents level 3
+	StyleIDTOC4             = "TOC4"             // Table of contents level 4
+	StyleIDTOC5             = "TOC5"             // Table of contents level 5
+	StyleIDTOC6             = "TOC6"             // Table of contents level 6
+	StyleIDTOC7             = "TOC7"             // Table of contents level 7
+	StyleIDTOC8             = "TOC8"             // Table of contents level 8
+	StyleIDTOC9             = "TOC9"             // Table of contents level 9
+	StyleIDHeader           = "Header"           // Header text style
+	StyleIDFooter           = "Footer"           // Footer text style
+	StyleIDFootnoteText     = "FootnoteText"     // Footnote text style
+	StyleIDEndnoteText      = "EndnoteText"      // Endnote text style
+	StyleIDBodyText         = "BodyText"         // Body text style
+	StyleIDBodyTextIndent   = "BodyTextIndent"   // Body text with first-line indent
+	StyleIDNoSpacing        = "NoSpacing"        // No spacing paragraph style
 )
 
-// Built-in character style IDs
+// Built-in character style IDs (OOXML standard).
+// These apply formatting to individual runs of text within paragraphs.
 const (
-	StyleIDDefaultParagraphFont = "DefaultParagraphFont"
-	StyleIDEmphasis             = "Emphasis"
-	StyleIDStrong               = "Strong"
-	StyleIDSubtle               = "Subtle"
-	StyleIDIntenseEmphasis      = "IntenseEmphasis"
-	StyleIDIntenseReference     = "IntenseReference"
-	StyleIDBookTitle            = "BookTitle"
-	StyleIDHyperlink            = "Hyperlink"
-	StyleIDFollowedHyperlink    = "FollowedHyperlink"
+	StyleIDDefaultParagraphFont = "DefaultParagraphFont" // Default character formatting
+	StyleIDEmphasis             = "Emphasis"             // Emphasis (typically italic)
+	StyleIDStrong               = "Strong"               // Strong emphasis (typically bold)
+	StyleIDSubtle               = "Subtle"               // Subtle text
+	StyleIDIntenseEmphasis      = "IntenseEmphasis"      // Intense emphasis
+	StyleIDIntenseReference     = "IntenseReference"     // Intense reference
+	StyleIDBookTitle            = "BookTitle"            // Book title style
+	StyleIDHyperlink            = "Hyperlink"            // Hyperlink text style
+	StyleIDFollowedHyperlink    = "FollowedHyperlink"    // Visited hyperlink style
 )
 
 // StyleManager manages document styles.

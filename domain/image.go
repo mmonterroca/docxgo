@@ -24,19 +24,20 @@ SOFTWARE.
 
 package domain
 
-// ImageFormat represents supported image formats.
+// ImageFormat represents supported image file formats.
 type ImageFormat string
 
+// Supported image format constants.
 const (
-	ImageFormatPNG  ImageFormat = "png"
-	ImageFormatJPEG ImageFormat = "jpeg"
-	ImageFormatJPG  ImageFormat = "jpg"
-	ImageFormatGIF  ImageFormat = "gif"
-	ImageFormatBMP  ImageFormat = "bmp"
-	ImageFormatTIFF ImageFormat = "tiff"
-	ImageFormatTIF  ImageFormat = "tif"
-	ImageFormatSVG  ImageFormat = "svg"
-	ImageFormatWEBP ImageFormat = "webp"
+	ImageFormatPNG  ImageFormat = "png"  // PNG format
+	ImageFormatJPEG ImageFormat = "jpeg" // JPEG format (full name)
+	ImageFormatJPG  ImageFormat = "jpg"  // JPEG format (short name)
+	ImageFormatGIF  ImageFormat = "gif"  // GIF format
+	ImageFormatBMP  ImageFormat = "bmp"  // BMP format
+	ImageFormatTIFF ImageFormat = "tiff" // TIFF format (full name)
+	ImageFormatTIF  ImageFormat = "tif"  // TIFF format (short name)
+	ImageFormatSVG  ImageFormat = "svg"  // SVG format
+	ImageFormatWEBP ImageFormat = "webp" // WebP format
 )
 
 // ImageSize represents image dimensions.
@@ -117,34 +118,37 @@ type ImagePosition struct {
 	BehindText bool              // Whether image is behind text
 }
 
-// ImagePositionType defines how an image is positioned.
+// ImagePositionType defines how an image is positioned in the document.
 type ImagePositionType string
 
+// Image position type constants.
 const (
-	ImagePositionInline   ImagePositionType = "inline"   // Inline with text
-	ImagePositionFloating ImagePositionType = "floating" // Floating/absolute position
+	ImagePositionInline   ImagePositionType = "inline"   // Inline with text (default)
+	ImagePositionFloating ImagePositionType = "floating" // Floating with absolute positioning
 )
 
-// HorizontalAlign defines horizontal alignment for floating images.
+// HorizontalAlign defines horizontal alignment options for floating images.
 type HorizontalAlign string
 
+// Horizontal alignment constants for floating images.
 const (
-	HAlignLeft   HorizontalAlign = "left"
-	HAlignCenter HorizontalAlign = "center"
-	HAlignRight  HorizontalAlign = "right"
-	HAlignInside HorizontalAlign = "inside"  // Inside margin
-	HAlignOutside HorizontalAlign = "outside" // Outside margin
+	HAlignLeft    HorizontalAlign = "left"    // Left-aligned
+	HAlignCenter  HorizontalAlign = "center"  // Center-aligned
+	HAlignRight   HorizontalAlign = "right"   // Right-aligned
+	HAlignInside  HorizontalAlign = "inside"  // Inside margin (left on odd pages)
+	HAlignOutside HorizontalAlign = "outside" // Outside margin (right on odd pages)
 )
 
-// VerticalAlign defines vertical alignment for floating images.
+// VerticalAlign defines vertical alignment options for floating images.
 type VerticalAlign string
 
+// Vertical alignment constants for floating images.
 const (
-	VAlignTop    VerticalAlign = "top"
-	VAlignCenter VerticalAlign = "center"
-	VAlignBottom VerticalAlign = "bottom"
-	VAlignInside VerticalAlign = "inside"
-	VAlignOutside VerticalAlign = "outside"
+	VAlignTop     VerticalAlign = "top"     // Top-aligned
+	VAlignCenter  VerticalAlign = "center"  // Center-aligned
+	VAlignBottom  VerticalAlign = "bottom"  // Bottom-aligned
+	VAlignInside  VerticalAlign = "inside"  // Inside margin (top on odd pages)
+	VAlignOutside VerticalAlign = "outside" // Outside margin (bottom on odd pages)
 )
 
 // TextWrapType defines how text wraps around an image.

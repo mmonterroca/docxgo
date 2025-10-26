@@ -23,8 +23,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
+// Package core provides concrete implementations of domain interfaces for go-docx v2.
+//
+// This package contains the core document model implementations including:
+// - Document: The main document structure
+// - Paragraph: Paragraph implementation with formatting
+// - Run: Text run implementation with character formatting
+// - Table: Table implementation with cells and rows
+// - Section: Section implementation with page settings
+// - Image: Image embedding and positioning
+// - Field: Field implementation (TOC, page numbers, etc.)
+//
+// These implementations handle the business logic and coordinate with
+// internal managers (ID generation, relationships, media, styles) and
+// serialization to XML structures.
 package core
 
 import (

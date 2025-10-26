@@ -23,9 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
-// Package domain defines the core interfaces for go-docx v2.
 package domain
 
 // Paragraph represents a paragraph in a document.
@@ -100,15 +97,16 @@ type Paragraph interface {
 	SetLineSpacing(spacing LineSpacing) error
 }
 
-// Alignment represents horizontal alignment options.
+// Alignment represents horizontal alignment options for paragraphs.
 type Alignment int
 
+// Paragraph alignment constants.
 const (
-	AlignmentLeft Alignment = iota
-	AlignmentCenter
-	AlignmentRight
-	AlignmentJustify
-	AlignmentDistribute
+	AlignmentLeft       Alignment = iota // Left-aligned (default)
+	AlignmentCenter                      // Center-aligned
+	AlignmentRight                       // Right-aligned
+	AlignmentJustify                     // Justified (both left and right)
+	AlignmentDistribute                  // Distributed evenly
 )
 
 // Indentation represents paragraph indentation settings.
@@ -128,25 +126,27 @@ type LineSpacing struct {
 // LineSpacingRule defines how line spacing is calculated.
 type LineSpacingRule int
 
+// Line spacing rule constants.
 const (
-	LineSpacingAuto    LineSpacingRule = iota // Auto (value = 240 = single spacing)
-	LineSpacingExact                          // Exact (value in twips)
-	LineSpacingAtLeast                        // At least (value in twips)
+	LineSpacingAuto    LineSpacingRule = iota // Auto spacing (value = 240 = single spacing)
+	LineSpacingExact                          // Exact spacing (value in twips)
+	LineSpacingAtLeast                        // At least spacing (value in twips, can expand)
 )
 
-// FieldType represents different field types in Word.
+// FieldType represents different field types in Word documents.
 type FieldType int
 
+// Field type constants for dynamic document fields.
 const (
-	FieldTypeTOC FieldType = iota
-	FieldTypePageNumber
-	FieldTypeNumPages
-	FieldTypePageCount // Alias for NumPages
-	FieldTypeDate
-	FieldTypeTime
-	FieldTypeStyleRef
-	FieldTypeRef
-	FieldTypeSeq
-	FieldTypeHyperlink
-	FieldTypeCustom // Custom field with user-defined code
+	FieldTypeTOC        FieldType = iota // Table of Contents
+	FieldTypePageNumber                  // Current page number
+	FieldTypeNumPages                    // Total number of pages
+	FieldTypePageCount                   // Alias for NumPages
+	FieldTypeDate                        // Current date
+	FieldTypeTime                        // Current time
+	FieldTypeStyleRef                    // Style reference
+	FieldTypeRef                         // Cross-reference
+	FieldTypeSeq                         // Sequence number
+	FieldTypeHyperlink                   // Hyperlink field
+	FieldTypeCustom                      // Custom field with user-defined code
 )

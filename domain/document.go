@@ -23,10 +23,63 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
-// Package domain defines the core interfaces for go-docx v2.
-// These interfaces provide a clean, testable API for working with Word documents.
+// Package domain defines the core domain interfaces for go-docx v2.
+//
+// This package provides a clean, testable API for working with Word documents.
+// All functionality is exposed through interfaces to promote loose coupling
+// and enable easy testing and mocking.
+//
+// # Core Interfaces
+//
+// The main interfaces are:
+//   - Document: The top-level document structure
+//   - Paragraph: A paragraph containing runs of formatted text
+//   - Run: A run of text with consistent formatting
+//   - Table: A table with rows and cells
+//   - Section: A section with page layout settings
+//   - Image: An embedded image with positioning
+//   - Field: Dynamic fields (TOC, page numbers, etc.)
+//   - Style: Paragraph and character styles
+//
+// # Example Usage
+//
+// Create a simple document:
+//
+//	doc := docx.NewDocument()
+//	para, _ := doc.AddParagraph()
+//	run, _ := para.AddRun()
+//	run.SetText("Hello, World!")
+//	run.SetBold(true)
+//	doc.SaveAs("hello.docx")
+//
+// Create a table:
+//
+//	table, _ := doc.AddTable(3, 2) // 3 rows, 2 columns
+//	cell, _ := table.Row(0).Cell(0)
+//	para, _ := cell.AddParagraph()
+//	run, _ := para.AddRun()
+//	run.SetText("Cell content")
+//
+// Add an image:
+//
+//	para, _ := doc.AddParagraph()
+//	img, _ := para.AddImage("photo.png")
+//	size := domain.NewImageSizeInches(3.0, 2.0)
+//	img.SetSize(size)
+//
+// # Architecture
+//
+// The domain package defines "what" can be done with a document.
+// Implementation details ("how") are handled by the internal/core package.
+// This separation enables:
+//   - Clean architecture with dependency inversion
+//   - Easy unit testing with mocks
+//   - Future alternative implementations
+//
+// # Thread Safety
+//
+// Document instances are NOT thread-safe. If you need concurrent access,
+// use external synchronization (e.g., sync.Mutex).
 package domain
 
 import "io"

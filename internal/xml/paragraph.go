@@ -23,8 +23,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
+// Package xml provides XML structures and marshaling/unmarshaling for Office Open XML (OOXML) format.
+//
+// This package defines the low-level XML structures that map directly to the OOXML specification.
+// Each struct corresponds to an XML element in the Word document format with proper namespace
+// attributes (w:, r:, wp:, etc.).
+//
+// Structures include:
+// - Document: w:document root element
+// - Paragraph: w:p (paragraph) element
+// - Run: w:r (run) element
+// - Table: w:tbl (table) element
+// - Drawing: w:drawing (drawing) element
+// - Style: w:style (style) element
+// - Section: w:sectPr (section properties) element
+// - Field: w:fldSimple, w:fldChar (field) elements
+//
+// These structures are used by the serializer package to convert domain objects
+// into XML that conforms to the Office Open XML standard.
 package xml
 
 import "encoding/xml"
