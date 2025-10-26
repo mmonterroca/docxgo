@@ -48,6 +48,6 @@ Have a great example? We'd love to include it! See [CONTRIBUTING.md](../CONTRIBU
 
 ## Documentation
 
-- [API Reference](https://pkg.go.dev/github.com/SlideLang/go-docx)
+- [API Reference](https://pkg.go.dev/github.com/mmonterroca/docxgo)
 - [Design Document](../docs/V2_DESIGN.md)
 - [Migration Guide](../MIGRATION.md) - Converting v1 examples to v2

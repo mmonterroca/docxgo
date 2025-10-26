@@ -42,7 +42,7 @@ cd go-docx
 Add the original repository as upstream (if not already added):
 
 ```bash
-git remote add upstream https://github.com/SlideLang/go-docx.git
+git remote add upstream https://github.com/mmonterroca/docxgo.git
 git remote -v  # Verify remotes
 ```
 
@@ -114,7 +114,7 @@ git push origin feature/your-feature-name
 
 #### 7. Open Pull Request
 
-1. Go to the [original repository](https://github.com/SlideLang/go-docx)
+1. Go to the [original repository](https://github.com/mmonterroca/docxgo)
 2. Click "New Pull Request"
 3. **Important**: Set base branch to `dev` (NOT `master`)
 4. Set compare branch to your feature branch
@@ -225,8 +225,8 @@ Update documentation when adding features:
 
 ## Community
 
-- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/SlideLang/go-docx/issues)
-- **Discussions**: Ask questions or share ideas in [GitHub Discussions](https://github.com/SlideLang/go-docx/discussions)
+- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
+- **Discussions**: Ask questions or share ideas in [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
 - **Code of Conduct**: Be respectful and constructive
 
 ## Questions?

@@ -1,8 +1,8 @@
-# go-docx v2
+# docxgo
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/SlideLang/go-docx/v2.svg)](https://pkg.go.dev/github.com/SlideLang/go-docx/v2)
-[![Go Report Card](https://goreportcard.com/badge/github.com/SlideLang/go-docx/v2)](https://goreportcard.com/report/github.com/SlideLang/go-docx/v2)
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mmonterroca/docxgo.svg)](https://pkg.go.dev/github.com/mmonterroca/docxgo)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mmonterroca/docxgo)](https://goreportcard.com/report/github.com/mmonterroca/docxgo)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A modern, clean-architecture Go library for creating and manipulating Microsoft Word (.docx) documents programmatically.
 
@@ -35,7 +35,7 @@ v2 is feature-complete for Phase 6 (Advanced Features) and ready for beta testin
 ## Installation
 
 ```bash
-go get github.com/SlideLang/go-docx/v2
+go get github.com/mmonterroca/docxgo
 ```
 
 ## Quick Start
@@ -46,8 +46,8 @@ go get github.com/SlideLang/go-docx/v2
 package main
 
 import (
-    docx "github.com/SlideLang/go-docx/v2"
-    "github.com/SlideLang/go-docx/v2/domain"
+    docx "github.com/mmonterroca/docxgo"
+    "github.com/mmonterroca/docxgo/domain"
 )
 
 func main() {
@@ -58,7 +58,7 @@ func main() {
     para, _ := doc.AddParagraph()
     para.SetStyle(domain.StyleIDHeading1)
     run, _ := para.AddRun()
-    run.AddText("Hello, go-docx v2!")
+    run.AddText("Hello, docxgo!")
     
     // Save the document
     doc.SaveToFile("hello.docx")
@@ -115,7 +115,7 @@ tocRun.AddField(docx.NewTOCField(tocOptions))
 linkPara, _ := doc.AddParagraph()
 linkRun, _ := linkPara.AddRun()
 linkField := docx.NewHyperlinkField(
-    "https://github.com/SlideLang/go-docx",
+    "https://github.com/mmonterroca/docxgo",
     "Visit go-docx",
 )
 linkRun.SetColor(0x0000FF)
@@ -168,7 +168,7 @@ go run main.go
 
 ## Architecture
 
-go-docx v2 follows **Clean Architecture** principles:
+docxgo follows **Clean Architecture** principles:
 
 ```
 domain/         # Interfaces and business logic
@@ -278,7 +278,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 
 ```bash
 # Clone the repository
-git clone https://github.com/SlideLang/go-docx.git
+git clone https://github.com/mmonterroca/docxgo.git
 cd go-docx/v2
 
 # Install dependencies
@@ -293,25 +293,29 @@ go run ./examples/basic/main.go
 
 ## License
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+This project is licensed under the **MIT License**.
 
 See [LICENSE](../LICENSE) for full details.
 
-### Multi-Contributor Copyright
+### What this means
 
-```
-Copyright (c) 2023-2025 The go-docx Authors
-See CONTRIBUTORS file for the list of copyright holders.
-```
+✅ **Commercial use allowed** - Use in proprietary/commercial projects  
+✅ **Private use allowed** - Use in private/internal projects  
+✅ **Modification allowed** - Modify and customize the code  
+✅ **Distribution allowed** - Share and distribute  
+
+Only requirement: Include the MIT license and copyright notice.
 
 ## Credits
 
-go-docx v2 is a complete rewrite with clean architecture principles. While inspired by earlier work, v2 represents a ground-up redesign focused on maintainability, testability, and modern Go practices.
+docxgo is a complete rewrite with clean architecture principles. While inspired by earlier work, it represents a ground-up redesign focused on maintainability, testability, and modern Go practices.
+
+Original inspiration: [fumiama/go-docx](https://github.com/fumiama/go-docx)
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/SlideLang/go-docx/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/SlideLang/go-docx/discussions)
+- **Issues**: [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
 - **Documentation**: [docs/](./docs/)
 
 ## Changelog

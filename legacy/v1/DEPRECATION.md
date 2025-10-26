@@ -63,7 +63,7 @@ v1 has fundamental limitations that cannot be fixed without breaking changes:
 2. Follow [MIGRATION.md](../../MIGRATION.md) guide
 3. Start with simple documents
 4. Test thoroughly (v2 is not production-ready yet)
-5. Report issues at https://github.com/SlideLang/go-docx/issues
+5. Report issues at https://github.com/mmonterroca/docxgo/issues
 
 ### Option 3: Stay on v1 Indefinitely (Not Recommended)
 
@@ -83,7 +83,7 @@ We will provide **critical bug fixes** for v1 through 2025, but no new features.
 
 ```bash
 # Use legacy v1 code (not recommended for new projects)
-go get github.com/SlideLang/go-docx/legacy/v1
+go get github.com/mmonterroca/docxgo/legacy/v1
 ```
 
 ### Quick Start
@@ -93,7 +93,7 @@ package main
 
 import (
     "os"
-    docx "github.com/SlideLang/go-docx/legacy/v1"
+    docx "github.com/mmonterroca/docxgo/legacy/v1"
 )
 
 func main() {
@@ -195,13 +195,13 @@ func TestSomething(t *testing.T) {
 
 ### For v1 Issues
 
-- **Critical bugs**: Report at https://github.com/SlideLang/go-docx/issues
+- **Critical bugs**: Report at https://github.com/mmonterroca/docxgo/issues
   - Tag with `legacy-v1` label
   - Include "v1" in title
 
 ### For Migration Questions
 
-- **Migration help**: Create discussion at https://github.com/SlideLang/go-docx/discussions
+- **Migration help**: Create discussion at https://github.com/mmonterroca/docxgo/discussions
 - **Email**: misael@monterroca.com (for complex migration scenarios)
 
 ### For v2 Questions
@@ -247,4 +247,4 @@ See [LICENSE](LICENSE) for full text.
 ---
 
 *This deprecation notice was created: October 25, 2025*  
-*For the latest information, see: https://github.com/SlideLang/go-docx*
+*For the latest information, see: https://github.com/mmonterroca/docxgo*

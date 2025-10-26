@@ -78,13 +78,13 @@
 ### Option 1: Using `go get`
 
 ```bash
-go get github.com/SlideLang/go-docx@latest
+go get github.com/mmonterroca/docxgo@latest
 ```
 
 ### Option 2: Add to `go.mod`
 
 ```go
-require github.com/SlideLang/go-docx v0.1.0-slidelang
+require github.com/mmonterroca/docxgo v0.1.0-slidelang
 ```
 
 Then run:
@@ -97,7 +97,7 @@ go mod download
 
 ```bash
 go mod tidy
-go test github.com/SlideLang/go-docx
+go test github.com/mmonterroca/docxgo
 ```
 
 ---
@@ -905,7 +905,7 @@ go mod init my-project
 
 3. **Install dependency:**
 ```bash
-go get github.com/SlideLang/go-docx@latest
+go get github.com/mmonterroca/docxgo@latest
 ```
 
 4. **Create `main.go` file** with any of the examples above.
@@ -921,7 +921,7 @@ go run main.go
 
 ```bash
 # Clone the repository
-git clone https://github.com/SlideLang/go-docx.git
+git clone https://github.com/mmonterroca/docxgo.git
 cd go-docx
 
 # Run the demo test
@@ -1271,7 +1271,7 @@ go mod tidy
 go clean -modcache
 
 # Re-download
-go get -u github.com/SlideLang/go-docx@latest
+go get -u github.com/mmonterroca/docxgo@latest
 ```
 
 ### Document is too large
@@ -1366,7 +1366,7 @@ func TestGenerateDocument(t *testing.T) {
 #### Creating Sections
 
 ```go
-import "github.com/SlideLang/go-docx/domain"
+import "github.com/mmonterroca/docxgo/domain"
 
 // Get default section
 section, err := doc.DefaultSection()
@@ -1496,7 +1496,7 @@ tocField := docx.NewTOCField(tocOptions)
 
 ```go
 // Create hyperlink
-url := "https://github.com/SlideLang/go-docx"
+url := "https://github.com/mmonterroca/docxgo"
 displayText := "go-docx Repository"
 linkField := docx.NewHyperlinkField(url, displayText)
 
@@ -1662,8 +1662,8 @@ package main
 
 import (
     "log"
-    "github.com/SlideLang/go-docx"
-    "github.com/SlideLang/go-docx/domain"
+    "github.com/mmonterroca/docxgo"
+    "github.com/mmonterroca/docxgo/domain"
 )
 
 func main() {
@@ -1821,8 +1821,8 @@ wg.Wait()
 
 ### Community
 
-- [GitHub Issues](https://github.com/SlideLang/go-docx/issues)
-- [GitHub Discussions](https://github.com/SlideLang/go-docx/discussions)
+- [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
+- [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
 
 ---
 
@@ -1830,9 +1830,9 @@ wg.Wait()
 
 Found a bug or have an idea to improve the documentation?
 
-1. Open an [Issue](https://github.com/SlideLang/go-docx/issues)
-2. Submit a [Pull Request](https://github.com/SlideLang/go-docx/pulls)
-3. Join the [Discussions](https://github.com/SlideLang/go-docx/discussions)
+1. Open an [Issue](https://github.com/mmonterroca/docxgo/issues)
+2. Submit a [Pull Request](https://github.com/mmonterroca/docxgo/pulls)
+3. Join the [Discussions](https://github.com/mmonterroca/docxgo/discussions)
 
 ---
 
@@ -1852,4 +1852,4 @@ AGPL-3.0 - See [LICENSE](../LICENSE) for details.
 
 **Questions? Comments?**
 
-Open an [Issue](https://github.com/SlideLang/go-docx/issues) or join the [Discussions](https://github.com/SlideLang/go-docx/discussions).
+Open an [Issue](https://github.com/mmonterroca/docxgo/issues) or join the [Discussions](https://github.com/mmonterroca/docxgo/discussions).

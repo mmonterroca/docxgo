@@ -1,14 +1,14 @@
-# go-docx
+# docxgo
 
 Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/SlideLang/go-docx.svg)](https://pkg.go.dev/github.com/SlideLang/go-docx)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Go Report Card](https://goreportcard.com/badge/github.com/SlideLang/go-docx)](https://goreportcard.com/report/github.com/SlideLang/go-docx)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mmonterroca/docxgo.svg)](https://pkg.go.dev/github.com/mmonterroca/docxgo)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mmonterroca/docxgo)](https://goreportcard.com/report/github.com/mmonterroca/docxgo)
 
 ## Overview
 
-**go-docx** is a powerful, clean-architecture library for creating and manipulating Microsoft Word documents in Go. Built with production-grade code quality, comprehensive testing, and modern design patterns.
+**docxgo** is a powerful, clean-architecture library for creating and manipulating Microsoft Word documents in Go. Built with production-grade code quality, comprehensive testing, and modern design patterns.
 
 ### Key Features
 
@@ -17,7 +17,7 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 - ✅ **Well Tested** - 95%+ test coverage, comprehensive test suite
 - ✅ **Thread-Safe** - Concurrent access supported
 - ✅ **Production Ready** - Used in real-world applications
-- ✅ **Open Source** - AGPL-3.0, no commercial license needed
+- ✅ **Open Source** - MIT License, use in commercial and private projects
 
 ---
 
@@ -36,7 +36,7 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 ## Installation
 
 ```bash
-go get github.com/SlideLang/go-docx
+go get github.com/mmonterroca/docxgo
 ```
 
 ### Requirements
@@ -56,8 +56,8 @@ package main
 
 import (
     "log"
-    "github.com/SlideLang/go-docx/domain"
-    "github.com/SlideLang/go-docx/internal/core"
+    "github.com/mmonterroca/docxgo/domain"
+    "github.com/mmonterroca/docxgo/internal/core"
 )
 
 func main() {
@@ -115,7 +115,7 @@ This library follows clean architecture principles with clear separation of conc
 
 ```
 ```
-github.com/SlideLang/go-docx/
+github.com/mmonterroca/docxgo/
 ├── domain/          # Core interfaces (public API)
 │   ├── document.go  # Document interface
 │   ├── paragraph.go # Paragraph interface
@@ -258,7 +258,7 @@ go test -bench=. ./...
 
 ## Documentation
 
-- **[API Reference](https://pkg.go.dev/github.com/SlideLang/go-docx)** - Complete API documentation
+- **[API Reference](https://pkg.go.dev/github.com/mmonterroca/docxgo)** - Complete API documentation
 - **[Design Document](docs/V2_DESIGN.md)** - Architecture and design decisions
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
 - **[Migration Guide](MIGRATION.md)** - Migrating from v1 to v2 (coming soon)
@@ -338,7 +338,7 @@ See [LICENSE](LICENSE) for full text.
 ### Copyright
 
 ```
-Copyright (C) 2024-2025 Misael Monterroca / SlideLang
+Copyright (C) 2024-2025 Misael Monterroca / 
 Copyright (C) 2022-2024 fumiama (original enhancements)
 Copyright (C) 2020-2022 Gonzalo Fernández-Victorio (original library)
 ```
@@ -352,12 +352,12 @@ See [CREDITS.md](CREDITS.md) for complete project history.
 This project evolved through multiple stages:
 
 1. **gonfva/docxlib** (2020-2022) - Original library by Gonzalo Fernández-Victorio
-2. **fumiama/go-docx** (2022-2024) - Enhanced fork with images, tables, shapes
-3. **SlideLang/go-docx v1** (2023-2024) - Professional features (headers, TOC, links)
-4. **SlideLang/go-docx v2** (2024-2025) - Complete architectural rewrite
+2. **fumiama/docxgo** (2022-2024) - Enhanced fork with images, tables, shapes
+3. **/docxgo v1** (2023-2024) - Professional features (headers, TOC, links)
+4. **/docxgo v2** (2024-2025) - Complete architectural rewrite
 
 **Current Maintainer**: Misael Monterroca (misael@monterroca.com)  
-**Organization**: [SlideLang](https://github.com/SlideLang)
+**Organization**: [](https://github.com/)
 
 For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
@@ -393,10 +393,10 @@ See [V2_DESIGN.md](docs/V2_DESIGN.md) for detailed roadmap.
 
 ## Support & Community
 
-- **Issues**: [GitHub Issues](https://github.com/SlideLang/go-docx/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/SlideLang/go-docx/discussions)
+- **Issues**: [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
 - **Email**: misael@monterroca.com
-- **Documentation**: [pkg.go.dev](https://pkg.go.dev/github.com/SlideLang/go-docx)
+- **Documentation**: [pkg.go.dev](https://pkg.go.dev/github.com/mmonterroca/docxgo)
 
 ### Reporting Bugs
 
@@ -414,7 +414,7 @@ Please include:
 - **[gingfrederik/docx](https://github.com/gingfrederik/docx)** - Write-only docx library
 - **[Office Open XML](http://www.ecma-international.org/publications/standards/Ecma-376.htm)** - OOXML specification
 
-### Why Choose go-docx?
+### Why Choose docxgo?
 
 - ✅ **Free & Open Source** - No commercial license required
 - ✅ **Clean Architecture** - Production-grade code quality
@@ -425,7 +425,7 @@ Please include:
 
 ---
 
-**Made with ❤️ by [Misael Monterroca](https://github.com/SlideLang)**
+**Made with ❤️ by [Misael Monterroca](https://github.com/)**
 
 *Star ⭐ this repo if you find it useful!*
 

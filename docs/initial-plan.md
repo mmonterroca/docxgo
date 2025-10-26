@@ -1,7 +1,7 @@
 # SlideLang/go-docx - Enhanced Fork
 
 **Fork de**: https://github.com/fumiama/go-docx  
-**Nuestro fork**: https://github.com/SlideLang/go-docx  
+**Nuestro fork**: https://github.com/mmonterroca/docxgo  
 **Versión base**: v0.0.0-20250506085032-0c30fd09304b (commit: 0c30fd09304b, 6 Mayo 2025)
 
 ## 🎯 Objetivo del Fork
@@ -503,7 +503,7 @@ func (d *Docx) AddFigureCaption(text string) {
 cd ~/cli/doclang-cli
 
 # Reemplazar fumiama/go-docx con nuestro fork
-go mod edit -replace github.com/fumiama/go-docx=github.com/SlideLang/go-docx@slidelang-enhanced
+go mod edit -replace github.com/fumiama/go-docx=github.com/mmonterroca/docxgo@slidelang-enhanced
 
 # O directamente editar go.mod:
 ```
@@ -516,7 +516,7 @@ require (
     github.com/fumiama/go-docx v0.0.0-20250506085032-0c30fd09304b
 )
 
-replace github.com/fumiama/go-docx => github.com/SlideLang/go-docx slidelang-enhanced
+replace github.com/fumiama/go-docx => github.com/mmonterroca/docxgo slidelang-enhanced
 ```
 
 ```bash
@@ -658,8 +658,8 @@ git push origin slidelang-enhanced
 
 ## 📞 Contacto
 
-**Proyecto**: https://github.com/SlideLang/go-docx  
-**Issues**: https://github.com/SlideLang/go-docx/issues  
-**Discussions**: https://github.com/SlideLang/go-docx/discussions
+**Proyecto**: https://github.com/mmonterroca/docxgo  
+**Issues**: https://github.com/mmonterroca/docxgo/issues  
+**Discussions**: https://github.com/mmonterroca/docxgo/discussions
 
 **Proyecto principal**: https://github.com/SlideLang/cli

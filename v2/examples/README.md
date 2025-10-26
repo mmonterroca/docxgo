@@ -134,8 +134,8 @@ Each example follows this pattern:
 package main
 
 import (
-    docx "github.com/SlideLang/go-docx/v2"
-    "github.com/SlideLang/go-docx/v2/domain"
+    docx "github.com/mmonterroca/docxgo"
+    "github.com/mmonterroca/docxgo/domain"
 )
 
 func main() {

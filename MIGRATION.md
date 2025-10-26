@@ -63,11 +63,11 @@ v2 is a **complete architectural rewrite** of go-docx. While this means breaking
 ```go
 // v1
 import "github.com/fumiama/go-docx"
-import docx "github.com/SlideLang/go-docx/legacy/v1"  // If using legacy
+import docx "github.com/mmonterroca/docxgo/legacy/v1"  // If using legacy
 
 // v2
-import "github.com/SlideLang/go-docx/domain"
-import "github.com/SlideLang/go-docx/internal/core"
+import "github.com/mmonterroca/docxgo/domain"
+import "github.com/mmonterroca/docxgo/internal/core"
 ```
 
 ### 2. **Error Handling**
@@ -151,7 +151,7 @@ para.SetAlignment(constants.AlignmentCenter)   // Constant
 go get github.com/fumiama/go-docx@none
 
 # Add v2
-go get github.com/SlideLang/go-docx@latest
+go get github.com/mmonterroca/docxgo@latest
 ```
 
 ### Step 2: Update Imports
@@ -162,9 +162,9 @@ import "github.com/fumiama/go-docx"
 
 // New
 import (
-    "github.com/SlideLang/go-docx/domain"
-    "github.com/SlideLang/go-docx/internal/core"
-    "github.com/SlideLang/go-docx/pkg/constants"
+    "github.com/mmonterroca/docxgo/domain"
+    "github.com/mmonterroca/docxgo/internal/core"
+    "github.com/mmonterroca/docxgo/pkg/constants"
 )
 ```
 
@@ -352,7 +352,7 @@ run.Color("FF0000") // Hex string
 run.SetColor(domain.Color{R: 255, G: 0, B: 0})
 
 // Or use predefined colors
-import "github.com/SlideLang/go-docx/pkg/color"
+import "github.com/mmonterroca/docxgo/pkg/color"
 run.SetColor(color.Red)
 run.SetColor(color.Blue)
 ```
@@ -680,7 +680,7 @@ tocRun.AddField(tocField)
 
 // Hyperlinks
 linkField := docx.NewHyperlinkField(
-    "https://github.com/SlideLang/go-docx",
+    "https://github.com/mmonterroca/docxgo",
     "go-docx Repository",
 )
 linkRun.SetColor(docx.ColorBlue)
@@ -747,14 +747,14 @@ styleMgr.AddStyle(customStyle)
 
 ### Resources
 
-- **Documentation**: [API Reference](https://pkg.go.dev/github.com/SlideLang/go-docx)
+- **Documentation**: [API Reference](https://pkg.go.dev/github.com/mmonterroca/docxgo)
 - **Examples**: [`examples/`](examples/) directory
 - **Design Doc**: [V2_DESIGN.md](docs/V2_DESIGN.md)
 
 ### Support Channels
 
-- **Issues**: [GitHub Issues](https://github.com/SlideLang/go-docx/issues) - For bugs
-- **Discussions**: [GitHub Discussions](https://github.com/SlideLang/go-docx/discussions) - For questions
+- **Issues**: [GitHub Issues](https://github.com/mmonterroca/docxgo/issues) - For bugs
+- **Discussions**: [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions) - For questions
 - **Email**: misael@monterroca.com - For complex migration scenarios
 
 ### Before Asking for Help
@@ -792,7 +792,7 @@ A: Yes, v2 uses the same OOXML standard.
 A: Not yet. Given the architectural differences, manual migration is recommended.
 
 **Q: What if I find a bug during migration?**  
-A: Please report it on [GitHub Issues](https://github.com/SlideLang/go-docx/issues) with the `migration` label.
+A: Please report it on [GitHub Issues](https://github.com/mmonterroca/docxgo/issues) with the `migration` label.
 
 **Q: Can I contribute to v2?**  
 A: Absolutely! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -800,4 +800,4 @@ A: Absolutely! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ---
 
 *Last Updated: October 25, 2025*  
-*For the latest information, see: https://github.com/SlideLang/go-docx*
+*For the latest information, see: https://github.com/mmonterroca/docxgo*

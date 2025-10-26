@@ -16,13 +16,13 @@ This directory contains the legacy v1 codebase, preserved for:
 ### Installation (Not Recommended)
 
 ```bash
-go get github.com/SlideLang/go-docx/legacy/v1
+go get github.com/mmonterroca/docxgo/legacy/v1
 ```
 
 ### Basic Usage
 
 ```go
-import docx "github.com/SlideLang/go-docx/legacy/v1"
+import docx "github.com/mmonterroca/docxgo/legacy/v1"
 
 // Create document
 w := docx.New().WithDefaultTheme()
@@ -100,8 +100,8 @@ finalDoc, _ := doc.Build()
 
 ## Support
 
-- **Critical Bugs** (through Dec 2025): https://github.com/SlideLang/go-docx/issues
-- **Migration Help**: https://github.com/SlideLang/go-docx/discussions
+- **Critical Bugs** (through Dec 2025): https://github.com/mmonterroca/docxgo/issues
+- **Migration Help**: https://github.com/mmonterroca/docxgo/discussions
 - **v2 Documentation**: [Main README](../../README.md)
 
 ---

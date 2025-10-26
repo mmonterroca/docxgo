@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to go-docx v2 will be documented in this file.
+All notable changes to docxgo will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -96,7 +96,7 @@ Complete rewrite of go-docx with clean architecture, comprehensive features, and
 
 #### Breaking Changes from v1
 - **Package Structure**: Moved from flat structure to `domain/`, `internal/`, `pkg/`
-- **Import Path**: `github.com/SlideLang/go-docx/v2` (was `fumiama/go-docx`)
+- **Import Path**: `github.com/mmonterroca/docxgo/v2` (was `fumiama/go-docx`)
 - **Document Creation**: `docx.NewDocument()` instead of `document.New()`
 - **Style API**: `para.SetStyle(domain.StyleIDHeading1)` instead of `para.Style("Heading1")`
 - **Section Access**: `doc.DefaultSection()` required for page layout
@@ -118,7 +118,8 @@ Complete rewrite of go-docx with clean architecture, comprehensive features, and
 - Style reference consistency
 
 ### Security
-- AGPL-3.0 license compliance
+- MIT License for maximum permissiveness
+- Commercial and private use allowed
 - No external dependencies for core functionality
 - Safe XML parsing and generation
 
@@ -166,7 +167,7 @@ run.AddText("Title")
 
 ### Major Changes
 
-1. **Import Path**: Change `fumiama/go-docx` → `github.com/SlideLang/go-docx/v2`
+1. **Import Path**: Change `fumiama/go-docx` → `github.com/mmonterroca/docxgo/v2`
 2. **Error Handling**: Add error checks to all API calls
 3. **Styles**: Use type-safe constants (`domain.StyleID*`)
 4. **Sections**: Use `doc.DefaultSection()` for page layout
@@ -220,21 +221,21 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 
 ### Contributors
 
-Thanks to all contributors who have helped make go-docx v2 possible!
+Thanks to all contributors who have helped make docxgo possible!
 
 See [CONTRIBUTORS](./CONTRIBUTORS) for the full list.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/SlideLang/go-docx/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/SlideLang/go-docx/discussions)
+- **Issues**: [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
 - **Documentation**: [docs/](./docs/)
 
 ## License
 
-GNU Affero General Public License v3.0 (AGPL-3.0)
+MIT License
 
----
+See LICENSE file for details.
 
-[Unreleased]: https://github.com/SlideLang/go-docx/compare/v2.0.0-beta...HEAD
-[2.0.0-beta]: https://github.com/SlideLang/go-docx/releases/tag/v2.0.0-beta
+[Unreleased]: https://github.com/mmonterroca/docxgo/compare/v2.0.0-beta...HEAD
+[2.0.0-beta]: https://github.com/mmonterroca/docxgo/releases/tag/v2.0.0-beta

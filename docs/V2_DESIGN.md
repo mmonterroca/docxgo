@@ -63,7 +63,7 @@
 
 ### Current Structure (Pre-Transition)
 ```
-github.com/SlideLang/go-docx/
+github.com/mmonterroca/docxgo/
 ├── v2/                         # New architecture (will become root)
 │   ├── domain/
 │   ├── internal/
@@ -74,7 +74,7 @@ github.com/SlideLang/go-docx/
 
 ### Target Structure (Post-Transition)
 ```
-github.com/SlideLang/go-docx/
+github.com/mmonterroca/docxgo/
 ├── docx.go                     # Main entry point (v2)
 ├── builder.go                  # Builder pattern implementation
 ├── options.go                  # Functional options
@@ -417,7 +417,7 @@ doc.WriteTo(file)
 
 ```go
 // v2 (new - current)
-import docx "github.com/SlideLang/go-docx"  // NEW namespace (no /v2 suffix in root)
+import docx "github.com/mmonterroca/docxgo"  // NEW namespace (no /v2 suffix in root)
 
 // Builder pattern with error handling
 doc := docx.NewDocument(
@@ -448,7 +448,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 ## 📊 Implementation Phases
 
 ### ✅ Phase 1: Foundation (Weeks 1-2) - COMPLETE
-- [x] Set up v2 module (`go mod init github.com/SlideLang/go-docx`)
+- [x] Set up v2 module (`go mod init github.com/mmonterroca/docxgo`)
 - [x] Define core interfaces (`domain/`)
 - [x] Create package structure
 - [x] Set up testing framework

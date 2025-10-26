@@ -14,7 +14,7 @@ This project has evolved through multiple stages, with each contributor adding s
 ### 🚀 Version 2.0 (2024-2025) - SlideLang/go-docx
 
 **Status**: Current Active Development  
-**Repository**: https://github.com/SlideLang/go-docx  
+**Repository**: https://github.com/mmonterroca/docxgo  
 **License**: AGPL-3.0
 
 #### Author
@@ -56,7 +56,7 @@ This project has evolved through multiple stages, with each contributor adding s
 
 ### 📦 Version 1.x Enhanced (2023-2024) - SlideLang Fork
 
-**Repository**: https://github.com/SlideLang/go-docx (root code, now deprecated)  
+**Repository**: https://github.com/mmonterroca/docxgo (root code, now deprecated)  
 **Based on**: fumiama/go-docx
 
 #### Author
@@ -269,8 +269,8 @@ Copyright (C) 2020-2022 Gonzalo Fernández-Victorio (original library)
 
 **Project Lead**: Misael Monterroca  
 **Email**: misael@monterroca.com  
-**GitHub**: https://github.com/SlideLang/go-docx  
-**Issues**: https://github.com/SlideLang/go-docx/issues
+**GitHub**: https://github.com/mmonterroca/docxgo  
+**Issues**: https://github.com/mmonterroca/docxgo/issues
 
 ---
 

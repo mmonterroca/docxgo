@@ -226,9 +226,9 @@ Quick start:
 
 ## 📫 Contact
 
-- Repository: https://github.com/SlideLang/go-docx
-- Issues: https://github.com/SlideLang/go-docx/issues
-- Discussions: https://github.com/SlideLang/go-docx/discussions
+- Repository: https://github.com/mmonterroca/docxgo
+- Issues: https://github.com/mmonterroca/docxgo/issues
+- Discussions: https://github.com/mmonterroca/docxgo/discussions
 
 ---
 
