@@ -1,17 +1,29 @@
 /*
-   Copyright (c) 2025 SlideLang
+MIT License
 
-   Example: Fields - Table of Contents, Page Numbers, and Hyperlinks
+Copyright (c) 2025 Misael Montero
+Copyright (c) 2020-2023 fumiama (original go-docx)
 
-   This example demonstrates how to use fields in go-docx v2:
-   - Adding page numbers to headers/footers
-   - Creating a Table of Contents
-   - Inserting hyperlinks
-   - Using STYLEREF for running headers
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-   Fields are dynamic elements that are calculated by Word when the document
-   is opened or updated (F9 key).
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
+
+
 
 package main
 
@@ -19,7 +31,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/SlideLang/go-docx"
+	"github.com/mmonterroca/docxgo"
 )
 
 func main() {
@@ -264,7 +276,7 @@ func addHyperlinks(doc *docx.Document) error {
 	linkRun.SetColor(docx.ColorBlue)
 	linkRun.SetUnderline(docx.UnderlineSingle)
 	
-	hyperlinkField := docx.NewHyperlinkField("https://github.com/SlideLang/go-docx", "go-docx repository")
+	hyperlinkField := docx.NewHyperlinkField("https://github.com/mmonterroca/docxgo", "go-docx repository")
 	linkRun.AddField(hyperlinkField)
 
 	// Text after link

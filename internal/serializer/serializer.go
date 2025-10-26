@@ -20,10 +20,10 @@ package serializer
 import (
 	"fmt"
 
-	"github.com/SlideLang/go-docx/domain"
-	"github.com/SlideLang/go-docx/internal/xml"
-	"github.com/SlideLang/go-docx/pkg/color"
-	"github.com/SlideLang/go-docx/pkg/constants"
+	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/internal/xml"
+	"github.com/mmonterroca/docxgo/pkg/color"
+	"github.com/mmonterroca/docxgo/pkg/constants"
 )
 
 // RunSerializer converts a domain.Run to xml.Run

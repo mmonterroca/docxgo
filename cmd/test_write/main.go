@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/SlideLang/go-docx/internal/core"
+	"github.com/mmonterroca/docxgo/internal/core"
 )
 
 func main() {

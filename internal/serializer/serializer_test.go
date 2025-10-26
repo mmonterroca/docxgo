@@ -22,9 +22,9 @@ import (
 	"encoding/xml"
 	"testing"
 
-	"github.com/SlideLang/go-docx/domain"
-	"github.com/SlideLang/go-docx/internal/core"
-	"github.com/SlideLang/go-docx/internal/serializer"
+	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/internal/core"
+	"github.com/mmonterroca/docxgo/internal/serializer"
 )
 
 func TestRunSerializer(t *testing.T) {

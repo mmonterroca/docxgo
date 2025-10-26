@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	docx "github.com/SlideLang/go-docx/v2"
-	"github.com/SlideLang/go-docx/v2/domain"
+	docx "github.com/mmonterroca/docxgo"
+	"github.com/mmonterroca/docxgo/domain"
 )
 
 func main() {

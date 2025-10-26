@@ -21,9 +21,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/SlideLang/go-docx/internal/serializer"
-	"github.com/SlideLang/go-docx/internal/writer"
-	"github.com/SlideLang/go-docx/pkg/errors"
+	"github.com/mmonterroca/docxgo/internal/serializer"
+	"github.com/mmonterroca/docxgo/internal/writer"
+	"github.com/mmonterroca/docxgo/pkg/errors"
 )
 
 // WriteTo writes the document to the given writer in .docx format.

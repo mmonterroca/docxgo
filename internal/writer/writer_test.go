@@ -23,8 +23,8 @@ import (
 	"encoding/xml"
 	"testing"
 
-	xmlstructs "github.com/SlideLang/go-docx/internal/xml"
-	"github.com/SlideLang/go-docx/pkg/constants"
+	xmlstructs "github.com/mmonterroca/docxgo/internal/xml"
+	"github.com/mmonterroca/docxgo/pkg/constants"
 )
 
 func TestZipWriter_WriteDocument(t *testing.T) {

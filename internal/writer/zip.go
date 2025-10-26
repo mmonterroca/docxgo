@@ -23,9 +23,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/SlideLang/go-docx/internal/serializer"
-	xmlstructs "github.com/SlideLang/go-docx/internal/xml"
-	"github.com/SlideLang/go-docx/pkg/constants"
+	"github.com/mmonterroca/docxgo/internal/serializer"
+	xmlstructs "github.com/mmonterroca/docxgo/internal/xml"
+	"github.com/mmonterroca/docxgo/pkg/constants"
 )
 
 // ZipWriter writes a .docx file to an io.Writer.
