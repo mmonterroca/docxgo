@@ -113,7 +113,7 @@ func FromHex(hex string) (domain.Color, error) {
 }
 
 // Validate checks if a color is valid (all components in range 0-255).
-func Validate(c domain.Color) error {
+func Validate(_ domain.Color) error {
 	// uint8 automatically ensures 0-255 range, so this is always valid
 	return nil
 }

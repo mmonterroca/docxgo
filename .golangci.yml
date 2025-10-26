@@ -4,12 +4,12 @@ linters-settings:
     ignoretests: true
 
   goimports:
-    local-prefixes: github.com/fumiama/go-docx
+    local-prefixes: github.com/mmonterroca/docxgo
 
   forbidigo:
     # Forbid the following identifiers
     forbid:
-      - ^fmt\.Errorf$ # consider errors.Errorf in github.com/pkg/errors
+      - ^fmt\.Errorf$ # Use errors package from pkg/errors
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.

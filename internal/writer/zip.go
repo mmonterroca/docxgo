@@ -1,3 +1,5 @@
+// Package writer handles writing DOCX files as ZIP archives containing XML documents.
+// It provides the ZipWriter for creating properly structured Office Open XML packages.
 package writer
 
 /*

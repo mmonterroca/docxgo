@@ -1,3 +1,5 @@
+// Package serializer converts domain objects into XML structures for OOXML serialization.
+// It provides serializers for documents, paragraphs, runs, tables, and other document elements.
 package serializer
 
 /*
@@ -589,7 +591,7 @@ func (s *DocumentSerializer) SerializeAppProperties(doc domain.Document) *xml.Ap
 	}
 }
 
-// Debug method for testing
+// DebugPrint outputs document statistics for testing and debugging purposes.
 func (s *DocumentSerializer) DebugPrint(doc domain.Document) {
 	fmt.Printf("Document has %d paragraphs and %d tables\n",
 		len(doc.Paragraphs()), len(doc.Tables()))

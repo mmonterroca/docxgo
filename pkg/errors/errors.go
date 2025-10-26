@@ -116,7 +116,7 @@ func (e *ValidationError) Error() string {
 		e.Field, e.Value, e.Constraint)
 }
 
-// Builder error wraps an error and allows method chaining to continue
+// BuilderError wraps an error and allows method chaining to continue
 // while capturing the first error that occurred.
 type BuilderError struct {
 	err error

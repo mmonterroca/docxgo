@@ -27,9 +27,9 @@ package core
 import (
 	"fmt"
 	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+	_ "image/gif"  // Register GIF format decoder
+	_ "image/jpeg" // Register JPEG format decoder
+	_ "image/png"  // Register PNG format decoder
 	"io"
 	"os"
 	"path/filepath"

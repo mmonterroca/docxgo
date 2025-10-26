@@ -103,6 +103,10 @@ func (sm *styleManager) initializeBuiltInStyles() {
 }
 
 // createBuiltInParagraphStyles creates all built-in paragraph styles.
+// Note: Error returns are intentionally ignored for built-in styles as they
+// use only valid, hardcoded values that cannot fail under normal circumstances.
+//
+//nolint:errcheck // Built-in styles use hardcoded valid values
 func (sm *styleManager) createBuiltInParagraphStyles() {
 	// Normal style (base for all paragraphs)
 	normal := newParagraphStyle(domain.StyleIDNormal, "Normal", true)
@@ -219,6 +223,10 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 }
 
 // createBuiltInCharacterStyles creates all built-in character styles.
+// Note: Error returns are intentionally ignored for built-in styles as they
+// use only valid, hardcoded values that cannot fail under normal circumstances.
+//
+//nolint:errcheck // Built-in styles use hardcoded valid values
 func (sm *styleManager) createBuiltInCharacterStyles() {
 	// Default Paragraph Font (base for all character styles)
 	defaultFont := newCharacterStyle(domain.StyleIDDefaultParagraphFont, "Default Paragraph Font", true)

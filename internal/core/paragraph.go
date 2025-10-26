@@ -86,7 +86,7 @@ func (p *paragraph) AddRun() (domain.Run, error) {
 }
 
 // AddField adds a field to the paragraph.
-func (p *paragraph) AddField(fieldType domain.FieldType) (domain.Field, error) {
+func (p *paragraph) AddField(_ domain.FieldType) (domain.Field, error) {
 	// TODO: Implement field creation
 	return nil, errors.Unsupported("Paragraph.AddField", "fields not yet implemented")
 }

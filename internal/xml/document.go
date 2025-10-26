@@ -23,8 +23,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
+// Package xml provides XML structures and marshaling for Office Open XML (OOXML) format.
+// This package defines the XML types used to serialize document elements into the
+// DOCX file format, including documents, paragraphs, runs, tables, and styles.
 package xml
 
 import "encoding/xml"
