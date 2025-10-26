@@ -29,7 +29,7 @@ package xml
 
 import "encoding/xml"
 
-// Field represents a w:fldSimple or w:fldChar complex field.
+// FieldSimple represents a w:fldSimple element for simple fields.
 // Complex fields use: w:fldChar (begin) -> w:instrText -> w:fldChar (separate) -> result -> w:fldChar (end)
 type FieldSimple struct {
 	XMLName xml.Name `xml:"w:fldSimple"`
@@ -52,21 +52,21 @@ type InstrText struct {
 	Content string   `xml:",chardata"`
 }
 
-// FieldBegin creates a field begin character.
+// NewFieldBegin creates a field begin character.
 func NewFieldBegin() *FieldChar {
 	return &FieldChar{
 		FldType: "begin",
 	}
 }
 
-// FieldSeparate creates a field separate character.
+// NewFieldSeparate creates a field separate character.
 func NewFieldSeparate() *FieldChar {
 	return &FieldChar{
 		FldType: "separate",
 	}
 }
 
-// FieldEnd creates a field end character.
+// NewFieldEnd creates a field end character.
 func NewFieldEnd() *FieldChar {
 	return &FieldChar{
 		FldType: "end",

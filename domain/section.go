@@ -86,7 +86,7 @@ type Margins struct {
 	Footer int // Distance from bottom edge to footer
 }
 
-// Default margins (1 inch = 1440 twips)
+// DefaultMargins provides standard 1-inch margins (1440 twips).
 var DefaultMargins = Margins{
 	Top:    1440,
 	Right:  1440,
@@ -99,27 +99,30 @@ var DefaultMargins = Margins{
 // Orientation represents page orientation.
 type Orientation int
 
+// Page orientation constants.
 const (
-	OrientationPortrait Orientation = iota
-	OrientationLandscape
+	OrientationPortrait  Orientation = iota // Portrait orientation
+	OrientationLandscape                    // Landscape orientation
 )
 
 // HeaderType represents different header types.
 type HeaderType int
 
+// Header type constants for different page scenarios.
 const (
 	HeaderDefault HeaderType = iota // Default header for all pages
-	HeaderFirst                     // Header for first page
-	HeaderEven                      // Header for even pages
+	HeaderFirst                      // Header for first page
+	HeaderEven                       // Header for even pages
 )
 
 // FooterType represents different footer types.
 type FooterType int
 
+// Footer type constants for different page scenarios.
 const (
 	FooterDefault FooterType = iota // Default footer for all pages
-	FooterFirst                     // Footer for first page
-	FooterEven                      // Footer for even pages
+	FooterFirst                      // Footer for first page
+	FooterEven                       // Footer for even pages
 )
 
 // Header represents a page header.
@@ -182,11 +185,12 @@ type Style interface {
 // StyleType represents the type of style.
 type StyleType int
 
+// Style type constants for different document elements.
 const (
-	StyleTypeParagraph StyleType = iota
-	StyleTypeCharacter
-	StyleTypeTable
-	StyleTypeNumbering
+	StyleTypeParagraph StyleType = iota // Paragraph style
+	StyleTypeCharacter                  // Character/run style
+	StyleTypeTable                      // Table style
+	StyleTypeNumbering                  // Numbering style
 )
 
 // Field represents a field in a document (TOC, page number, etc.)

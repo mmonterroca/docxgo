@@ -150,13 +150,14 @@ const (
 // TextWrapType defines how text wraps around an image.
 type TextWrapType string
 
+// Text wrapping constants for floating images.
 const (
-	WrapNone       TextWrapType = "none"       // No wrapping
-	WrapSquare     TextWrapType = "square"     // Square wrapping
-	WrapTight      TextWrapType = "tight"      // Tight wrapping
-	WrapThrough    TextWrapType = "through"    // Through wrapping
-	WrapTopBottom  TextWrapType = "topBottom"  // Top and bottom only
-	WrapBehindText TextWrapType = "behindText" // Behind text
+	WrapNone        TextWrapType = "none"        // No wrapping
+	WrapSquare      TextWrapType = "square"      // Square wrapping
+	WrapTight       TextWrapType = "tight"       // Tight wrapping
+	WrapThrough     TextWrapType = "through"     // Through wrapping
+	WrapTopBottom   TextWrapType = "topBottom"   // Top and bottom only
+	WrapBehindText  TextWrapType = "behindText"  // Behind text
 	WrapInFrontText TextWrapType = "inFrontText" // In front of text
 )
 

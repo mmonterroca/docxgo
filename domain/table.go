@@ -181,14 +181,15 @@ type BorderStyle struct {
 // BorderLineStyle represents border line styles.
 type BorderLineStyle int
 
+// Border line style constants for table borders.
 const (
-	BorderNone BorderLineStyle = iota
-	BorderSingle
-	BorderDotted
-	BorderDashed
-	BorderDouble
-	BorderTriple
-	BorderThick
+	BorderNone   BorderLineStyle = iota // No border
+	BorderSingle                        // Single line
+	BorderDotted                        // Dotted line
+	BorderDashed                        // Dashed line
+	BorderDouble                        // Double line
+	BorderTriple                        // Triple line
+	BorderThick                         // Thick line
 )
 
 // TableStyle represents table styling options.
@@ -209,13 +210,14 @@ var (
 	TableStyleAccent2       = TableStyle{Name: "MediumShading1Accent2"}
 )
 
-// VerticalMergeType represents vertical merge status for table cells.
+// VerticalMergeType represents the vertical merge state of a table cell.
 type VerticalMergeType int
 
+// Vertical merge type constants for table cells.
 const (
-	VMergeNone    VerticalMergeType = iota // No vertical merge
-	VMergeRestart                           // Start of vertical merge
-	VMergeContinue                          // Continuation of vertical merge
+	VMergeNone     VerticalMergeType = iota // No vertical merge
+	VMergeRestart                            // Start of vertical merge
+	VMergeContinue                           // Continuation of vertical merge
 )
 
 // CellMergeInfo represents cell merge information.

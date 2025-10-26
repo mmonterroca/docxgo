@@ -78,10 +78,8 @@ func NewTOCField(switches map[string]string) domain.Field {
 	field := NewField(domain.FieldTypeTOC).(*docxField)
 	
 	// Apply switches
-	if switches != nil {
-		for key, value := range switches {
-			field.properties[key] = value
-		}
+	for key, value := range switches {
+		field.properties[key] = value
 	}
 	
 	// Rebuild code with switches
@@ -165,6 +163,8 @@ func (f *docxField) Update() error {
 		f.result = "1" // Placeholder - actual value determined by Word
 	case domain.FieldTypePageCount:
 		f.result = "1" // Placeholder - actual value determined by Word
+	case domain.FieldTypeNumPages:
+		f.result = "1" // Placeholder - actual value determined by Word
 	case domain.FieldTypeTOC:
 		f.result = "Table of Contents" // Placeholder
 	case domain.FieldTypeStyleRef:
@@ -176,8 +176,14 @@ func (f *docxField) Update() error {
 		}
 	case domain.FieldTypeDate:
 		f.result = "1/1/2025" // Placeholder
+	case domain.FieldTypeTime:
+		f.result = "12:00:00" // Placeholder
 	case domain.FieldTypeSeq:
 		f.result = "1" // Placeholder
+	case domain.FieldTypeRef:
+		f.result = "" // Placeholder - populated by Word
+	case domain.FieldTypeCustom:
+		f.result = "" // Custom fields have user-defined results
 	default:
 		f.result = "" // Unknown field type
 	}
@@ -193,14 +199,24 @@ func (f *docxField) getDefaultCode() string {
 		return constants.FieldCodePageNumber
 	case domain.FieldTypePageCount:
 		return constants.FieldCodeNumPages
+	case domain.FieldTypeNumPages:
+		return constants.FieldCodeNumPages
 	case domain.FieldTypeTOC:
 		return constants.FieldCodeTOC + ` \\o "1-3" \\h \\z \\u`
 	case domain.FieldTypeDate:
 		return constants.FieldCodeDate
+	case domain.FieldTypeTime:
+		return constants.FieldCodeTime
 	case domain.FieldTypeStyleRef:
 		return constants.FieldCodeStyleRef + ` "Heading 1"`
 	case domain.FieldTypeSeq:
 		return constants.FieldCodeSeq + ` Figure`
+	case domain.FieldTypeRef:
+		return constants.FieldCodeRef
+	case domain.FieldTypeHyperlink:
+		return "HYPERLINK" // Hyperlink fields use HYPERLINK code
+	case domain.FieldTypeCustom:
+		return "" // Custom fields require user-defined codes
 	default:
 		return ""
 	}
@@ -217,12 +233,8 @@ func (f *docxField) buildTOCCode() string {
 		code += ` \\o "1-3"`
 	}
 
-	// Hyperlinks
-	if _, ok := f.properties["hyperlinks"]; ok {
-		code += ` \\h`
-	} else {
-		code += ` \\h` // Default: include hyperlinks
-	}
+	// Hyperlinks (always included by default)
+	code += ` \\h`
 
 	// Hide page numbers
 	if _, ok := f.properties["hidePageNumbers"]; ok {
