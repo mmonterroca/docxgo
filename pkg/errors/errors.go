@@ -228,6 +228,30 @@ func Validation(field string, value interface{}, constraint, message string) err
 	}
 }
 
+// NewValidationError creates a validation error with operation context.
+// This is a convenience function for backward compatibility.
+func NewValidationError(op, field string, value interface{}, message string) error {
+	return &DocxError{
+		Code: ErrCodeValidation,
+		Op:   op,
+		Err: &ValidationError{
+			Field:   field,
+			Value:   value,
+			Message: message,
+		},
+	}
+}
+
+// NewNotFoundError creates a "not found" error.
+// This is a convenience function for backward compatibility.
+func NewNotFoundError(op, field string, value interface{}, message string) error {
+	return &DocxError{
+		Code:    ErrCodeNotFound,
+		Op:      op,
+		Message: fmt.Sprintf("%s: %v - %s", field, value, message),
+	}
+}
+
 // InvalidArgument creates a validation error for invalid arguments.
 func InvalidArgument(op, field string, value interface{}, message string) error {
 	return &DocxError{

@@ -175,7 +175,7 @@ func (ps *paragraphStyle) Alignment() domain.Alignment {
 
 // SetAlignment sets the paragraph alignment.
 func (ps *paragraphStyle) SetAlignment(align domain.Alignment) error {
-	if align < domain.AlignmentLeft || align > domain.AlignmentDistributed {
+	if align < domain.AlignmentLeft || align > domain.AlignmentDistribute {
 		return errors.NewValidationError(
 			"ParagraphStyle.SetAlignment",
 			"alignment",

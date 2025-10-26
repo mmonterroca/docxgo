@@ -39,15 +39,15 @@ type Paragraph struct {
 
 // ParagraphProperties represents w:pPr element.
 type ParagraphProperties struct {
-	XMLName       xml.Name       `xml:"w:pPr"`
-	Style         *Style         `xml:"w:pStyle,omitempty"`
-	Justification *Justification `xml:"w:jc,omitempty"`
-	Indentation   *Indentation   `xml:"w:ind,omitempty"`
-	Spacing       *Spacing       `xml:"w:spacing,omitempty"`
+	XMLName       xml.Name           `xml:"w:pPr"`
+	Style         *ParagraphStyleRef `xml:"w:pStyle,omitempty"`
+	Justification *Justification     `xml:"w:jc,omitempty"`
+	Indentation   *Indentation       `xml:"w:ind,omitempty"`
+	Spacing       *Spacing           `xml:"w:spacing,omitempty"`
 }
 
-// Style represents w:pStyle element.
-type Style struct {
+// ParagraphStyleRef represents w:pStyle element (reference to a style).
+type ParagraphStyleRef struct {
 	Val string `xml:"w:val,attr"`
 }
 

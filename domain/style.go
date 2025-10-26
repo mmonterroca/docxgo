@@ -199,10 +199,3 @@ type CharacterStyle interface {
 	// SetSize sets the font size in half-points.
 	SetSize(halfPoints int) error
 }
-
-// Indentation represents paragraph indentation in twips.
-type Indentation struct {
-	Left      int // Left indent
-	Right     int // Right indent
-	FirstLine int // First line indent (positive) or hanging (negative)
-}
