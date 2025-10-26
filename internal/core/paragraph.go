@@ -47,6 +47,7 @@ type paragraph struct {
 	id            string
 	runs          []domain.Run
 	fields        []domain.Field
+	images        []domain.Image
 	styleName     string
 	alignment     domain.Alignment
 	indent        domain.Indentation
@@ -63,6 +64,7 @@ func NewParagraph(id string, idGen IDGenerator, relManager *manager.Relationship
 		id:            id,
 		runs:          make([]domain.Run, 0, constants.DefaultRunCapacity),
 		fields:        make([]domain.Field, 0, 4),
+		images:        make([]domain.Image, 0, 4),
 		alignment:     domain.AlignmentLeft,
 		indent:        domain.Indentation{},
 		spacingBefore: constants.DefaultParagraphSpacing,
@@ -120,6 +122,82 @@ func (p *paragraph) AddHyperlink(url, displayText string) (domain.Run, error) {
 	_ = run.SetUnderline(domain.UnderlineSingle)
 
 	return run, nil
+}
+
+// AddImage adds an image to the paragraph from a file path.
+func (p *paragraph) AddImage(path string) (domain.Image, error) {
+	id := p.idGen.NextImageID()
+	img, err := NewImage(id, path)
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImage")
+	}
+
+	// Add relationship for image
+	relID, err := p.relManager.AddImage(img.Target())
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImage")
+	}
+
+	// Set relationship ID on image
+	if docxImg, ok := img.(*docxImage); ok {
+		docxImg.SetRelationshipID(relID)
+	}
+
+	p.images = append(p.images, img)
+	return img, nil
+}
+
+// AddImageWithSize adds an image with custom dimensions.
+func (p *paragraph) AddImageWithSize(path string, size domain.ImageSize) (domain.Image, error) {
+	id := p.idGen.NextImageID()
+	img, err := NewImageWithSize(id, path, size)
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImageWithSize")
+	}
+
+	// Add relationship for image
+	relID, err := p.relManager.AddImage(img.Target())
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImageWithSize")
+	}
+
+	// Set relationship ID on image
+	if docxImg, ok := img.(*docxImage); ok {
+		docxImg.SetRelationshipID(relID)
+	}
+
+	p.images = append(p.images, img)
+	return img, nil
+}
+
+// AddImageWithPosition adds an image with custom positioning.
+func (p *paragraph) AddImageWithPosition(path string, size domain.ImageSize, pos domain.ImagePosition) (domain.Image, error) {
+	id := p.idGen.NextImageID()
+	img, err := NewImageWithPosition(id, path, size, pos)
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImageWithPosition")
+	}
+
+	// Add relationship for image
+	relID, err := p.relManager.AddImage(img.Target())
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImageWithPosition")
+	}
+
+	// Set relationship ID on image
+	if docxImg, ok := img.(*docxImage); ok {
+		docxImg.SetRelationshipID(relID)
+	}
+
+	p.images = append(p.images, img)
+	return img, nil
+}
+
+// Images returns all images in this paragraph.
+func (p *paragraph) Images() []domain.Image {
+	images := make([]domain.Image, len(p.images))
+	copy(images, p.images)
+	return images
 }
 
 // Runs returns all runs in this paragraph.

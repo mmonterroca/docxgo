@@ -1,6 +1,6 @@
 # go-docx v2.0 - Clean Architecture Design
 
-**Status**: � Phase 6 Complete - Advanced Features Implemented  
+**Status**: ✅ Phase 6.5 Complete - Builder Pattern & API Polish Implemented  
 **Target**: Q1 2026  
 **Breaking Changes**: Yes (major version bump)
 
@@ -507,36 +507,49 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - 6,646+ lines of production code + tests
 - Core architecture 95% complete and functional
 
-### 🚧 Phase 6.5: Builder Pattern & API Polish (Current - Week 13)
+### ✅ Phase 6.5: Builder Pattern & API Polish - COMPLETE
 **Goal**: Implement fluent API with builder pattern
 
-**Status**: In Progress
-- [ ] Create builder.go with fluent API (~300 lines)
-  - [ ] DocumentBuilder with error accumulation
-  - [ ] ParagraphBuilder with chainable methods
-  - [ ] TableBuilder with row/cell builders
-  - [ ] Build() method with validation
-- [ ] Create options.go with functional options (~150 lines)
-  - [ ] Config struct with defaults
-  - [ ] WithDefaultFont, WithPageSize, WithMargins
-  - [ ] WithStrictValidation option
-- [ ] Add API convenience wrappers (~70 lines)
-  - [ ] Run.SetFontSize(points) wrapper
-  - [ ] Document.SaveToFile(path) alias
-  - [ ] Document.StyleManager() accessor
-  - [ ] Color constants (Red, Blue, Green, etc.)
-- [ ] Complete metadata support in WriteTo (~100 lines)
-  - [ ] CoreProperties serialization
-  - [ ] AppProperties serialization
-  - [ ] Relationship management integration
-- [ ] Fix all example code to use builder pattern
-  - [ ] examples/04_fields/
-  - [ ] v2/examples/05_styles/
-  - [ ] v2/examples/06_sections/
-  - [ ] v2/examples/07_advanced/
+**Status**: ✅ COMPLETE (October 26, 2025)
+- [x] Create builder.go with fluent API (~500 lines)
+  - [x] DocumentBuilder with error accumulation
+  - [x] ParagraphBuilder with chainable methods (Text, Bold, Italic, Color, FontSize, Alignment, Underline, End)
+  - [x] TableBuilder with RowBuilder and CellBuilder
+  - [x] Build() method with validation
+- [x] Create options.go with functional options (~200 lines)
+  - [x] Config struct with defaults
+  - [x] 9 Option functions (WithDefaultFont, WithPageSize, WithMargins, WithStrictValidation, WithMetadata, WithTitle, WithAuthor, WithSubject)
+  - [x] PageSize constants (A4, Letter, Legal, A3, Tabloid)
+  - [x] Margins presets (Normal, Narrow, Wide)
+- [x] Add API convenience exports (~50 lines in docx.go)
+  - [x] 12 Color constants (Black, White, Red, Green, Blue, Yellow, Cyan, Magenta, Orange, Purple, Gray, Silver)
+  - [x] Alignment constants (Center, Left, Right, Justify)
+  - [x] Underline constants (Single, Double, Thick, Dotted, Dashed, Wave)
+- [x] Complete metadata support in WriteTo (~50 lines)
+  - [x] RelationshipManager.ToXML() method
+  - [x] CoreProperties serialization integration
+  - [x] AppProperties serialization integration
+- [x] Create builder examples
+  - [x] v2/examples/01_basic/ - Simple builder demonstration
+  - [x] v2/examples/02_intermediate/ - Professional product catalog
+  - [x] Updated v2/examples/README.md with builder docs
+- [x] Comprehensive tests (builder_test.go - 500 lines)
+  - [x] 25+ test cases for all builders
+  - [x] Error accumulation tests
+  - [x] Validation tests
+  - [x] Chaining tests
 
-**Estimated effort**: 8-12 hours
-**Priority**: HIGH - Required for beta release
+**Achievements:**
+- Complete fluent API with builder pattern (500 lines)
+- Functional options pattern with presets (200 lines)
+- 12 predefined color constants for convenience
+- Full metadata serialization support
+- 2 new comprehensive examples (01_basic, 02_intermediate)
+- 25+ test cases with full coverage
+- Updated documentation (CHANGELOG.md, examples/README.md)
+
+**Actual effort**: 8 hours
+**Priority**: ✅ COMPLETE - Beta-ready
 
 ### Phase 7: Documentation & Release ✅ COMPLETE
 - [x] Headers/Footers (proper implementation with Section interface)
@@ -573,7 +586,154 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - Package-level godoc with 200+ lines of examples
 - All field creation functions exported with documentation
 
-### Phase 8: Beta Testing & Polish (Weeks 15-16)
+### 🚧 Phase 8: Images & Media (Current - Week 14)
+**Goal**: Implement image insertion and media management
+
+**Status**: In Progress
+- [ ] Domain interfaces (image.go) (~100 lines)
+  - [ ] Image interface with dimensions, format, data
+  - [ ] ImageFormat enum (PNG, JPEG, GIF, BMP, TIFF)
+  - [ ] ImageSize struct with width/height in pixels
+- [ ] Core implementation (internal/core/image.go) (~200 lines)
+  - [ ] AddImage(path string) method
+  - [ ] AddImageWithSize(path string, width, height)
+  - [ ] Image format detection
+  - [ ] Image dimension reading
+- [ ] Media manager enhancement (internal/manager/media.go) (~150 lines)
+  - [ ] Image relationship creation
+  - [ ] Media file packaging
+  - [ ] Duplicate image detection
+  - [ ] Image caching
+- [ ] XML serialization (internal/xml/drawing.go enhancement) (~100 lines)
+  - [ ] Drawing element serialization
+  - [ ] Picture element serialization
+  - [ ] Extent and position handling
+- [ ] Builder integration (builder.go) (~50 lines)
+  - [ ] ParagraphBuilder.Image(path) method
+  - [ ] ParagraphBuilder.ImageWithSize(path, width, height)
+- [ ] Tests (image_test.go) (~300 lines)
+  - [ ] Image insertion tests
+  - [ ] Format detection tests
+  - [ ] Size calculation tests
+  - [ ] Media relationship tests
+- [ ] Example (v2/examples/08_images/) (~200 lines)
+  - [ ] Basic image insertion
+  - [ ] Image sizing and positioning
+  - [ ] Multiple images in document
+
+**Estimated effort**: 10-12 hours
+**Priority**: HIGH - Major feature for v2.0.0
+
+### 🚧 Phase 9: Advanced Tables (Week 15)
+**Goal**: Implement advanced table features
+
+**Status**: Not Started
+- [ ] Cell merging (table.go enhancement) (~200 lines)
+  - [ ] MergeCells(startRow, startCol, endRow, endCol)
+  - [ ] MergeCellsHorizontal(row, startCol, endCol)
+  - [ ] MergeCellsVertical(col, startRow, endRow)
+  - [ ] GridSpan and VMerge XML serialization
+- [ ] Nested tables (table.go) (~100 lines)
+  - [ ] Cell.AddTable(rows, cols) method
+  - [ ] Nested table serialization
+  - [ ] Proper relationship handling
+- [ ] Table styles (table.go) (~150 lines)
+  - [ ] TableStyle interface
+  - [ ] Built-in table styles (Grid, List, etc.)
+  - [ ] SetTableStyle(styleID) method
+  - [ ] Style serialization
+- [ ] Table builder enhancement (builder.go) (~100 lines)
+  - [ ] TableBuilder.Style(styleID)
+  - [ ] CellBuilder.Merge(colspan, rowspan)
+  - [ ] RowBuilder.Height(value, rule)
+- [ ] Tests (table_advanced_test.go) (~400 lines)
+  - [ ] Cell merging tests (horizontal, vertical, both)
+  - [ ] Nested table tests
+  - [ ] Table style tests
+  - [ ] Complex table scenarios
+- [ ] Example (v2/examples/09_advanced_tables/) (~300 lines)
+  - [ ] Cell merging demonstration
+  - [ ] Nested tables
+  - [ ] Styled tables
+  - [ ] Complex layouts (calendar, invoice, etc.)
+
+**Estimated effort**: 12-15 hours
+**Priority**: HIGH - Essential for professional documents
+
+### Phase 10: Document Reading (Week 16)
+**Goal**: Implement .docx file reading and modification
+
+**Status**: Not Started
+- [ ] Unpack infrastructure (internal/reader/) (~300 lines)
+  - [ ] ZIP extraction
+  - [ ] XML parsing
+  - [ ] Relationship loading
+- [ ] XML deserialization (internal/xml/) (~400 lines)
+  - [ ] Document.xml parser
+  - [ ] Styles.xml parser
+  - [ ] Relationships parser
+  - [ ] Media loading
+- [ ] Domain object creation (internal/core/) (~300 lines)
+  - [ ] XML → Paragraph conversion
+  - [ ] XML → Run conversion
+  - [ ] XML → Table conversion
+  - [ ] Section/Header/Footer loading
+- [ ] Public API (docx.go) (~100 lines)
+  - [ ] OpenDocument(path string) function
+  - [ ] Document.Reload() method
+  - [ ] Document modification workflow
+- [ ] Tests (reader_test.go) (~500 lines)
+  - [ ] Open existing document tests
+  - [ ] Roundtrip tests (create → save → open → verify)
+  - [ ] Modification tests
+  - [ ] Complex document reading
+- [ ] Example (v2/examples/10_modify_document/) (~200 lines)
+  - [ ] Open and modify existing document
+  - [ ] Add content to existing document
+  - [ ] Update metadata
+
+**Estimated effort**: 15-20 hours
+**Priority**: MEDIUM - Nice to have for v2.0.0, essential for v2.1.0
+
+### Phase 11: Code Quality & Optimization (Week 17)
+**Goal**: Refactoring, optimization, and polish
+
+**Status**: Not Started
+- [ ] Code cleanup (~3 hours)
+  - [ ] Review and resolve all TODO comments
+  - [ ] Remove dead code
+  - [ ] Consistent naming conventions
+  - [ ] Package organization review
+- [ ] Linter fixes (~2 hours)
+  - [ ] Run golangci-lint
+  - [ ] Fix all warnings
+  - [ ] Enable stricter linting rules
+  - [ ] Add .golangci.yml config
+- [ ] godoc completion (~3 hours)
+  - [ ] Add package-level documentation
+  - [ ] Complete all public API godoc comments
+  - [ ] Add examples in godoc
+  - [ ] Generate and review godoc output
+- [ ] Test coverage improvement (~4 hours)
+  - [ ] Identify uncovered code paths
+  - [ ] Add missing unit tests
+  - [ ] Add edge case tests
+  - [ ] Target 95%+ coverage
+- [ ] Performance optimization (~4 hours)
+  - [ ] Add benchmark tests
+  - [ ] Profile hot paths
+  - [ ] Optimize allocations
+  - [ ] Memory pool usage where appropriate
+- [ ] Error handling review (~2 hours)
+  - [ ] Consistent error messages
+  - [ ] Proper error wrapping
+  - [ ] Error types documentation
+
+**Estimated effort**: 16-20 hours
+**Priority**: MEDIUM - Quality improvements
+
+### Phase 12: Beta Testing & Release (Week 18)
+- [ ] Integration testing
 - [ ] Community feedback integration
 - [ ] Bug fixes
 - [ ] Performance tuning

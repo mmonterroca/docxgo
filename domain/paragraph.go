@@ -40,6 +40,20 @@ type Paragraph interface {
 	// AddHyperlink adds a hyperlink to the paragraph.
 	AddHyperlink(url, displayText string) (Run, error)
 
+	// AddImage adds an image to the paragraph from a file path.
+	// Returns the created Image object.
+	AddImage(path string) (Image, error)
+
+	// AddImageWithSize adds an image with custom dimensions.
+	// If width or height is 0, maintains aspect ratio.
+	AddImageWithSize(path string, size ImageSize) (Image, error)
+
+	// AddImageWithPosition adds an image with custom positioning.
+	AddImageWithPosition(path string, size ImageSize, pos ImagePosition) (Image, error)
+
+	// Images returns all images in this paragraph.
+	Images() []Image
+
 	// Runs returns all runs in this paragraph.
 	Runs() []Run
 
