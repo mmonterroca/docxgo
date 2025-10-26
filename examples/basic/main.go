@@ -36,7 +36,8 @@ import (
 
 func main() {
 	fmt.Println("go-docx v2 - Basic Example")
-	fmt.Println("==========================\n")
+	fmt.Println("==========================")
+	fmt.Println()
 
 	// Create a new document
 	doc := core.NewDocument()

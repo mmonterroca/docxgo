@@ -99,7 +99,7 @@ func (d *document) AddSection() (domain.Section, error) {
 func (d *document) DefaultSection() (domain.Section, error) {
 	if len(d.sections) == 0 {
 		// Create default section if it doesn't exist
-		section := NewSection(*d.relManager, *d.idGen)
+		section := NewSection(d.relManager, d.idGen)
 		d.sections = append(d.sections, section)
 		return section, nil
 	}

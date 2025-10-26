@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/pkg/errors"
 )
 
 func TestDocumentBuilder_Build(t *testing.T) {
@@ -33,7 +34,7 @@ func TestDocumentBuilder_Build(t *testing.T) {
 
 	t.Run("accumulates errors", func(t *testing.T) {
 		builder := NewDocumentBuilder()
-		builder.errors = append(builder.errors, domain.NewDocumentError("test error"))
+		builder.errors = append(builder.errors, errors.NewValidationError("test", "field", "value", "test error"))
 		
 		doc, err := builder.Build()
 		if err == nil {

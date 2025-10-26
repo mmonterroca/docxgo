@@ -45,12 +45,12 @@ type docxSection struct {
 	columns       int
 	headers       map[domain.HeaderType]*docxHeader
 	footers       map[domain.FooterType]*docxFooter
-	relationMgr   manager.RelationshipManager
-	idGen         manager.IDGenerator
+	relationMgr   *manager.RelationshipManager
+	idGen         *manager.IDGenerator
 }
 
 // NewSection creates a new section with default settings.
-func NewSection(relationMgr manager.RelationshipManager, idGen manager.IDGenerator) domain.Section {
+func NewSection(relationMgr *manager.RelationshipManager, idGen *manager.IDGenerator) domain.Section {
 	return &docxSection{
 		pageSize:    domain.PageSizeA4,
 		margins:     domain.DefaultMargins,
@@ -208,8 +208,8 @@ type docxHeader struct {
 	mu          sync.RWMutex
 	headerType  domain.HeaderType
 	paragraphs  []domain.Paragraph
-	relationMgr manager.RelationshipManager
-	idGen       manager.IDGenerator
+	relationMgr *manager.RelationshipManager
+	idGen       *manager.IDGenerator
 }
 
 // AddParagraph adds a paragraph to the header.
@@ -218,7 +218,7 @@ func (h *docxHeader) AddParagraph() (domain.Paragraph, error) {
 	defer h.mu.Unlock()
 
 	id := h.idGen.NextParagraphID()
-	para := NewParagraph(id, &h.idGen, &h.relationMgr)
+	para := NewParagraph(id, h.idGen, h.relationMgr)
 	h.paragraphs = append(h.paragraphs, para)
 	return para, nil
 }
@@ -239,8 +239,8 @@ type docxFooter struct {
 	mu          sync.RWMutex
 	footerType  domain.FooterType
 	paragraphs  []domain.Paragraph
-	relationMgr manager.RelationshipManager
-	idGen       manager.IDGenerator
+	relationMgr *manager.RelationshipManager
+	idGen       *manager.IDGenerator
 }
 
 // AddParagraph adds a paragraph to the footer.
@@ -249,7 +249,7 @@ func (f *docxFooter) AddParagraph() (domain.Paragraph, error) {
 	defer f.mu.Unlock()
 
 	id := f.idGen.NextParagraphID()
-	para := NewParagraph(id, &f.idGen, &f.relationMgr)
+	para := NewParagraph(id, f.idGen, f.relationMgr)
 	f.paragraphs = append(f.paragraphs, para)
 	return para, nil
 }
