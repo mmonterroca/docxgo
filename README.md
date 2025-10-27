@@ -62,42 +62,46 @@ import (
 )
 
 func main() {
-    // Create document with options
-    doc := docx.NewDocument(
-        docx.WithDefaultFont("Calibri"),
-        docx.WithPageSize(docx.A4),
+    // Option 1: Simple API (direct domain interfaces)
+    doc := docx.NewDocument()
+    
+    para, _ := doc.AddParagraph()
+    run, _ := para.AddRun()
+    run.SetText("Hello, World!")
+    run.SetBold(true)
+    run.SetColor(docx.Red)
+    
+    doc.SaveAs("simple.docx")
+    
+    // Option 2: Builder API (fluent, chainable)
+    builder := docx.NewDocumentBuilder(
+        docx.WithDefaultFont("Calibri", 11),
+        docx.WithPageSize(docx.PageSizeA4),
         docx.WithTitle("My Report"),
         docx.WithAuthor("John Doe"),
     )
     
     // Add content using fluent API
-    doc.AddParagraph().
+    builder.AddParagraph().
         Text("Project Report").
-        Style("Heading1").
-        Center().
+        Bold().
+        FontSize(16).
+        Alignment(docx.AlignmentCenter).
         End()
     
-    doc.AddParagraph().
+    builder.AddParagraph().
         Text("This is bold text").Bold().
         Text(" and this is ").
         Text("colored text").Color(docx.Red).FontSize(14).
         End()
     
-    // Add a styled table
-    doc.AddTable(3, 3).
-        Style("LightGrid").
-        Row(0).Cell(0).Text("Header 1").Bold().End().
-        Row(0).Cell(1).Text("Header 2").Bold().End().
-        Row(1).Cell(0).Text("Data 1").End().
-        End()
-    
     // Build and save
-    finalDoc, err := doc.Build()
+    doc, err := builder.Build()
     if err != nil {
         log.Fatal(err)
     }
     
-    if err := finalDoc.SaveAs("report.docx"); err != nil {
+    if err := doc.SaveAs("report.docx"); err != nil {
         log.Fatal(err)
     }
 }
