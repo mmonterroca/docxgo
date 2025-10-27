@@ -104,9 +104,10 @@ func (d *document) AddTable(rows, cols int) (domain.Table, error) {
 }
 
 // AddSection adds a new section to the document.
+// Note: Currently only DefaultSection() is fully supported.
+// Multi-section documents will be implemented in a future release.
 func (d *document) AddSection() (domain.Section, error) {
-	// TODO: Implement section creation
-	return nil, errors.Unsupported("Document.AddSection", "sections not yet implemented")
+	return nil, errors.Unsupported("Document.AddSection", "multi-section documents not yet implemented - use DefaultSection() instead")
 }
 
 // AddPageBreak adds a page break to the document.

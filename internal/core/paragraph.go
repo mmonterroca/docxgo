@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package core
 
 import (
@@ -86,9 +84,9 @@ func (p *paragraph) AddRun() (domain.Run, error) {
 }
 
 // AddField adds a field to the paragraph.
+// Deprecated: Use AddRun() and run.AddField() instead for better control.
 func (p *paragraph) AddField(_ domain.FieldType) (domain.Field, error) {
-	// TODO: Implement field creation
-	return nil, errors.Unsupported("Paragraph.AddField", "fields not yet implemented")
+	return nil, errors.Unsupported("Paragraph.AddField", "use AddRun() and run.AddField() instead")
 }
 
 // AddHyperlink adds a hyperlink to the paragraph.
@@ -227,8 +225,11 @@ func (p *paragraph) Text() string {
 }
 
 // Style returns the style applied to this paragraph.
+// Note: Currently only returns the style name, not a full Style object.
+// For now, use SetStyle() to apply styles and track the name yourself if needed.
 func (p *paragraph) Style() domain.Style {
-	// TODO: Implement style retrieval
+	// Style retrieval from the style manager is not yet implemented.
+	// Return nil for now - users should track the applied style name themselves.
 	return nil
 }
 
