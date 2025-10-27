@@ -109,13 +109,13 @@ func main() {
 
 ### More Examples
 
-See the [`examples/`](examples/) and [`v2/examples/`](v2/examples/) directories:
+See the [`examples/`](examples/) directory for comprehensive examples:
 
-- **[01_hello](v2/examples/01_basic/)** - Simple document with builder
-- **[02_formatted](v2/examples/02_intermediate/)** - Professional product catalog
-- **[04_fields](examples/04_fields/)** - TOC, page numbers, hyperlinks
-- **[08_images](v2/examples/08_images/)** - Image insertion and positioning
-- **[09_advanced_tables](v2/examples/09_advanced_tables/)** - Cell merging, nested tables, styling
+- **[01_basic](examples/01_basic/)** - Simple document with builder pattern
+- **[02_intermediate](examples/02_intermediate/)** - Professional product catalog
+- **[04_fields](examples/04_fields/)** - TOC, page numbers, hyperlinks (⚠️ needs v2 API update)
+- **[08_images](examples/08_images/)** - Image insertion and positioning
+- **[09_advanced_tables](examples/09_advanced_tables/)** - Cell merging, nested tables, styling
 
 ---
 
