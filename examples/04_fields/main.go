@@ -62,7 +62,7 @@ func main() {
 	}
 
 	// Save the document
-	if err := doc.SaveToFile("fields_example.docx"); err != nil {
+	if err := doc.SaveAs("fields_example.docx"); err != nil {
 		log.Fatalf("Failed to save document: %v", err)
 	}
 

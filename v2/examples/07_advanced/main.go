@@ -46,7 +46,7 @@ func main() {
 	addConclusion(doc)
 
 	// Save the document
-	if err := doc.SaveToFile("07_advanced_demo.docx"); err != nil {
+	if err := doc.SaveAs("07_advanced_demo.docx"); err != nil {
 		log.Fatalf("Failed to save document: %v", err)
 	}
 

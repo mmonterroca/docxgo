@@ -8,22 +8,18 @@ import (
 )
 
 func main() {
-	// Create document with custom options
-	doc, err := docx.NewDocumentBuilder(
+	// Create document builder with custom options
+	builder := docx.NewDocumentBuilder(
 		docx.WithTitle("Product Catalog"),
 		docx.WithAuthor("ACME Corporation"),
 		docx.WithSubject("Q1 2024 Product Lineup"),
 		docx.WithDefaultFont("Arial", 11),
 		docx.WithPageSize(docx.PageSizeLetter),
 		docx.WithMargins(docx.MarginsNormal),
-	).Build()
-	
-	if err != nil {
-		log.Fatalf("Failed to create document: %v", err)
-	}
+	)
 
 	// Cover page
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("ACME Corporation").
 		Bold().
 		FontSize(20).
@@ -31,55 +27,55 @@ func main() {
 		Alignment(docx.AlignmentCenter).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("Product Catalog 2024").
 		FontSize(16).
 		Color(docx.Gray).
 		Alignment(docx.AlignmentCenter).
 		End()
 
-	doc.AddParagraph().End()
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
+	builder.AddParagraph().End()
 
 	// Table of contents placeholder
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("Table of Contents").
 		Bold().
 		FontSize(14).
 		Underline(docx.UnderlineSingle).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("1. Electronics.....................................5").
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("2. Home & Garden...............................12").
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("3. Sports & Outdoors..........................18").
 		End()
 
-	doc.AddParagraph().End()
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
+	builder.AddParagraph().End()
 
 	// Section 1: Electronics
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("1. Electronics").
 		Bold().
 		FontSize(16).
 		Color(docx.Blue).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("Our electronics lineup features cutting-edge technology and innovative designs.").
 		End()
 
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
 
 	// Product table
-	doc.AddTable().
+	builder.AddTable().
 		Width(8000).
 		Row().
 			Cell().Text("Product").Bold().Width(2000).End().
@@ -103,48 +99,48 @@ func main() {
 		End().
 	End()
 
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
 
 	// Features highlight
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("Key Features:").
 		Bold().
 		FontSize(12).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("✓ Industry-leading performance").
 		Color(docx.Green).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("✓ 2-year warranty on all electronics").
 		Color(docx.Green).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("✓ Free shipping on orders over $500").
 		Color(docx.Green).
 		End()
 
-	doc.AddParagraph().End()
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
+	builder.AddParagraph().End()
 
 	// Section 2: Home & Garden
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("2. Home & Garden").
 		Bold().
 		FontSize(16).
 		Color(docx.Blue).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("Transform your living space with our curated collection.").
 		End()
 
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
 
-	doc.AddTable().
+	builder.AddTable().
 		Width(8000).
 		Row().
 			Cell().Text("Product").Bold().Width(2000).End().
@@ -168,23 +164,23 @@ func main() {
 		End().
 	End()
 
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
 
 	// Section 3: Sports & Outdoors
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("3. Sports & Outdoors").
 		Bold().
 		FontSize(16).
 		Color(docx.Blue).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("Gear up for adventure with our premium outdoor equipment.").
 		End()
 
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
 
-	doc.AddTable().
+	builder.AddTable().
 		Width(8000).
 		Row().
 			Cell().Text("Product").Bold().Width(2000).End().
@@ -208,39 +204,39 @@ func main() {
 		End().
 	End()
 
-	doc.AddParagraph().End()
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
+	builder.AddParagraph().End()
 
 	// Contact info
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("Contact Information").
 		Bold().
 		FontSize(14).
 		Underline(docx.UnderlineSingle).
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("ACME Corporation").
 		Bold().
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("📧 sales@acme.example.com").
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("📞 1-800-ACME-123").
 		End()
 
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("🌐 www.acme.example.com").
 		Color(docx.Blue).
 		End()
 
-	doc.AddParagraph().End()
+	builder.AddParagraph().End()
 
 	// Footer note
-	doc.AddParagraph().
+	builder.AddParagraph().
 		Text("Prices subject to change. All products include standard warranty. ").
 		Text("Visit our website for current pricing and availability.").
 		FontSize(9).
@@ -249,8 +245,14 @@ func main() {
 		Alignment(docx.AlignmentCenter).
 		End()
 
+	// Build the document
+	doc, err := builder.Build()
+	if err != nil {
+		log.Fatalf("Failed to build document: %v", err)
+	}
+
 	// Save the document
-	if err := doc.SaveToFile("02_intermediate_builder.docx"); err != nil {
+	if err := doc.SaveAs("02_intermediate_builder.docx"); err != nil {
 		log.Fatalf("Failed to save document: %v", err)
 	}
 

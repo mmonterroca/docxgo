@@ -242,7 +242,7 @@ func main() {
 	}
 
 	// Save the document
-	if err := doc.SaveToFile("06_sections_demo.docx"); err != nil {
+	if err := doc.SaveAs("06_sections_demo.docx"); err != nil {
 		log.Fatalf("Failed to save document: %v", err)
 	}
 

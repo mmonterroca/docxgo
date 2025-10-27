@@ -158,7 +158,7 @@ func main() {
 	subtitleRun.AddText("This is a subtitle with special formatting")
 
 	// Save the document
-	if err := doc.SaveToFile("05_styles_demo.docx"); err != nil {
+	if err := doc.SaveAs("05_styles_demo.docx"); err != nil {
 		log.Fatalf("Failed to save document: %v", err)
 	}
 
