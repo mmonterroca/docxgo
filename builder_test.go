@@ -11,7 +11,7 @@ func TestDocumentBuilder_Build(t *testing.T) {
 	t.Run("builds document with paragraph", func(t *testing.T) {
 		builder := NewDocumentBuilder()
 		builder.AddParagraph().Text("Test").End()
-		
+
 		doc, err := builder.Build()
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -27,7 +27,7 @@ func TestDocumentBuilder_Build(t *testing.T) {
 			WithAuthor("Test Author"),
 		)
 		builder.AddParagraph().Text("Test").End()
-		
+
 		doc, err := builder.Build()
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -291,7 +291,7 @@ func TestTableBuilder_Basic(t *testing.T) {
 	t.Run("creates empty table", func(t *testing.T) {
 		builder := NewDocumentBuilder()
 		builder.AddTable(1, 1).End()
-		
+
 		_, err := builder.Build()
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -299,31 +299,193 @@ func TestTableBuilder_Basic(t *testing.T) {
 	})
 
 	t.Run("creates table with width", func(t *testing.T) {
-		t.Skip("TODO: Fix Width API - requires WidthType parameter")
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Width(domain.WidthDXA, 5000).
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
 	})
 
 	t.Run("creates table with alignment", func(t *testing.T) {
-		t.Skip("TODO: Fix Alignment API")
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Alignment(domain.AlignmentCenter).
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
 	})
 }
 
 func TestTableBuilder_Rows(t *testing.T) {
-	t.Skip("Table builder Row/Cell API needs redesign - currently requires indices")
+	t.Run("configures row height", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(2, 2).
+			Row(0).
+			Height(500).
+			End().
+			End()
 
-	// TODO: Fix table builder API
-	// Current API requires Row(int).Cell(int) but tests expect Row().Cell()
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("configures multiple rows", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(3, 2).
+			Row(0).Height(400).End().
+			Row(1).Height(500).End().
+			Row(2).Height(600).End().
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
 }
 
 func TestRowBuilder_Cells(t *testing.T) {
-	t.Skip("Table builder Row/Cell API needs redesign")
+	t.Run("adds text to cell", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 2).
+			Row(0).
+			Cell(0).Text("Cell 1").End().
+			Cell(1).Text("Cell 2").End().
+			End().
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("formats cell text", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Text("Bold text").
+			Bold().
+			End().
+			End().
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
 }
 
 func TestCellBuilder_Formatting(t *testing.T) {
-	t.Skip("Table builder Row/Cell API needs redesign")
+	t.Run("sets cell width", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Width(3000).
+			Text("Wide cell").
+			End().
+			End().
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("sets cell vertical alignment", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			VerticalAlignment(domain.VerticalAlignCenter).
+			Text("Centered").
+			End().
+			End().
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("sets cell shading", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Shading(domain.Color{R: 220, G: 220, B: 220}).
+			Text("Gray background").
+			End().
+			End().
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
 }
 
 func TestTableBuilder_ComplexTable(t *testing.T) {
-	t.Skip("Table builder Row/Cell API needs redesign")
+	t.Run("creates table with mixed formatting", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(2, 3).
+			Width(domain.WidthDXA, 9000).
+			Alignment(domain.AlignmentCenter).
+			Row(0).
+			Height(400).
+			Cell(0).Text("Header 1").Bold().End().
+			Cell(1).Text("Header 2").Bold().End().
+			Cell(2).Text("Header 3").Bold().End().
+			End().
+			Row(1).
+			Height(300).
+			Cell(0).Text("Data 1").End().
+			Cell(1).Text("Data 2").End().
+			Cell(2).Text("Data 3").End().
+			End().
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("creates table with cell merging", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(2, 2).
+			Row(0).
+			Cell(0).
+			Merge(2, 1).
+			Text("Merged cell").
+			End().
+			End().
+			Row(1).
+			Cell(0).Text("Cell 1").End().
+			Cell(1).Text("Cell 2").End().
+			End().
+			End()
+
+		_, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
 }
 
 func TestBuilder_ErrorAccumulation(t *testing.T) {
