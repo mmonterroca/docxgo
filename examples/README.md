@@ -75,13 +75,15 @@ cd basic && go run main.go
 
 ## ⚠️ Examples Under Renovation
 
-The following examples use APIs that are being refactored:
-- `04_fields/` - Fields system (TOC, page numbers, hyperlinks) - **Needs v2 API update**
-- `05_styles/` - Style management - **Needs v2 API update**
-- `06_sections/` - Sections and page layout - **Needs v2 API update**
-- `07_advanced/` - Advanced integration - **Needs v2 API update**
+The following examples are being updated to match the v2 API and have been moved to [`_wip/`](./_wip/) (work in progress):
+- `_wip/04_fields/` - Fields system (TOC, page numbers, hyperlinks)
+- `_wip/05_styles/` - Style management
+- `_wip/06_sections/` - Sections and page layout
+- `_wip/07_advanced/` - Advanced integration
 
-These will be updated to match the v2 API in a future release.
+See [`_wip/README.md`](./_wip/README.md) for details on what needs to be updated.
+
+**Note:** These examples are excluded from CI/CD builds until they're updated.
 
 ## Requirements
 

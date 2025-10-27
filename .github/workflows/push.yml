@@ -40,3 +40,9 @@ jobs:
 
       - name: Test
         run: go test $(go list ./...)
+
+      - name: Test Examples
+        run: |
+          cd examples
+          chmod +x test_all.sh
+          ./test_all.sh
