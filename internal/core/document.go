@@ -60,6 +60,7 @@ type document struct {
 	idGen        *manager.IDGenerator
 	relManager   *manager.RelationshipManager
 	mediaManager *manager.MediaManager
+	styleManager domain.StyleManager
 }
 
 // NewDocument creates a new Document.
@@ -73,6 +74,7 @@ func NewDocument() domain.Document {
 		idGen:        idGen,
 		relManager:   manager.NewRelationshipManager(idGen),
 		mediaManager: manager.NewMediaManager(idGen),
+		styleManager: manager.NewStyleManager(),
 	}
 }
 
@@ -245,4 +247,9 @@ func (d *document) SetMetadata(meta *domain.Metadata) error {
 	}
 	d.metadata = meta
 	return nil
+}
+
+// StyleManager returns the style manager for this document.
+func (d *document) StyleManager() domain.StyleManager {
+	return d.styleManager
 }

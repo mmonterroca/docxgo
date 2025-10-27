@@ -76,17 +76,34 @@ func main() {
 	infoRun, _ := infoPara.AddRun()
 	infoRun.AddText("This document demonstrates several built-in styles:")
 
-	builtInStyles := []string{
-		"Normal", "Heading1", "Heading2", "Heading3",
-		"Title", "Subtitle", "Quote", "IntenseQuote",
-		"ListParagraph", "Caption",
+	// Get style manager to query available styles
+	styleMgr := doc.StyleManager()
+
+	// List common built-in styles dynamically
+	commonStyleIDs := []string{
+		domain.StyleIDNormal,
+		domain.StyleIDHeading1,
+		domain.StyleIDHeading2,
+		domain.StyleIDHeading3,
+		domain.StyleIDTitle,
+		domain.StyleIDSubtitle,
+		domain.StyleIDQuote,
+		domain.StyleIDIntenseQuote,
+		domain.StyleIDListParagraph,
+		domain.StyleIDCaption,
 	}
 
-	for _, styleID := range builtInStyles {
-		stylePara, _ := doc.AddParagraph()
-		stylePara.SetStyle(domain.StyleIDListParagraph)
-		styleRun, _ := stylePara.AddRun()
-		styleRun.AddText("• " + styleID)
+	for _, styleID := range commonStyleIDs {
+		if styleMgr.HasStyle(styleID) {
+			stylePara, _ := doc.AddParagraph()
+			stylePara.SetStyle(domain.StyleIDListParagraph)
+			styleRun, _ := stylePara.AddRun()
+			
+			// Get style to display its name
+			if style, err := styleMgr.GetStyle(styleID); err == nil {
+				styleRun.AddText(fmt.Sprintf("• %s (%s)", style.Name(), styleID))
+			}
+		}
 	}
 
 	doc.AddParagraph()

@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 // Package core provides core implementations of domain interfaces.
 package core
 
@@ -46,8 +44,8 @@ type run struct {
 	underline domain.UnderlineStyle
 	strike    bool
 	highlight domain.HighlightColor
-	fields    []domain.Field      // Fields embedded in this run
-	breaks    []domain.BreakType  // Breaks in this run
+	fields    []domain.Field     // Fields embedded in this run
+	breaks    []domain.BreakType // Breaks in this run
 }
 
 // NewRun creates a new Run.
@@ -215,11 +213,11 @@ func (r *run) AddField(field domain.Field) error {
 	if field == nil {
 		return errors.InvalidArgument("Run.AddField", "field", nil, "field cannot be nil")
 	}
-	
+
 	if r.fields == nil {
 		r.fields = make([]domain.Field, 0, 2)
 	}
-	
+
 	r.fields = append(r.fields, field)
 	return nil
 }

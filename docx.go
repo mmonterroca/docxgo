@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 // Package docx provides functionality for creating and manipulating
 // Microsoft Word (.docx) documents.
 //

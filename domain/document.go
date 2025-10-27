@@ -103,6 +103,10 @@ type Document interface {
 	// Creates a new paragraph with a page break run.
 	AddPageBreak() error
 
+	// StyleManager returns the style manager for this document.
+	// Use this to query, add, or modify document styles.
+	StyleManager() StyleManager
+
 	// DefaultSection returns the default (first) section of the document.
 	// Every document has at least one section.
 	DefaultSection() (Section, error)
