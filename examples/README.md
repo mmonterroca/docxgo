@@ -133,6 +133,7 @@ cd basic && go run main.go
 
 ## Testing All Examples
 
+### Quick Test - Verify Compilation
 Run the included test script to verify all examples compile:
 
 ```bash
@@ -140,6 +141,60 @@ Run the included test script to verify all examples compile:
 ```
 
 This will test all 9 working examples and report results.
+
+---
+
+### Complete Validation - Generate and Validate Documents
+
+#### 🚀 Run All Examples
+Execute all examples and generate .docx files:
+
+```bash
+./run_all_examples.sh
+```
+
+**Output**: 8 .docx files in their respective directories
+
+#### 🔍 Validate OOXML Integrity
+Verify the generated documents are valid:
+
+```bash
+./validate_docx.sh
+```
+
+**Checks**:
+- ✅ ZIP structure integrity
+- ✅ Required OOXML files present
+- ✅ Valid Office Open XML format
+
+#### 📊 View Validation Results
+See detailed validation reports:
+- [VALIDATION_COMPLETE.md](./VALIDATION_COMPLETE.md) - Full validation report
+- [VALIDATION_RESULTS.md](./VALIDATION_RESULTS.md) - Detailed feature checklist
+
+---
+
+### Generated Documents
+
+After running `./run_all_examples.sh`, you'll have:
+
+```
+examples/
+├── 01_basic/01_basic_builder.docx (4.1KB)
+├── 02_intermediate/02_intermediate_builder.docx (4.7KB)
+├── 04_fields/fields_example.docx (4.0KB)
+├── 05_styles/05_styles_demo.docx (3.7KB)
+├── 06_sections/06_sections_demo.docx (3.9KB)
+├── 07_advanced/07_advanced_demo.docx (4.6KB)
+├── 08_images/08_images_output.docx (4.2KB)
+└── 09_advanced_tables/09_advanced_tables_output.docx (4.8KB)
+```
+
+**All documents are ready to open in**:
+- Microsoft Word (Windows/macOS)
+- LibreOffice Writer
+- Google Docs
+- Any OOXML-compatible word processor
 
 ## Documentation
 
