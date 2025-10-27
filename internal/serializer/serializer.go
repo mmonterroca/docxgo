@@ -3,7 +3,7 @@
 package serializer
 
 /*
-   Copyright (c) 2025 SlideLang
+   Copyright (c) 2025 Misael Monterroca
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU Affero General Public License as published
@@ -587,7 +587,7 @@ func (s *DocumentSerializer) SerializeAppProperties(doc domain.Document) *xml.Ap
 		DocSecurity: 0,
 		Lines:       0,
 		Paragraphs:  len(doc.Paragraphs()),
-		Company:     "SlideLang",
+		Company:     "Misael Monterroca",
 	}
 }
 

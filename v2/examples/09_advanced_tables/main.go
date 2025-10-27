@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 
 Example: Advanced table features - cell merging, nested tables, and styling
 

@@ -135,7 +135,7 @@ See full migration guide (coming soon): `docs/MIGRATION.md`
 ## Credits
 
 - Original v1: Various contributors
-- v2 Clean Architecture Rewrite: SlideLang team (2025)
+- v2 Clean Architecture Rewrite: Misael Monterroca team (2025)
 
 ## License
 

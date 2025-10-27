@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

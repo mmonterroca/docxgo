@@ -123,7 +123,7 @@
 		<pre class="file" id="file0" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -356,7 +356,7 @@ func (d *document) SetMetadata(meta *domain.Metadata) error <span class="cov0" t
 		<pre class="file" id="file1" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -644,7 +644,7 @@ func (f *docxField) MarkDirty() <span class="cov1" title="1">{
 		<pre class="file" id="file2" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -914,7 +914,7 @@ func ReadImageFromReader(id string, reader io.Reader, format domain.ImageFormat)
 		<pre class="file" id="file3" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -1254,7 +1254,7 @@ func (p *paragraph) SetLineSpacing(spacing domain.LineSpacing) error <span class
 		<pre class="file" id="file4" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -1466,7 +1466,7 @@ func (r *run) Fields() []domain.Field <span class="cov0" title="0">{
 		<pre class="file" id="file5" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -1734,7 +1734,7 @@ func (f *docxFooter) Paragraphs() []domain.Paragraph <span class="cov0" title="0
 		<pre class="file" id="file6" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -2143,7 +2143,7 @@ func (c *tableCell) Tables() []domain.Table <span class="cov5" title="14">{
 		<pre class="file" id="file7" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -2401,7 +2401,7 @@ func (cs *characterStyle) SetSize(halfPoints int) error <span class="cov1" title
 		<pre class="file" id="file8" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -2558,7 +2558,7 @@ func (g *IDGenerator) Reset() <span class="cov0" title="0">{
 		<pre class="file" id="file9" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -2743,7 +2743,7 @@ func (mm *MediaManager) detectContentType(ext string) string <span class="cov0" 
 		<pre class="file" id="file10" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -3095,7 +3095,7 @@ func (ps *paragraphStyle) SetOutlineLevel(level int) error <span class="cov7" ti
 		<pre class="file" id="file11" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -3293,7 +3293,7 @@ func (rm *RelationshipManager) ToXML() *xml.Relationships <span class="cov0" tit
 		<pre class="file" id="file12" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -3745,7 +3745,7 @@ func (sm *styleManager) IsBuiltIn(styleID string) bool <span class="cov2" title=
 package serializer
 
 /*
-   Copyright (c) 2025 SlideLang
+   Copyright (c) 2025 Misael Monterroca
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU Affero General Public License as published
@@ -4329,7 +4329,7 @@ func (s *DocumentSerializer) SerializeAppProperties(doc domain.Document) *xml.Ap
                 DocSecurity: 0,
                 Lines:       0,
                 Paragraphs:  len(doc.Paragraphs()),
-                Company:     "SlideLang",
+                Company:     "Misael Monterroca",
         }
 }</span>
 
@@ -4345,7 +4345,7 @@ func (s *DocumentSerializer) DebugPrint(doc domain.Document) <span class="cov0" 
 package writer
 
 /*
-   Copyright (c) 2025 SlideLang
+   Copyright (c) 2025 Misael Monterroca
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -4632,7 +4632,7 @@ func (zw *ZipWriter) writeRaw(path string, data []byte) error <span class="cov7"
 		<pre class="file" id="file15" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -4848,7 +4848,7 @@ func convertVAlign(align domain.VerticalAlign) string <span class="cov0" title="
 		<pre class="file" id="file16" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -4932,7 +4932,7 @@ func NewInstrText(instruction string) *InstrText <span class="cov10" title="3">{
 		<pre class="file" id="file17" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -5008,7 +5008,7 @@ func (f *Footer) AddParagraph(p *Paragraph) <span class="cov8" title="1">{
 		<pre class="file" id="file18" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -5155,7 +5155,7 @@ func (sp *SectionProperties) AddFooterRef(footerType, rID string) <span class="c
 		<pre class="file" id="file19" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -5337,7 +5337,7 @@ func NewCharacterStyle(styleID, name string, isDefault bool) *Style <span class=
 		<pre class="file" id="file20" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -5458,7 +5458,7 @@ func Validate(_ domain.Color) error <span class="cov0" title="0">{
 		<pre class="file" id="file21" style="display: none">/*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

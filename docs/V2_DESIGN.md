@@ -1154,7 +1154,7 @@ if err != nil {
 
 ### Current Development (v2)
 - **Author**: Misael Monterroca (misael@monterroca.com)
-- **Organization**: SlideLang
+- **GitHub**: https://github.com/mmonterroca/docxgo
 - **Role**: Complete architectural rewrite, clean architecture implementation
 
 ### Previous Contributions

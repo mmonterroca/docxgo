@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Copyright (c) 2020-2023 fumiama (original go-docx)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -324,7 +324,7 @@ See the examples/ directory for complete working examples:
 
 MIT License - see LICENSE file for details.
 
-Copyright (c) 2025 Misael Montero
+Copyright (c) 2025 Misael Monterroca
 Original go-docx: Copyright (c) 2020-2023 fumiama
 */
 package docx

@@ -36,7 +36,7 @@
 
 ## 🎯 Introduction
 
-**go-docx** is a high-performance Go library for creating and manipulating Microsoft Word (.docx) documents programmatically. This is an enhanced version (SlideLang fork) that includes professional features for technical documentation.
+**go-docx** is a high-performance Go library for creating and manipulating Microsoft Word (.docx) documents programmatically. This is an enhanced version (Misael Monterroca fork) that includes professional features for technical documentation.
 
 ### Key Features
 
@@ -1846,7 +1846,7 @@ AGPL-3.0 - See [LICENSE](../LICENSE) for details.
 
 - **Original:** [gonfva/docxlib](https://github.com/gonfva/docxlib)
 - **Upstream:** [fumiama/go-docx](https://github.com/fumiama/go-docx)
-- **Enhanced by:** [SlideLang Team](https://github.com/SlideLang)
+- **Enhanced by:** [Misael Monterroca Team](https://github.com/mmonterroca)
 
 ---
 

@@ -4,14 +4,14 @@
 
 **Misael Monterroca**  
 Email: misael@monterroca.com  
-GitHub: [@SlideLang](https://github.com/SlideLang)  
+GitHub: [@mmonterroca](https://github.com/mmonterroca)  
 Role: Project Lead, v2 Architect & Lead Developer
 
 ## Project Genealogy
 
 This project has evolved through multiple stages, with each contributor adding significant value. We maintain this history to honor all contributions while clarifying the current state of the project.
 
-### 🚀 Version 2.0 (2024-2025) - SlideLang/go-docx
+### 🚀 Version 2.0 (2024-2025) - mmonterroca/docxgo
 
 **Status**: Current Active Development  
 **Repository**: https://github.com/mmonterroca/docxgo  
@@ -54,7 +54,7 @@ This project has evolved through multiple stages, with each contributor adding s
 
 ---
 
-### 📦 Version 1.x Enhanced (2023-2024) - SlideLang Fork
+### 📦 Version 1.x Enhanced (2023-2024) - Misael Monterroca Fork
 
 **Repository**: https://github.com/mmonterroca/docxgo (root code, now deprecated)  
 **Based on**: fumiama/go-docx
@@ -166,11 +166,11 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
            └─ Enhanced with images, tables, shapes
            └─ Expanded API surface
 
-2023-2024: SlideLang/go-docx v1 (fork)
+2023-2024: mmonterroca/docxgo v1 (fork)
            └─ Professional features (headers, TOC, links)
            └─ Comprehensive documentation
 
-2024-2025: SlideLang/go-docx v2 (complete rewrite)
+2024-2025: mmonterroca/docxgo v2 (complete rewrite)
            └─ Clean architecture
            └─ Production-grade code quality
            └─ Independent project
@@ -201,7 +201,7 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
 4. **Namespace Clarity**
    - Users need clear distinction between versions
    - Original namespace doesn't reflect current reality
-   - SlideLang organization as proper owner
+   - Misael Monterroca organization as proper owner
 
 ### Attribution Philosophy
 
@@ -222,7 +222,7 @@ We maintain **full transparency** about project history:
 - **[kingzbauer/docx](https://github.com/kingzbauer/docx)** - Alternative approach
 - **[nguyenthenguyen/docx](https://github.com/nguyenthenguyen/docx)** - Different implementation
 
-### Why Choose SlideLang/go-docx v2?
+### Why Choose mmonterroca/docxgo v2?
 
 - ✅ **Open source** (AGPL-3.0) - no commercial license needed
 - ✅ **Clean architecture** - testable, maintainable, extensible
@@ -258,7 +258,7 @@ See [LICENSE](LICENSE) for full text.
 ### Copyright Notices
 
 ```
-Copyright (C) 2024-2025 Misael Monterroca / SlideLang (v2 architecture & development)
+Copyright (C) 2024-2025 Misael Monterroca / Misael Monterroca (v2 architecture & development)
 Copyright (C) 2022-2024 fumiama (v1 enhancements)
 Copyright (C) 2020-2022 Gonzalo Fernández-Victorio (original library)
 ```

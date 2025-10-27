@@ -3,7 +3,7 @@
 package writer
 
 /*
-   Copyright (c) 2025 SlideLang
+   Copyright (c) 2025 Misael Monterroca
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

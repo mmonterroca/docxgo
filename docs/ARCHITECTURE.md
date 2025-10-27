@@ -901,4 +901,4 @@ This architecture document will be updated as the library evolves.
 
 **Last Updated**: October 24, 2025  
 **Version**: 0.4.0  
-**Contributors**: SlideLang team, fumiama, gonfva, and community
+**Contributors**: Misael Monterroca, fumiama, gonfva, and community

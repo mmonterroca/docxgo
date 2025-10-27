@@ -1,4 +1,4 @@
-# SlideLang/go-docx - Enhanced Fork
+# Misael Monterroca/go-docx - Enhanced Fork
 
 **Fork de**: https://github.com/fumiama/go-docx  
 **Nuestro fork**: https://github.com/mmonterroca/docxgo  
@@ -6,7 +6,7 @@
 
 ## 🎯 Objetivo del Fork
 
-Extender go-docx con funcionalidades profesionales necesarias para generar documentos Word de alta calidad desde **DocLang** y **SlideLang**, especialmente para exportación DOCX.
+Extender go-docx con funcionalidades profesionales necesarias para generar documentos Word de alta calidad desde **DocLang** y **Misael Monterroca**, especialmente para exportación DOCX.
 
 ### ¿Por qué un Fork?
 
@@ -21,16 +21,16 @@ Extender go-docx con funcionalidades profesionales necesarias para generar docum
 
 ```bash
 # Clonar el repositorio
-git clone git@github.com:SlideLang/go-docx.git ~/go-docx-slidelang
-cd ~/go-docx-slidelang
+git clone git@github.com:Misael Monterroca/go-docx.git ~/go-docx-mmonterroca
+cd ~/go-docx-mmonterroca
 
 # Agregar upstream para sincronizar con original
 git remote add upstream https://github.com/fumiama/go-docx.git
 
 # Verificar remotes
 git remote -v
-# origin    git@github.com:SlideLang/go-docx.git (fetch)
-# origin    git@github.com:SlideLang/go-docx.git (push)
+# origin    git@github.com:Misael Monterroca/go-docx.git (fetch)
+# origin    git@github.com:Misael Monterroca/go-docx.git (push)
 # upstream  https://github.com/fumiama/go-docx.git (fetch)
 # upstream  https://github.com/fumiama/go-docx.git (push)
 ```
@@ -39,10 +39,10 @@ git remote -v
 
 ```bash
 # Crear rama permanente para nuestras mejoras
-git checkout -b slidelang-enhanced
+git checkout -b main
 
 # Push de la rama
-git push -u origin slidelang-enhanced
+git push -u origin main
 ```
 
 ### 3. Configurar Go Module
@@ -495,7 +495,7 @@ func (d *Docx) AddFigureCaption(text string) {
 
 ---
 
-## 🔗 Integración con DocLang/SlideLang
+## 🔗 Integración con DocLang/Misael Monterroca
 
 ### Actualizar go.mod en cli
 
@@ -503,20 +503,20 @@ func (d *Docx) AddFigureCaption(text string) {
 cd ~/cli/doclang-cli
 
 # Reemplazar fumiama/go-docx con nuestro fork
-go mod edit -replace github.com/fumiama/go-docx=github.com/mmonterroca/docxgo@slidelang-enhanced
+go mod edit -replace github.com/fumiama/go-docx=github.com/mmonterroca/docxgo@main
 
 # O directamente editar go.mod:
 ```
 
 ```go
 // go.mod
-module github.com/slidelang/doclang-cli
+module github.com/mmonterroca/doclang-cli
 
 require (
     github.com/fumiama/go-docx v0.0.0-20250506085032-0c30fd09304b
 )
 
-replace github.com/fumiama/go-docx => github.com/mmonterroca/docxgo slidelang-enhanced
+replace github.com/fumiama/go-docx => github.com/mmonterroca/docxgo main
 ```
 
 ```bash
@@ -615,11 +615,11 @@ grep -A 10 "w:bookmarkStart" document_formatted.xml
 ## 🤝 Contribuir
 
 ### Workflow
-1. Feature branch desde `slidelang-enhanced`
+1. Feature branch desde `main`
 2. Implementar con tests
-3. PR a `slidelang-enhanced`
+3. PR a `main`
 4. Review y merge
-5. Tag releases: `v0.1.0-slidelang`, `v0.2.0-slidelang`, etc.
+5. Tag releases: `v0.1.0`, `v0.1.0`, etc.
 
 ### Sincronizar con Upstream
 ```bash
@@ -629,7 +629,7 @@ git merge upstream/master
 
 # Resolver conflictos si hay
 # Push a nuestro fork
-git push origin slidelang-enhanced
+git push origin main
 ```
 
 ---
@@ -662,4 +662,4 @@ git push origin slidelang-enhanced
 **Issues**: https://github.com/mmonterroca/docxgo/issues  
 **Discussions**: https://github.com/mmonterroca/docxgo/discussions
 
-**Proyecto principal**: https://github.com/SlideLang/cli
+**Proyecto principal**: https://github.com/mmonterroca/cli
