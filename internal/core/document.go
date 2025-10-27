@@ -40,8 +40,10 @@ SOFTWARE.
 package core
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/mmonterroca/docxgo/domain"
 	"github.com/mmonterroca/docxgo/internal/manager"
@@ -61,27 +63,35 @@ type document struct {
 	relManager   *manager.RelationshipManager
 	mediaManager *manager.MediaManager
 	styleManager domain.StyleManager
+	headerCount  int
+	footerCount  int
 }
 
 // NewDocument creates a new Document.
 func NewDocument() domain.Document {
 	idGen := manager.NewIDGenerator()
-	return &document{
+	relManager := manager.NewRelationshipManager(idGen)
+	doc := &document{
 		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
 		tables:       make([]domain.Table, 0, constants.DefaultTableCapacity),
 		sections:     make([]domain.Section, 0, 1),
 		metadata:     &domain.Metadata{},
 		idGen:        idGen,
-		relManager:   manager.NewRelationshipManager(idGen),
+		relManager:   relManager,
 		mediaManager: manager.NewMediaManager(idGen),
 		styleManager: manager.NewStyleManager(),
 	}
+
+	// Ensure core document relationships exist (styles, fonts, theme)
+	doc.ensureDefaultRelationships()
+
+	return doc
 }
 
 // AddParagraph adds a new paragraph to the document.
 func (d *document) AddParagraph() (domain.Paragraph, error) {
 	id := d.idGen.NextParagraphID()
-	para := NewParagraph(id, d.idGen, d.relManager)
+	para := NewParagraph(id, d.idGen, d.relManager, d.mediaManager)
 	d.paragraphs = append(d.paragraphs, para)
 	return para, nil
 }
@@ -98,7 +108,7 @@ func (d *document) AddTable(rows, cols int) (domain.Table, error) {
 	}
 
 	id := d.idGen.NextTableID()
-	table := NewTable(id, rows, cols, d.idGen, d.relManager)
+	table := NewTable(id, rows, cols, d.idGen, d.relManager, d.mediaManager)
 	d.tables = append(d.tables, table)
 	return table, nil
 }
@@ -131,7 +141,7 @@ func (d *document) AddPageBreak() error {
 func (d *document) DefaultSection() (domain.Section, error) {
 	if len(d.sections) == 0 {
 		// Create default section if it doesn't exist
-		section := NewSection(d.relManager, d.idGen)
+		section := NewSection(d.relManager, d.idGen, d.mediaManager)
 		d.sections = append(d.sections, section)
 		return section, nil
 	}
@@ -160,11 +170,139 @@ func (d *document) Sections() []domain.Section {
 	return sections
 }
 
+// generateHeadingBookmarks generates bookmarks for all headings in the document.
+// This is required for Table of Contents (TOC) fields to work properly.
+// Bookmarks are named _Toc{sequential_number} and only applied to paragraphs with Heading styles.
+func (d *document) generateHeadingBookmarks() {
+	bookmarkCounter := 0
+
+	for _, para := range d.paragraphs {
+		// Type assert to access internal paragraph methods
+		if p, ok := para.(*paragraph); ok {
+			styleName := p.StyleName()
+
+			// Check if this paragraph has a Heading style
+			if strings.HasPrefix(styleName, "Heading") {
+				bookmarkID := fmt.Sprintf("%d", bookmarkCounter)
+				bookmarkName := fmt.Sprintf("_Toc%d", bookmarkCounter)
+				p.SetBookmark(bookmarkID, bookmarkName)
+				bookmarkCounter++
+			}
+		}
+	}
+}
+
+// prepareHeaderFooterRelationships ensures that every header/footer defined in the
+// document has an associated relationship and target part name within the DOCX
+// package. This must run before serialization so both section references and the
+// document relationships list are consistent.
+func (d *document) prepareHeaderFooterRelationships() {
+	for _, sec := range d.sections {
+		coreSection, ok := sec.(*docxSection)
+		if !ok {
+			continue
+		}
+
+		coreSection.mu.Lock()
+
+		for _, header := range coreSection.headers {
+			if header == nil {
+				continue
+			}
+
+			if header.TargetPath() == "" {
+				d.headerCount++
+				target := fmt.Sprintf("header%d.xml", d.headerCount)
+				header.setRelationship(header.RelationshipID(), target)
+			}
+
+			if header.RelationshipID() == "" {
+				if relID, err := d.relManager.AddHeader(header.TargetPath()); err == nil {
+					header.setRelationship(relID, header.TargetPath())
+				}
+			}
+		}
+
+		for _, footer := range coreSection.footers {
+			if footer == nil {
+				continue
+			}
+
+			if footer.TargetPath() == "" {
+				d.footerCount++
+				target := fmt.Sprintf("footer%d.xml", d.footerCount)
+				footer.setRelationship(footer.RelationshipID(), target)
+			}
+
+			if footer.RelationshipID() == "" {
+				if relID, err := d.relManager.AddFooter(footer.TargetPath()); err == nil {
+					footer.setRelationship(relID, footer.TargetPath())
+				}
+			}
+		}
+
+		coreSection.mu.Unlock()
+	}
+}
+
+// ensureDefaultRelationships guarantees that the DOCX package contains the
+// required relationships for styles, fonts, and theme assets. Without these
+// entries Word falls back to implicit defaults and style assignments appear as
+// "Normal", which breaks features such as the Table of Contents.
+func (d *document) ensureDefaultRelationships() {
+	if d == nil || d.relManager == nil {
+		return
+	}
+
+	// Track existing relationship targets to avoid duplicates when called
+	// multiple times (e.g. SaveAs after WriteTo).
+	existing := make(map[string]bool)
+	for _, rel := range d.relManager.All() {
+		existing[rel.Target] = true
+	}
+
+	baseRels := []struct {
+		relType string
+		target  string
+	}{
+		{constants.RelTypeStyles, "styles.xml"},
+		{constants.RelTypeFontTable, "fontTable.xml"},
+		{constants.RelTypeTheme, "theme/theme1.xml"},
+	}
+
+	for _, rel := range baseRels {
+		if existing[rel.target] {
+			continue
+		}
+
+		// Ignore the error because the inputs are fixed and validated. In the
+		// unlikely event of a failure we still prefer to continue writing the
+		// document instead of aborting.
+		_, _ = d.relManager.Add(rel.relType, rel.target, "Internal")
+	}
+}
+
 // WriteTo writes the document to the provided writer in .docx format.
 func (d *document) WriteTo(w io.Writer) (int64, error) {
+	if len(d.sections) == 0 {
+		if _, err := d.DefaultSection(); err != nil {
+			return 0, errors.Wrap(err, "Document.WriteTo")
+		}
+	}
+
+	// Generate bookmarks for headings (needed for TOC)
+	d.generateHeadingBookmarks()
+
+	// Ensure headers and footers have relationships/targets before serialization
+	d.prepareHeaderFooterRelationships()
+
+	// Ensure required base relationships are present before serialization
+	d.ensureDefaultRelationships()
+
 	// Serialize domain objects to XML structures
 	ser := serializer.NewDocumentSerializer()
 	xmlDoc := ser.SerializeDocument(d)
+	headers, footers := ser.SerializeSectionParts(d)
 
 	// Create ZIP writer
 	zipWriter := writer.NewZipWriter(w)
@@ -177,8 +315,13 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	coreProps := ser.SerializeCoreProperties(d.metadata)
 	appProps := ser.SerializeAppProperties(d)
 
+	// Serialize styles
+	styles := ser.SerializeStyles(d.styleManager)
+
+	mediaFiles := d.mediaManager.All()
+
 	// Write document structure
-	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps); err != nil {
+	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers); err != nil {
 		return 0, errors.WrapWithCode(err, errors.ErrCodeIO, "Document.WriteTo")
 	}
 

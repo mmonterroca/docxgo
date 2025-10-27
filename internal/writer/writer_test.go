@@ -38,8 +38,8 @@ func TestZipWriter_WriteDocument(t *testing.T) {
 		Body: &xmlstructs.Body{
 			Paragraphs: []*xmlstructs.Paragraph{
 				{
-					Runs: []*xmlstructs.Run{
-						{
+					Elements: []interface{}{
+						&xmlstructs.Run{
 							Text: &xmlstructs.Text{Content: "Hello, World!"},
 						},
 					},
@@ -53,7 +53,7 @@ func TestZipWriter_WriteDocument(t *testing.T) {
 		Relationships: []*xmlstructs.Relationship{},
 	}
 
-	err := zw.WriteDocument(doc, rels, nil, nil)
+	err := zw.WriteDocument(doc, rels, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("WriteDocument failed: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestZipWriter_ContentTypes(t *testing.T) {
 		Relationships: []*xmlstructs.Relationship{},
 	}
 
-	zw.WriteDocument(doc, rels, nil, nil)
+	zw.WriteDocument(doc, rels, nil, nil, nil, nil, nil, nil)
 	zw.Close()
 
 	// Read and verify [Content_Types].xml
@@ -158,8 +158,8 @@ func TestZipWriter_DocumentXML(t *testing.T) {
 		Body: &xmlstructs.Body{
 			Paragraphs: []*xmlstructs.Paragraph{
 				{
-					Runs: []*xmlstructs.Run{
-						{
+					Elements: []interface{}{
+						&xmlstructs.Run{
 							Text: &xmlstructs.Text{Content: "Test paragraph"},
 						},
 					},
@@ -173,7 +173,7 @@ func TestZipWriter_DocumentXML(t *testing.T) {
 		Relationships: []*xmlstructs.Relationship{},
 	}
 
-	zw.WriteDocument(doc, rels, nil, nil)
+	zw.WriteDocument(doc, rels, nil, nil, nil, nil, nil, nil)
 	zw.Close()
 
 	// Read and verify word/document.xml exists

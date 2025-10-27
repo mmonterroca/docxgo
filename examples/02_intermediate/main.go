@@ -38,7 +38,8 @@ func main() {
 	builder.AddParagraph().End()
 	builder.AddParagraph().End()
 
-	// Table of contents placeholder
+	// Table of contents (static text - for dynamic TOC with auto-updating page numbers, see example 07_advanced)
+	// Note: This is a simple text-based TOC. For a real Word TOC field that updates automatically, use AddTOC() as shown in 07_advanced
 	builder.AddParagraph().
 		Text("Table of Contents").
 		Bold().

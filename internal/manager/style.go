@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package manager
 
 import (
@@ -115,6 +113,8 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	sm.styles[domain.StyleIDNormal] = normal
 
 	// Heading styles
+	// Note: outlineLevel is 0-based (0 for Heading 1, 1 for Heading 2, etc.)
+	// This is required for TOC functionality - Word uses outline levels to build TOC
 	headings := []struct {
 		id           string
 		name         string
@@ -122,15 +122,15 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 		size         int // in half-points
 		bold         bool
 	}{
-		{domain.StyleIDHeading1, "Heading 1", 1, 32, true},  // 16pt
-		{domain.StyleIDHeading2, "Heading 2", 2, 26, true},  // 13pt
-		{domain.StyleIDHeading3, "Heading 3", 3, 24, true},  // 12pt
-		{domain.StyleIDHeading4, "Heading 4", 4, 24, true},  // 12pt
-		{domain.StyleIDHeading5, "Heading 5", 5, 22, true},  // 11pt
-		{domain.StyleIDHeading6, "Heading 6", 6, 22, false}, // 11pt
-		{domain.StyleIDHeading7, "Heading 7", 7, 22, false}, // 11pt
-		{domain.StyleIDHeading8, "Heading 8", 8, 22, false}, // 11pt
-		{domain.StyleIDHeading9, "Heading 9", 9, 22, false}, // 11pt
+		{domain.StyleIDHeading1, "heading 1", 0, 32, true},  // 16pt, outline level 0
+		{domain.StyleIDHeading2, "heading 2", 1, 26, true},  // 13pt, outline level 1
+		{domain.StyleIDHeading3, "heading 3", 2, 24, true},  // 12pt, outline level 2
+		{domain.StyleIDHeading4, "heading 4", 3, 24, true},  // 12pt, outline level 3
+		{domain.StyleIDHeading5, "heading 5", 4, 22, true},  // 11pt, outline level 4
+		{domain.StyleIDHeading6, "heading 6", 5, 22, false}, // 11pt, outline level 5
+		{domain.StyleIDHeading7, "heading 7", 6, 22, false}, // 11pt, outline level 6
+		{domain.StyleIDHeading8, "heading 8", 7, 22, false}, // 11pt, outline level 7
+		{domain.StyleIDHeading9, "heading 9", 8, 22, false}, // 11pt, outline level 8
 	}
 
 	for _, h := range headings {
@@ -141,11 +141,11 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 		style.SetSpacingAfter(120)  // 120 twips = 6pt
 		style.SetKeepNext(true)
 		style.SetKeepLines(true)
-		
+
 		// Set font through the base Style interface
 		font := domain.Font{Name: "Calibri Light"}
 		style.SetFont(font)
-		
+
 		sm.styles[h.id] = style
 	}
 
@@ -165,6 +165,13 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	quote.SetIndentation(domain.Indentation{Left: 720, Right: 720}) // 0.5 inch
 	sm.styles[domain.StyleIDQuote] = quote
 
+	intenseQuote := newParagraphStyle(domain.StyleIDIntenseQuote, "Intense Quote", true)
+	intenseQuote.SetBasedOn(domain.StyleIDNormal)
+	intenseQuote.SetIndentation(domain.Indentation{Left: 720, Right: 720})
+	intenseQuote.SetSpacingBefore(120)
+	intenseQuote.SetSpacingAfter(120)
+	sm.styles[domain.StyleIDIntenseQuote] = intenseQuote
+
 	// List Paragraph
 	listPara := newParagraphStyle(domain.StyleIDListParagraph, "List Paragraph", true)
 	listPara.SetBasedOn(domain.StyleIDNormal)
@@ -172,6 +179,8 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	sm.styles[domain.StyleIDListParagraph] = listPara
 
 	// TOC styles
+	// Note: TOC styles format the table of contents entries after generation
+	// outlineLevel matches the TOC level (0-based: TOC1=0, TOC2=1, etc.)
 	for i := 1; i <= 9; i++ {
 		id := ""
 		name := ""
@@ -197,6 +206,7 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 		}
 		tocStyle := newParagraphStyle(id, name, true)
 		tocStyle.SetBasedOn(domain.StyleIDNormal)
+		tocStyle.SetOutlineLevel(i - 1) // 0-based: TOC 1 = level 0, TOC 2 = level 1, etc.
 		tocStyle.SetIndentation(domain.Indentation{Left: (i - 1) * 220})
 		sm.styles[id] = tocStyle
 	}

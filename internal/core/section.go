@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package core
 
 import (
@@ -38,28 +36,30 @@ import (
 
 // docxSection implements the Section interface.
 type docxSection struct {
-	mu            sync.RWMutex
-	pageSize      domain.PageSize
-	margins       domain.Margins
-	orientation   domain.Orientation
-	columns       int
-	headers       map[domain.HeaderType]*docxHeader
-	footers       map[domain.FooterType]*docxFooter
-	relationMgr   *manager.RelationshipManager
-	idGen         *manager.IDGenerator
+	mu           sync.RWMutex
+	pageSize     domain.PageSize
+	margins      domain.Margins
+	orientation  domain.Orientation
+	columns      int
+	headers      map[domain.HeaderType]*docxHeader
+	footers      map[domain.FooterType]*docxFooter
+	relationMgr  *manager.RelationshipManager
+	idGen        *manager.IDGenerator
+	mediaManager *manager.MediaManager
 }
 
 // NewSection creates a new section with default settings.
-func NewSection(relationMgr *manager.RelationshipManager, idGen *manager.IDGenerator) domain.Section {
+func NewSection(relationMgr *manager.RelationshipManager, idGen *manager.IDGenerator, mediaManager *manager.MediaManager) domain.Section {
 	return &docxSection{
-		pageSize:    domain.PageSizeA4,
-		margins:     domain.DefaultMargins,
-		orientation: domain.OrientationPortrait,
-		columns:     1,
-		headers:     make(map[domain.HeaderType]*docxHeader),
-		footers:     make(map[domain.FooterType]*docxFooter),
-		relationMgr: relationMgr,
-		idGen:       idGen,
+		pageSize:     domain.PageSizeA4,
+		margins:      domain.DefaultMargins,
+		orientation:  domain.OrientationPortrait,
+		columns:      1,
+		headers:      make(map[domain.HeaderType]*docxHeader),
+		footers:      make(map[domain.FooterType]*docxFooter),
+		relationMgr:  relationMgr,
+		idGen:        idGen,
+		mediaManager: mediaManager,
 	}
 }
 
@@ -171,10 +171,11 @@ func (s *docxSection) Header(headerType domain.HeaderType) (domain.Header, error
 
 	// Create new header
 	header := &docxHeader{
-		headerType:  headerType,
-		paragraphs:  make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
-		relationMgr: s.relationMgr,
-		idGen:       s.idGen,
+		headerType:   headerType,
+		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
+		relationMgr:  s.relationMgr,
+		idGen:        s.idGen,
+		mediaManager: s.mediaManager,
 	}
 
 	s.headers[headerType] = header
@@ -193,23 +194,51 @@ func (s *docxSection) Footer(footerType domain.FooterType) (domain.Footer, error
 
 	// Create new footer
 	footer := &docxFooter{
-		footerType:  footerType,
-		paragraphs:  make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
-		relationMgr: s.relationMgr,
-		idGen:       s.idGen,
+		footerType:   footerType,
+		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
+		relationMgr:  s.relationMgr,
+		idGen:        s.idGen,
+		mediaManager: s.mediaManager,
 	}
 
 	s.footers[footerType] = footer
 	return footer, nil
 }
 
+// HeadersAll returns a copy of all headers defined for the section.
+func (s *docxSection) HeadersAll() map[domain.HeaderType]domain.Header {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make(map[domain.HeaderType]domain.Header, len(s.headers))
+	for k, v := range s.headers {
+		result[k] = v
+	}
+	return result
+}
+
+// FootersAll returns a copy of all footers defined for the section.
+func (s *docxSection) FootersAll() map[domain.FooterType]domain.Footer {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make(map[domain.FooterType]domain.Footer, len(s.footers))
+	for k, v := range s.footers {
+		result[k] = v
+	}
+	return result
+}
+
 // docxHeader implements the Header interface.
 type docxHeader struct {
-	mu          sync.RWMutex
-	headerType  domain.HeaderType
-	paragraphs  []domain.Paragraph
-	relationMgr *manager.RelationshipManager
-	idGen       *manager.IDGenerator
+	mu           sync.RWMutex
+	headerType   domain.HeaderType
+	paragraphs   []domain.Paragraph
+	relationMgr  *manager.RelationshipManager
+	idGen        *manager.IDGenerator
+	relID        string
+	targetPath   string
+	mediaManager *manager.MediaManager
 }
 
 // AddParagraph adds a paragraph to the header.
@@ -218,7 +247,7 @@ func (h *docxHeader) AddParagraph() (domain.Paragraph, error) {
 	defer h.mu.Unlock()
 
 	id := h.idGen.NextParagraphID()
-	para := NewParagraph(id, h.idGen, h.relationMgr)
+	para := NewParagraph(id, h.idGen, h.relationMgr, h.mediaManager)
 	h.paragraphs = append(h.paragraphs, para)
 	return para, nil
 }
@@ -234,13 +263,38 @@ func (h *docxHeader) Paragraphs() []domain.Paragraph {
 	return result
 }
 
+// RelationshipID returns the relationship ID associated with this header.
+func (h *docxHeader) RelationshipID() string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.relID
+}
+
+// TargetPath returns the target part path for this header within the DOCX package.
+func (h *docxHeader) TargetPath() string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.targetPath
+}
+
+// setRelationship stores the relationship metadata for the header.
+func (h *docxHeader) setRelationship(relID, target string) {
+	h.mu.Lock()
+	h.relID = relID
+	h.targetPath = target
+	h.mu.Unlock()
+}
+
 // docxFooter implements the Footer interface.
 type docxFooter struct {
-	mu          sync.RWMutex
-	footerType  domain.FooterType
-	paragraphs  []domain.Paragraph
-	relationMgr *manager.RelationshipManager
-	idGen       *manager.IDGenerator
+	mu           sync.RWMutex
+	footerType   domain.FooterType
+	paragraphs   []domain.Paragraph
+	relationMgr  *manager.RelationshipManager
+	idGen        *manager.IDGenerator
+	relID        string
+	targetPath   string
+	mediaManager *manager.MediaManager
 }
 
 // AddParagraph adds a paragraph to the footer.
@@ -249,7 +303,7 @@ func (f *docxFooter) AddParagraph() (domain.Paragraph, error) {
 	defer f.mu.Unlock()
 
 	id := f.idGen.NextParagraphID()
-	para := NewParagraph(id, f.idGen, f.relationMgr)
+	para := NewParagraph(id, f.idGen, f.relationMgr, f.mediaManager)
 	f.paragraphs = append(f.paragraphs, para)
 	return para, nil
 }
@@ -263,4 +317,26 @@ func (f *docxFooter) Paragraphs() []domain.Paragraph {
 	result := make([]domain.Paragraph, len(f.paragraphs))
 	copy(result, f.paragraphs)
 	return result
+}
+
+// RelationshipID returns the relationship ID associated with this footer.
+func (f *docxFooter) RelationshipID() string {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.relID
+}
+
+// TargetPath returns the target part path for this footer within the DOCX package.
+func (f *docxFooter) TargetPath() string {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.targetPath
+}
+
+// setRelationship stores the relationship metadata for the footer.
+func (f *docxFooter) setRelationship(relID, target string) {
+	f.mu.Lock()
+	f.relID = relID
+	f.targetPath = target
+	f.mu.Unlock()
 }

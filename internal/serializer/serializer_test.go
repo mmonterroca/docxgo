@@ -18,19 +18,35 @@
 package serializer_test
 
 import (
-	"encoding/xml"
+	stdxml "encoding/xml"
 	"testing"
 
 	"github.com/mmonterroca/docxgo/domain"
 	"github.com/mmonterroca/docxgo/internal/core"
 	"github.com/mmonterroca/docxgo/internal/serializer"
+	xmlstructs "github.com/mmonterroca/docxgo/internal/xml"
 )
+
+func collectRuns(p *xmlstructs.Paragraph) []*xmlstructs.Run {
+	runs := make([]*xmlstructs.Run, 0)
+	for _, el := range p.Elements {
+		switch v := el.(type) {
+		case *xmlstructs.Run:
+			runs = append(runs, v)
+		case *xmlstructs.Hyperlink:
+			runs = append(runs, v.Runs...)
+		default:
+			// ignore other elements (bookmarks, field chars handled via runs)
+		}
+	}
+	return runs
+}
 
 func TestRunSerializer(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()
 	run, _ := para.AddRun()
-	
+
 	run.SetText("Hello, World!")
 	run.SetBold(true)
 	run.SetItalic(true)
@@ -68,7 +84,7 @@ func TestRunSerializer_XMLOutput(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()
 	run, _ := para.AddRun()
-	
+
 	run.SetText("Test")
 	run.SetBold(true)
 
@@ -76,7 +92,7 @@ func TestRunSerializer_XMLOutput(t *testing.T) {
 	xmlRun := ser.Serialize(run)
 
 	// Marshal to XML
-	data, err := xml.MarshalIndent(xmlRun, "", "  ")
+	data, err := stdxml.MarshalIndent(xmlRun, "", "  ")
 	if err != nil {
 		t.Fatalf("failed to marshal: %v", err)
 	}
@@ -104,10 +120,10 @@ func TestRunSerializer_XMLOutput(t *testing.T) {
 func TestParagraphSerializer(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()
-	
+
 	run1, _ := para.AddRun()
 	run1.SetText("First ")
-	
+
 	run2, _ := para.AddRun()
 	run2.SetText("Second")
 	run2.SetBold(true)
@@ -117,8 +133,8 @@ func TestParagraphSerializer(t *testing.T) {
 	ser := serializer.NewParagraphSerializer()
 	xmlPara := ser.Serialize(para)
 
-	if len(xmlPara.Runs) != 2 {
-		t.Errorf("expected 2 runs, got %d", len(xmlPara.Runs))
+	if runs := collectRuns(xmlPara); len(runs) != 2 {
+		t.Errorf("expected 2 runs, got %d", len(runs))
 	}
 
 	if xmlPara.Properties == nil {
@@ -135,7 +151,7 @@ func TestParagraphSerializer(t *testing.T) {
 func TestParagraphSerializer_Indentation(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()
-	
+
 	indent := domain.Indentation{
 		Left:      720,
 		Right:     360,
@@ -196,17 +212,19 @@ func TestTableSerializer(t *testing.T) {
 	if len(firstCell.Paragraphs) == 0 {
 		t.Fatal("expected at least one paragraph in first cell")
 	}
-	if len(firstCell.Paragraphs[0].Runs) == 0 {
+	firstPara := firstCell.Paragraphs[0]
+	cellRuns := collectRuns(firstPara)
+	if len(cellRuns) == 0 {
 		t.Fatal("expected at least one run in first paragraph")
 	}
-	if firstCell.Paragraphs[0].Runs[0].Text.Content != "Cell 0,0" {
-		t.Errorf("expected 'Cell 0,0', got %q", firstCell.Paragraphs[0].Runs[0].Text.Content)
+	if cellRuns[0].Text == nil || cellRuns[0].Text.Content != "Cell 0,0" {
+		t.Errorf("expected 'Cell 0,0', got %v", cellRuns[0].Text)
 	}
 }
 
 func TestDocumentSerializer(t *testing.T) {
 	doc := core.NewDocument()
-	
+
 	// Add paragraph
 	para, _ := doc.AddParagraph()
 	run, _ := para.AddRun()
@@ -240,7 +258,7 @@ func TestDocumentSerializer(t *testing.T) {
 
 func TestDocumentSerializer_CompleteXML(t *testing.T) {
 	doc := core.NewDocument()
-	
+
 	// Set metadata
 	meta := &domain.Metadata{
 		Title:   "Test Document",
@@ -256,10 +274,10 @@ func TestDocumentSerializer_CompleteXML(t *testing.T) {
 	run.SetBold(true)
 
 	ser := serializer.NewDocumentSerializer()
-	
+
 	// Serialize document
 	xmlDoc := ser.SerializeDocument(doc)
-	data, err := xml.MarshalIndent(xmlDoc, "", "  ")
+	data, err := stdxml.MarshalIndent(xmlDoc, "", "  ")
 	if err != nil {
 		t.Fatalf("failed to marshal document: %v", err)
 	}
@@ -274,7 +292,7 @@ func TestDocumentSerializer_CompleteXML(t *testing.T) {
 
 	// Serialize core properties
 	coreProps := ser.SerializeCoreProperties(meta)
-	propsData, err := xml.MarshalIndent(coreProps, "", "  ")
+	propsData, err := stdxml.MarshalIndent(coreProps, "", "  ")
 	if err != nil {
 		t.Fatalf("failed to marshal core properties: %v", err)
 	}
@@ -289,7 +307,7 @@ func TestDocumentSerializer_CompleteXML(t *testing.T) {
 }
 
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && 
+	return len(s) > 0 && len(substr) > 0 &&
 		(s == substr || len(s) > len(substr) && containsSubstring(s, substr))
 }
 

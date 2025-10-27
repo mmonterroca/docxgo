@@ -203,6 +203,14 @@ go test -cover ./...             # With coverage
 go test -race ./...              # Race detection
 ```
 
+After regenerating any `.docx` fixtures (especially under `examples/`), validate them with the local Open XML validator to be sure Microsoft Word will open them without warnings:
+
+```bash
+dotnet run --project DocxValidator -- examples/07_advanced/07_advanced_demo.docx
+```
+
+The validator project targets .NET 8 and reports schema errors inline. Fix any reported issues before opening a pull request.
+
 ### Documentation
 
 Update documentation when adding features:

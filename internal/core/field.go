@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package core
 
 import (
@@ -76,15 +74,15 @@ func NewPageCountField() domain.Field {
 // NewTOCField creates a Table of Contents field with options.
 func NewTOCField(switches map[string]string) domain.Field {
 	field := NewField(domain.FieldTypeTOC).(*docxField)
-	
+
 	// Apply switches
 	for key, value := range switches {
 		field.properties[key] = value
 	}
-	
+
 	// Rebuild code with switches
 	field.code = field.buildTOCCode()
-	
+
 	return field
 }
 
@@ -134,10 +132,10 @@ func (f *docxField) SetCode(code string) error {
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	
+
 	f.code = code
 	f.isDirty = true
-	
+
 	return nil
 }
 
@@ -236,13 +234,13 @@ func (f *docxField) buildTOCCode() string {
 	// Hyperlinks (always included by default)
 	code += ` \\h`
 
-	// Hide page numbers
-	if _, ok := f.properties["hidePageNumbers"]; ok {
+	// Hide page numbers (only if explicitly set to "true")
+	if hidePN, ok := f.properties["hidePageNumbers"]; ok && hidePN == "true" {
 		code += ` \\n`
 	}
 
-	// Hide tab leader
-	if _, ok := f.properties["hideTabLeader"]; ok {
+	// Hide tab leader (only if explicitly set to "true")
+	if hideTab, ok := f.properties["hideTabLeader"]; ok && hideTab == "true" {
 		code += ` \\p`
 	}
 

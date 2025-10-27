@@ -28,35 +28,39 @@ package core
 
 import (
 	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/internal/manager"
 	"github.com/mmonterroca/docxgo/pkg/constants"
 	"github.com/mmonterroca/docxgo/pkg/errors"
 )
 
 // run implements the domain.Run interface.
 type run struct {
-	id        string
-	text      string
-	font      domain.Font
-	color     domain.Color
-	size      int // in half-points
-	bold      bool
-	italic    bool
-	underline domain.UnderlineStyle
-	strike    bool
-	highlight domain.HighlightColor
-	fields    []domain.Field     // Fields embedded in this run
-	breaks    []domain.BreakType // Breaks in this run
+	id         string
+	text       string
+	image      domain.Image
+	font       domain.Font
+	color      domain.Color
+	size       int // in half-points
+	bold       bool
+	italic     bool
+	underline  domain.UnderlineStyle
+	strike     bool
+	highlight  domain.HighlightColor
+	fields     []domain.Field     // Fields embedded in this run
+	breaks     []domain.BreakType // Breaks in this run
+	relManager *manager.RelationshipManager
 }
 
 // NewRun creates a new Run.
-func NewRun(id string) domain.Run {
+func NewRun(id string, relManager *manager.RelationshipManager) domain.Run {
 	return &run{
-		id:        id,
-		font:      domain.Font{Name: constants.DefaultFontName},
-		color:     domain.ColorBlack,
-		size:      constants.DefaultFontSize,
-		underline: domain.UnderlineNone,
-		highlight: domain.HighlightNone,
+		id:         id,
+		font:       domain.Font{Name: constants.DefaultFontName},
+		color:      domain.ColorBlack,
+		size:       constants.DefaultFontSize,
+		underline:  domain.UnderlineNone,
+		highlight:  domain.HighlightNone,
+		relManager: relManager,
 	}
 }
 
@@ -69,6 +73,16 @@ func (r *run) Text() string {
 func (r *run) SetText(text string) error {
 	r.text = text
 	return nil
+}
+
+// Image returns the image associated with this run, if any.
+func (r *run) Image() domain.Image {
+	return r.image
+}
+
+// setImage attaches an image to the run for serialization.
+func (r *run) setImage(img domain.Image) {
+	r.image = img
 }
 
 // Font returns the font settings for this run.
@@ -212,6 +226,32 @@ func (r *run) Breaks() []domain.BreakType {
 func (r *run) AddField(field domain.Field) error {
 	if field == nil {
 		return errors.InvalidArgument("Run.AddField", "field", nil, "field cannot be nil")
+	}
+
+	if field.Type() == domain.FieldTypeHyperlink {
+		accessor, ok := field.(interface {
+			GetProperty(string) (string, bool)
+			SetProperty(string, string)
+		})
+		if !ok {
+			return errors.InvalidArgument("Run.AddField", "field", field, "hyperlink field must support property access")
+		}
+
+		if r.relManager == nil {
+			return errors.InvalidState("Run.AddField", "hyperlink relationship manager not initialized")
+		}
+
+		url, ok := accessor.GetProperty("url")
+		if !ok || url == "" {
+			return errors.InvalidArgument("Run.AddField", "url", url, "hyperlink URL cannot be empty")
+		}
+
+		relID, err := r.relManager.AddHyperlink(url)
+		if err != nil {
+			return errors.Wrap(err, "Run.AddField")
+		}
+
+		accessor.SetProperty("relationshipID", relID)
 	}
 
 	if r.fields == nil {

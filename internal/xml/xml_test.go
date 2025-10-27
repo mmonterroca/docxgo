@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package xml
 
 import (
@@ -35,9 +33,9 @@ import (
 
 func TestFieldChar_Marshal(t *testing.T) {
 	tests := []struct {
-		name     string
-		field    *FieldChar
-		wantXML  string
+		name    string
+		field   *FieldChar
+		wantXML string
 	}{
 		{
 			name:    "Begin",
@@ -72,7 +70,7 @@ func TestFieldChar_Marshal(t *testing.T) {
 
 func TestInstrText_Marshal(t *testing.T) {
 	instr := NewInstrText("PAGE")
-	
+
 	data, err := xml.Marshal(instr)
 	if err != nil {
 		t.Fatalf("Marshal() error = %v", err)
@@ -99,7 +97,7 @@ func TestSectionProperties_Marshal(t *testing.T) {
 	}
 
 	xmlStr := string(data)
-	
+
 	// Check page size
 	if !strings.Contains(xmlStr, `w:w="12240"`) {
 		t.Error("Should contain page width")
@@ -107,8 +105,8 @@ func TestSectionProperties_Marshal(t *testing.T) {
 	if !strings.Contains(xmlStr, `w:h="15840"`) {
 		t.Error("Should contain page height")
 	}
-	if !strings.Contains(xmlStr, `w:orient="portrait"`) {
-		t.Error("Should contain orientation")
+	if strings.Contains(xmlStr, `w:orient="portrait"`) {
+		t.Error("Portrait orientation should omit explicit attribute")
 	}
 
 	// Check margins
@@ -119,6 +117,20 @@ func TestSectionProperties_Marshal(t *testing.T) {
 	// Check columns
 	if !strings.Contains(xmlStr, `w:num="2"`) {
 		t.Error("Should contain column count")
+	}
+	if !strings.Contains(xmlStr, `w:space="720"`) {
+		t.Error("Should contain default column spacing")
+	}
+
+	// Landscape orientation should emit attribute
+	sectPrLandscape := NewSectionProperties()
+	sectPrLandscape.SetPageSize(15840, 12240, true)
+	dataLandscape, err := xml.Marshal(sectPrLandscape)
+	if err != nil {
+		t.Fatalf("Marshal() error for landscape = %v", err)
+	}
+	if !strings.Contains(string(dataLandscape), `w:orient="landscape"`) {
+		t.Error("Landscape orientation should include orient attribute")
 	}
 }
 
@@ -133,7 +145,7 @@ func TestSectionProperties_HeaderFooterRefs(t *testing.T) {
 	}
 
 	xmlStr := string(data)
-	
+
 	if !strings.Contains(xmlStr, `w:headerReference`) {
 		t.Error("Should contain header reference")
 	}
@@ -150,11 +162,11 @@ func TestSectionProperties_HeaderFooterRefs(t *testing.T) {
 
 func TestHeader_Marshal(t *testing.T) {
 	header := NewHeader()
-	
+
 	// Add a simple paragraph
 	para := &Paragraph{
-		Runs: []*Run{
-			{
+		Elements: []interface{}{
+			&Run{
 				Text: &Text{
 					Space:   "preserve",
 					Content: "Header Text",
@@ -170,7 +182,7 @@ func TestHeader_Marshal(t *testing.T) {
 	}
 
 	xmlStr := string(data)
-	
+
 	if !strings.Contains(xmlStr, `<w:hdr`) {
 		t.Error("Should contain hdr element")
 	}
@@ -184,11 +196,11 @@ func TestHeader_Marshal(t *testing.T) {
 
 func TestFooter_Marshal(t *testing.T) {
 	footer := NewFooter()
-	
+
 	// Add a simple paragraph
 	para := &Paragraph{
-		Runs: []*Run{
-			{
+		Elements: []interface{}{
+			&Run{
 				Text: &Text{
 					Space:   "preserve",
 					Content: "Footer Text",
@@ -204,7 +216,7 @@ func TestFooter_Marshal(t *testing.T) {
 	}
 
 	xmlStr := string(data)
-	
+
 	if !strings.Contains(xmlStr, `<w:ftr`) {
 		t.Error("Should contain ftr element")
 	}
@@ -215,11 +227,11 @@ func TestFooter_Marshal(t *testing.T) {
 
 func TestStyles_Marshal(t *testing.T) {
 	styles := NewStyles()
-	
+
 	// Add Normal style
 	normalStyle := NewParagraphStyle("Normal", "Normal", true)
 	styles.AddStyle(normalStyle)
-	
+
 	// Add Heading1 style
 	heading1 := NewParagraphStyle("Heading1", "Heading 1", false)
 	heading1.BasedOn = &BasedOn{Val: "Normal"}
@@ -234,7 +246,7 @@ func TestStyles_Marshal(t *testing.T) {
 	}
 
 	xmlStr := string(data)
-	
+
 	if !strings.Contains(xmlStr, `<w:styles`) {
 		t.Error("Should contain styles element")
 	}
@@ -254,7 +266,7 @@ func TestStyles_Marshal(t *testing.T) {
 
 func TestCharacterStyle_Marshal(t *testing.T) {
 	styles := NewStyles()
-	
+
 	emphasis := NewCharacterStyle("Emphasis", "Emphasis", false)
 	emphasis.RunProps = &RunProperties{
 		Italic: &BoolValue{},
@@ -267,7 +279,7 @@ func TestCharacterStyle_Marshal(t *testing.T) {
 	}
 
 	xmlStr := string(data)
-	
+
 	if !strings.Contains(xmlStr, `w:type="character"`) {
 		t.Error("Should contain character type")
 	}
@@ -287,7 +299,7 @@ func TestRun_WithFieldChar(t *testing.T) {
 	}
 
 	xmlStr := string(data)
-	
+
 	if !strings.Contains(xmlStr, `<w:r>`) {
 		t.Error("Should contain run element")
 	}
@@ -310,7 +322,7 @@ func TestRun_WithInstrText(t *testing.T) {
 	}
 
 	xmlStr := string(data)
-	
+
 	if !strings.Contains(xmlStr, `<w:r>`) {
 		t.Error("Should contain run element")
 	}

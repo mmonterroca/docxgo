@@ -179,6 +179,11 @@ func (img *docxImage) Target() string {
 	return img.target
 }
 
+// setTarget updates the internal target path for the image within the DOCX package.
+func (img *docxImage) setTarget(target string) {
+	img.target = target
+}
+
 // Description returns the alt text description.
 func (img *docxImage) Description() string {
 	return img.description

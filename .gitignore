@@ -4,3 +4,19 @@ docxlib
 /*.xml
 .DS_Store
 docx_debug/
+DocxValidator/bin/
+DocxValidator/obj/
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Compiled binaries generated inside numbered examples
+examples/[0-9][0-9]_*/*
+!examples/[0-9][0-9]_*/**/*.go
+!examples/[0-9][0-9]_*/**/*.md

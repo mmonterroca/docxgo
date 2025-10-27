@@ -35,39 +35,40 @@ type Drawing struct {
 
 // Inline represents an inline drawing (flows with text).
 type Inline struct {
-	XMLName           xml.Name          `xml:"wp:inline"`
-	DistT             int               `xml:"distT,attr,omitempty"`   // Distance from text (top)
-	DistB             int               `xml:"distB,attr,omitempty"`   // Distance from text (bottom)
-	DistL             int               `xml:"distL,attr,omitempty"`   // Distance from text (left)
-	DistR             int               `xml:"distR,attr,omitempty"`   // Distance from text (right)
-	Extent            *Extent           `xml:"wp:extent"`              // Drawing size
-	EffectExtent      *EffectExtent     `xml:"wp:effectExtent,omitempty"`
-	DocPr             *DocPr            `xml:"wp:docPr"`               // Non-visual properties
+	XMLName           xml.Name           `xml:"wp:inline"`
+	DistT             int                `xml:"distT,attr,omitempty"` // Distance from text (top)
+	DistB             int                `xml:"distB,attr,omitempty"` // Distance from text (bottom)
+	DistL             int                `xml:"distL,attr,omitempty"` // Distance from text (left)
+	DistR             int                `xml:"distR,attr,omitempty"` // Distance from text (right)
+	Extent            *Extent            `xml:"wp:extent"`            // Drawing size
+	EffectExtent      *EffectExtent      `xml:"wp:effectExtent,omitempty"`
+	DocPr             *DocPr             `xml:"wp:docPr"` // Non-visual properties
 	CNvGraphicFramePr *CNvGraphicFramePr `xml:"wp:cNvGraphicFramePr,omitempty"`
-	Graphic           *Graphic          `xml:"a:graphic"`              // Graphic content
+	Graphic           *Graphic           `xml:"a:graphic"` // Graphic content
 }
 
 // Anchor represents a floating drawing (absolute positioning).
 type Anchor struct {
-	XMLName            xml.Name           `xml:"wp:anchor"`
-	DistT              int                `xml:"distT,attr,omitempty"`
-	DistB              int                `xml:"distB,attr,omitempty"`
-	DistL              int                `xml:"distL,attr,omitempty"`
-	DistR              int                `xml:"distR,attr,omitempty"`
-	SimplePos          *SimplePos         `xml:"wp:simplePos"`
-	PositionH          *PositionH         `xml:"wp:positionH"`
-	PositionV          *PositionV         `xml:"wp:positionV"`
-	Extent             *Extent            `xml:"wp:extent"`
-	EffectExtent       *EffectExtent      `xml:"wp:effectExtent,omitempty"`
-	WrapType           *WrapType          `xml:"wp:wrapSquare,omitempty"` // or wrapTight, wrapThrough, etc.
-	DocPr              *DocPr             `xml:"wp:docPr"`
-	CNvGraphicFramePr  *CNvGraphicFramePr `xml:"wp:cNvGraphicFramePr,omitempty"`
-	Graphic            *Graphic           `xml:"a:graphic"`
-	RelativeHeight     int                `xml:"relativeHeight,attr,omitempty"`
-	BehindDoc          bool               `xml:"behindDoc,attr,omitempty"`
-	Locked             bool               `xml:"locked,attr,omitempty"`
-	LayoutInCell       bool               `xml:"layoutInCell,attr,omitempty"`
-	AllowOverlap       bool               `xml:"allowOverlap,attr,omitempty"`
+	XMLName           xml.Name           `xml:"wp:anchor"`
+	DistT             int                `xml:"distT,attr,omitempty"`
+	DistB             int                `xml:"distB,attr,omitempty"`
+	DistL             int                `xml:"distL,attr,omitempty"`
+	DistR             int                `xml:"distR,attr,omitempty"`
+	SimplePosAttr     bool               `xml:"simplePos,attr"`
+	RelativeHeight    int                `xml:"relativeHeight,attr"`
+	BehindDoc         bool               `xml:"behindDoc,attr"`
+	Locked            bool               `xml:"locked,attr"`
+	LayoutInCell      bool               `xml:"layoutInCell,attr"`
+	AllowOverlap      bool               `xml:"allowOverlap,attr"`
+	SimplePos         *SimplePos         `xml:"wp:simplePos"`
+	PositionH         *PositionH         `xml:"wp:positionH"`
+	PositionV         *PositionV         `xml:"wp:positionV"`
+	Extent            *Extent            `xml:"wp:extent"`
+	EffectExtent      *EffectExtent      `xml:"wp:effectExtent,omitempty"`
+	WrapType          *WrapType          `xml:"wp:wrapSquare,omitempty"` // or wrapTight, wrapThrough, etc.
+	DocPr             *DocPr             `xml:"wp:docPr"`
+	CNvGraphicFramePr *CNvGraphicFramePr `xml:"wp:cNvGraphicFramePr,omitempty"`
+	Graphic           *Graphic           `xml:"a:graphic"`
 }
 
 // Extent represents the size of a drawing in EMUs.
@@ -96,16 +97,16 @@ type DocPr struct {
 
 // CNvGraphicFramePr represents non-visual graphic frame properties.
 type CNvGraphicFramePr struct {
-	XMLName           xml.Name          `xml:"wp:cNvGraphicFramePr"`
+	XMLName           xml.Name           `xml:"wp:cNvGraphicFramePr"`
 	GraphicFrameLocks *GraphicFrameLocks `xml:"a:graphicFrameLocks,omitempty"`
 }
 
 // GraphicFrameLocks represents graphic frame lock settings.
 type GraphicFrameLocks struct {
-	XMLName         xml.Name `xml:"a:graphicFrameLocks"`
-	NoChangeAspect  bool     `xml:"noChangeAspect,attr,omitempty"`
-	NoMove          bool     `xml:"noMove,attr,omitempty"`
-	NoResize        bool     `xml:"noResize,attr,omitempty"`
+	XMLName        xml.Name `xml:"a:graphicFrameLocks"`
+	NoChangeAspect bool     `xml:"noChangeAspect,attr,omitempty"`
+	NoMove         bool     `xml:"noMove,attr,omitempty"`
+	NoResize       bool     `xml:"noResize,attr,omitempty"`
 }
 
 // SimplePos represents simple positioning.
@@ -117,18 +118,18 @@ type SimplePos struct {
 
 // PositionH represents horizontal positioning.
 type PositionH struct {
-	XMLName    xml.Name `xml:"wp:positionH"`
-	RelativeFrom string   `xml:"relativeFrom,attr"` // page, column, character, etc.
-	PosOffset  *int     `xml:"wp:posOffset,omitempty"` // Offset in EMUs
-	Align      *string  `xml:"wp:align,omitempty"`     // left, center, right, etc.
+	XMLName      xml.Name `xml:"wp:positionH"`
+	RelativeFrom string   `xml:"relativeFrom,attr"`      // page, column, character, etc.
+	PosOffset    *int     `xml:"wp:posOffset,omitempty"` // Offset in EMUs
+	Align        *string  `xml:"wp:align,omitempty"`     // left, center, right, etc.
 }
 
 // PositionV represents vertical positioning.
 type PositionV struct {
-	XMLName    xml.Name `xml:"wp:positionV"`
+	XMLName      xml.Name `xml:"wp:positionV"`
 	RelativeFrom string   `xml:"relativeFrom,attr"` // page, paragraph, line, etc.
-	PosOffset  *int     `xml:"wp:posOffset,omitempty"`
-	Align      *string  `xml:"wp:align,omitempty"`
+	PosOffset    *int     `xml:"wp:posOffset,omitempty"`
+	Align        *string  `xml:"wp:align,omitempty"`
 }
 
 // WrapType represents text wrapping (multiple types available).
@@ -139,8 +140,8 @@ type WrapType struct {
 
 // Graphic represents the graphic content.
 type Graphic struct {
-	XMLName     xml.Name    `xml:"a:graphic"`
-	Xmlns       string      `xml:"xmlns:a,attr"`
+	XMLName     xml.Name     `xml:"a:graphic"`
+	Xmlns       string       `xml:"xmlns:a,attr"`
 	GraphicData *GraphicData `xml:"a:graphicData"`
 }
 
@@ -153,11 +154,11 @@ type GraphicData struct {
 
 // Pic represents a picture element.
 type Pic struct {
-	XMLName   xml.Name  `xml:"pic:pic"`
-	Xmlns     string    `xml:"xmlns:pic,attr"`
-	NvPicPr   *NvPicPr  `xml:"pic:nvPicPr"`  // Non-visual picture properties
-	BlipFill  *BlipFill `xml:"pic:blipFill"` // Image fill
-	SpPr      *SpPr     `xml:"pic:spPr"`     // Shape properties
+	XMLName  xml.Name  `xml:"pic:pic"`
+	Xmlns    string    `xml:"xmlns:pic,attr"`
+	NvPicPr  *NvPicPr  `xml:"pic:nvPicPr"`  // Non-visual picture properties
+	BlipFill *BlipFill `xml:"pic:blipFill"` // Image fill
+	SpPr     *SpPr     `xml:"pic:spPr"`     // Shape properties
 }
 
 // NvPicPr represents non-visual picture properties.
@@ -177,15 +178,15 @@ type CNvPr struct {
 
 // CNvPicPr represents non-visual picture drawing properties.
 type CNvPicPr struct {
-	XMLName    xml.Name    `xml:"pic:cNvPicPr"`
-	PicLocks   *PicLocks   `xml:"a:picLocks,omitempty"`
+	XMLName  xml.Name  `xml:"pic:cNvPicPr"`
+	PicLocks *PicLocks `xml:"a:picLocks,omitempty"`
 }
 
 // PicLocks represents picture lock settings.
 type PicLocks struct {
-	XMLName        xml.Name `xml:"a:picLocks"`
-	NoChangeAspect bool     `xml:"noChangeAspect,attr,omitempty"`
-	NoChangeArrowheads bool `xml:"noChangeArrowheads,attr,omitempty"`
+	XMLName            xml.Name `xml:"a:picLocks"`
+	NoChangeAspect     bool     `xml:"noChangeAspect,attr,omitempty"`
+	NoChangeArrowheads bool     `xml:"noChangeArrowheads,attr,omitempty"`
 }
 
 // BlipFill represents the image fill.
@@ -215,8 +216,8 @@ type FillRect struct {
 
 // SpPr represents shape properties.
 type SpPr struct {
-	XMLName xml.Name `xml:"pic:spPr"`
-	Xfrm    *Xfrm    `xml:"a:xfrm"`
+	XMLName  xml.Name  `xml:"pic:spPr"`
+	Xfrm     *Xfrm     `xml:"a:xfrm"`
 	PrstGeom *PrstGeom `xml:"a:prstGeom"`
 }
 

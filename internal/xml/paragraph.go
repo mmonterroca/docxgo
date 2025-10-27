@@ -49,8 +49,20 @@ import "encoding/xml"
 type Paragraph struct {
 	XMLName    xml.Name             `xml:"w:p"`
 	Properties *ParagraphProperties `xml:"w:pPr,omitempty"`
-	Runs       []*Run               `xml:"w:r,omitempty"`
-	Hyperlinks []*Hyperlink         `xml:"w:hyperlink,omitempty"`
+	Elements   []interface{}        `xml:",any"`
+}
+
+// BookmarkStart represents w:bookmarkStart element.
+type BookmarkStart struct {
+	XMLName xml.Name `xml:"w:bookmarkStart"`
+	ID      string   `xml:"w:id,attr"`
+	Name    string   `xml:"w:name,attr"`
+}
+
+// BookmarkEnd represents w:bookmarkEnd element.
+type BookmarkEnd struct {
+	XMLName xml.Name `xml:"w:bookmarkEnd"`
+	ID      string   `xml:"w:id,attr"`
 }
 
 // ParagraphProperties represents w:pPr element.

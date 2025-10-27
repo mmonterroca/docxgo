@@ -28,12 +28,23 @@ import (
 	"github.com/mmonterroca/docxgo/pkg/constants"
 )
 
+type drawingIDProvider interface {
+	NextDrawingID() int
+}
+
 // RunSerializer converts a domain.Run to xml.Run
-type RunSerializer struct{}
+type RunSerializer struct {
+	idProvider drawingIDProvider
+}
 
 // NewRunSerializer creates a new RunSerializer.
 func NewRunSerializer() *RunSerializer {
 	return &RunSerializer{}
+}
+
+// SetDrawingIDProvider injects a provider for generating unique drawing IDs.
+func (s *RunSerializer) SetDrawingIDProvider(provider drawingIDProvider) {
+	s.idProvider = provider
 }
 
 // Serialize converts a domain.Run to xml.Run.
@@ -41,6 +52,18 @@ func (s *RunSerializer) Serialize(run domain.Run) *xml.Run {
 	xmlRun := &xml.Run{
 		Properties: s.serializeProperties(run),
 		Text:       s.serializeText(run),
+	}
+
+	if imageProvider, ok := run.(interface{ Image() domain.Image }); ok {
+		if img := imageProvider.Image(); img != nil {
+			drawingID := 1
+			if s.idProvider != nil {
+				drawingID = s.idProvider.NextDrawingID()
+			}
+			xmlRun.Drawing = s.serializeDrawing(img, drawingID)
+			// For image runs we don't include text content.
+			xmlRun.Text = nil
+		}
 	}
 
 	// Add breaks if any
@@ -51,6 +74,18 @@ func (s *RunSerializer) Serialize(run domain.Run) *xml.Run {
 	}
 
 	return xmlRun
+}
+
+func (s *RunSerializer) serializeDrawing(img domain.Image, drawingID int) *xml.Drawing {
+	if img == nil {
+		return nil
+	}
+
+	pos := img.Position()
+	if pos.Type == domain.ImagePositionFloating {
+		return xml.NewFloatingDrawing(img, drawingID)
+	}
+	return xml.NewInlineDrawing(img, drawingID)
 }
 
 func (s *RunSerializer) serializeProperties(run domain.Run) *xml.RunProperties {
@@ -96,6 +131,7 @@ func (s *RunSerializer) serializeProperties(run domain.Run) *xml.RunProperties {
 	if font.Name != "" && font.Name != constants.DefaultFontName {
 		props.Font = &xml.Font{
 			ASCII:    font.Name,
+			HAnsi:    font.Name,
 			EastAsia: font.EastAsia,
 			CS:       font.CS,
 		}
@@ -220,19 +256,164 @@ func NewParagraphSerializer() *ParagraphSerializer {
 func (s *ParagraphSerializer) Serialize(para domain.Paragraph) *xml.Paragraph {
 	xmlPara := &xml.Paragraph{
 		Properties: s.serializeProperties(para),
-		Runs:       make([]*xml.Run, 0, len(para.Runs())),
+		Elements:   make([]interface{}, 0, len(para.Runs())+2),
 	}
 
-	// Serialize runs
+	// Add bookmark if this paragraph has one (needed for TOC)
+	if corePara, ok := para.(interface {
+		BookmarkID() string
+		BookmarkName() string
+	}); ok {
+		if bookmarkID := corePara.BookmarkID(); bookmarkID != "" {
+			xmlPara.Elements = append(xmlPara.Elements, &xml.BookmarkStart{
+				ID:   bookmarkID,
+				Name: corePara.BookmarkName(),
+			})
+		}
+	}
+
+	// Serialize runs - expand runs with fields into multiple XML runs
 	for _, run := range para.Runs() {
-		xmlPara.Runs = append(xmlPara.Runs, s.runSerializer.Serialize(run))
+		// Check if run has fields
+		if runWithFields, ok := run.(interface{ Fields() []domain.Field }); ok {
+			fields := runWithFields.Fields()
+			if len(fields) > 0 {
+				// Expand run with fields into multiple XML runs
+				xmlPara.Elements = append(xmlPara.Elements, s.expandRunWithFields(run, fields)...)
+				continue
+			}
+		}
+
+		// Regular run without fields
+		xmlPara.Elements = append(xmlPara.Elements, s.runSerializer.Serialize(run))
+	}
+
+	// Add bookmark end if this paragraph has a bookmark
+	if corePara, ok := para.(interface{ BookmarkID() string }); ok {
+		if bookmarkID := corePara.BookmarkID(); bookmarkID != "" {
+			xmlPara.Elements = append(xmlPara.Elements, &xml.BookmarkEnd{ID: bookmarkID})
+		}
 	}
 
 	return xmlPara
 }
 
+// expandRunWithFields expands a run containing fields into XML elements while preserving formatting.
+// The returned slice may include runs, hyperlinks, and field components.
+func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domain.Field) []interface{} {
+	elements := make([]interface{}, 0, len(fields)*5)
+
+	for _, field := range fields {
+		wasDirty := false
+		if dirtyChecker, ok := field.(interface{ IsDirty() bool }); ok {
+			wasDirty = dirtyChecker.IsDirty()
+		}
+		if updater, ok := field.(interface{ Update() error }); ok {
+			_ = updater.Update()
+			if wasDirty {
+				if marker, ok := field.(interface{ MarkDirty() }); ok {
+					marker.MarkDirty()
+				}
+			}
+		}
+
+		switch field.Type() {
+		case domain.FieldTypeHyperlink:
+			if accessor, ok := field.(interface {
+				GetProperty(string) (string, bool)
+			}); ok {
+				relID, relOK := accessor.GetProperty("relationshipID")
+				if relOK && relID != "" {
+					display := field.Result()
+					if display == "" {
+						if disp, ok := accessor.GetProperty("display"); ok {
+							display = disp
+						}
+					}
+
+					var xmlRun *xml.Run
+					if setter, ok := run.(interface{ SetText(string) error }); ok {
+						origText := run.Text()
+						_ = setter.SetText(display)
+						xmlRun = s.runSerializer.Serialize(run)
+						_ = setter.SetText(origText)
+					} else {
+						xmlRun = &xml.Run{
+							Properties: s.runSerializer.serializeProperties(run),
+							Text:       &xml.Text{Content: display},
+						}
+					}
+
+					if xmlRun.Text == nil {
+						xmlRun.Text = &xml.Text{Content: display}
+					} else {
+						xmlRun.Text.Content = display
+					}
+
+					xmlRun.FieldChar = nil
+					xmlRun.InstrText = nil
+
+					if xmlRun.Properties == nil {
+						xmlRun.Properties = &xml.RunProperties{}
+					}
+					xmlRun.Properties.Style = &xml.RunStyle{Val: "Hyperlink"}
+
+					hyperlink := &xml.Hyperlink{
+						ID:   relID,
+						Runs: []*xml.Run{xmlRun},
+					}
+					elements = append(elements, hyperlink)
+					continue
+				}
+			}
+		}
+
+		beginRun := &xml.Run{FieldChar: xml.NewFieldBegin()}
+		if dirtyField, ok := field.(interface{ IsDirty() bool }); ok {
+			if dirtyField.IsDirty() {
+				dirty := true
+				beginRun.FieldChar.Dirty = &dirty
+			}
+		}
+		elements = append(elements, beginRun)
+
+		instrRun := &xml.Run{InstrText: xml.NewInstrText(field.Code())}
+		elements = append(elements, instrRun)
+
+		sepRun := &xml.Run{FieldChar: xml.NewFieldSeparate()}
+		elements = append(elements, sepRun)
+
+		resultText := field.Result()
+		if resultText != "" {
+			resultRun := &xml.Run{
+				Properties: s.runSerializer.serializeProperties(run),
+				Text:       &xml.Text{Content: resultText},
+			}
+			elements = append(elements, resultRun)
+		}
+
+		endRun := &xml.Run{FieldChar: xml.NewFieldEnd()}
+		elements = append(elements, endRun)
+	}
+
+	if run.Text() != "" {
+		elements = append(elements, s.runSerializer.Serialize(run))
+	}
+
+	return elements
+}
+
 func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.ParagraphProperties {
 	props := &xml.ParagraphProperties{}
+
+	// Style - access the internal styleName field via type assertion
+	if corePara, ok := para.(interface{ StyleName() string }); ok {
+		if styleName := corePara.StyleName(); styleName != "" {
+			props.Style = &xml.ParagraphStyleRef{
+				Val: styleName,
+			}
+		}
+	}
 
 	// Alignment
 	if para.Alignment() != domain.AlignmentLeft {
@@ -523,14 +704,28 @@ func intPtrIfNotZero(i int) *int {
 type DocumentSerializer struct {
 	paraSerializer  *ParagraphSerializer
 	tableSerializer *TableSerializer
+	drawingCounter  int
 }
 
 // NewDocumentSerializer creates a new DocumentSerializer.
 func NewDocumentSerializer() *DocumentSerializer {
-	return &DocumentSerializer{
-		paraSerializer:  NewParagraphSerializer(),
-		tableSerializer: NewTableSerializer(),
+	paraSer := NewParagraphSerializer()
+	tableSer := NewTableSerializer()
+	serializer := &DocumentSerializer{
+		paraSerializer:  paraSer,
+		tableSerializer: tableSer,
 	}
+
+	paraSer.runSerializer.SetDrawingIDProvider(serializer)
+	tableSer.paraSerializer.runSerializer.SetDrawingIDProvider(serializer)
+
+	return serializer
+}
+
+// NextDrawingID returns a unique ID for drawing elements.
+func (s *DocumentSerializer) NextDrawingID() int {
+	s.drawingCounter++
+	return s.drawingCounter
 }
 
 // SerializeBody converts document content to xml.Body.
@@ -550,16 +745,98 @@ func (s *DocumentSerializer) SerializeBody(doc domain.Document) *xml.Body {
 		body.Tables = append(body.Tables, s.tableSerializer.Serialize(table))
 	}
 
+	if sectPr := s.serializeSectionProperties(doc); sectPr != nil {
+		body.SectPr = sectPr
+	}
+
 	return body
 }
 
 // SerializeDocument creates the complete document XML structure.
 func (s *DocumentSerializer) SerializeDocument(doc domain.Document) *xml.Document {
 	return &xml.Document{
-		XMLnsW: constants.NamespaceMain,
-		XMLnsR: constants.NamespaceRelationships,
-		Body:   s.SerializeBody(doc),
+		XMLnsW:  constants.NamespaceMain,
+		XMLnsR:  constants.NamespaceRelationships,
+		XMLnsWP: constants.NamespaceWordprocessingDrawing,
+		Body:    s.SerializeBody(doc),
 	}
+}
+
+// SerializeSectionParts converts headers and footers into their own XML parts.
+// The returned maps are keyed by the part filename (e.g., "header1.xml").
+func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[string]*xml.Header, map[string]*xml.Footer) {
+	headers := make(map[string]*xml.Header)
+	footers := make(map[string]*xml.Footer)
+
+	sections := doc.Sections()
+	for _, section := range sections {
+		secWithMaps, ok := section.(interface {
+			HeadersAll() map[domain.HeaderType]domain.Header
+			FootersAll() map[domain.FooterType]domain.Footer
+		})
+		if !ok {
+			continue
+		}
+
+		for _, header := range secWithMaps.HeadersAll() {
+			headerMeta, ok := header.(interface {
+				Paragraphs() []domain.Paragraph
+				RelationshipID() string
+				TargetPath() string
+			})
+			if !ok {
+				continue
+			}
+
+			target := headerMeta.TargetPath()
+			if target == "" || headerMeta.RelationshipID() == "" {
+				continue
+			}
+			if _, exists := headers[target]; exists {
+				continue
+			}
+
+			xmlHeader := xml.NewHeader()
+			for _, para := range headerMeta.Paragraphs() {
+				xmlHeader.AddParagraph(s.paraSerializer.Serialize(para))
+			}
+			headers[target] = xmlHeader
+		}
+
+		for _, footer := range secWithMaps.FootersAll() {
+			footerMeta, ok := footer.(interface {
+				Paragraphs() []domain.Paragraph
+				RelationshipID() string
+				TargetPath() string
+			})
+			if !ok {
+				continue
+			}
+
+			target := footerMeta.TargetPath()
+			if target == "" || footerMeta.RelationshipID() == "" {
+				continue
+			}
+			if _, exists := footers[target]; exists {
+				continue
+			}
+
+			xmlFooter := xml.NewFooter()
+			for _, para := range footerMeta.Paragraphs() {
+				xmlFooter.AddParagraph(s.paraSerializer.Serialize(para))
+			}
+			footers[target] = xmlFooter
+		}
+	}
+
+	if len(headers) == 0 {
+		headers = nil
+	}
+	if len(footers) == 0 {
+		footers = nil
+	}
+
+	return headers, footers
 }
 
 // SerializeCoreProperties converts metadata to core properties.
@@ -620,4 +897,339 @@ func (s *DocumentSerializer) SerializeAppProperties(doc domain.Document) *xml.Ap
 func (s *DocumentSerializer) DebugPrint(doc domain.Document) {
 	fmt.Printf("Document has %d paragraphs and %d tables\n",
 		len(doc.Paragraphs()), len(doc.Tables()))
+}
+
+// SerializeStyles converts a domain.StyleManager to xml.Styles.
+func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager) *xml.Styles {
+	xmlStyles := xml.NewStyles()
+
+	// Set doc defaults
+	xmlStyles.DocDefaults = &xml.DocDefaults{
+		RunDefaults: &xml.RunDefaults{
+			Properties: &xml.RunProperties{
+				Font: &xml.Font{
+					ASCII: "Calibri",
+					HAnsi: "Calibri",
+				},
+				Size: &xml.HalfPt{Val: 22}, // 11pt
+			},
+		},
+		ParaDefaults: &xml.ParagraphDefaults{},
+	}
+
+	// Serialize all styles from the style manager
+	for _, style := range styleManager.ListStyles() {
+		xmlStyle := s.serializeStyle(style)
+		if xmlStyle != nil {
+			xmlStyles.AddStyle(xmlStyle)
+		}
+	}
+
+	return xmlStyles
+}
+
+func (s *DocumentSerializer) serializeStyle(style domain.Style) *xml.Style {
+	if style == nil {
+		return nil
+	}
+
+	xmlStyle := &xml.Style{
+		Type:    s.styleTypeToString(style.Type()),
+		StyleID: style.ID(),
+		Name:    &xml.StyleName{Val: style.Name()},
+	}
+
+	// Set default flag
+	if style.IsDefault() {
+		defaultVal := true
+		xmlStyle.Default = &defaultVal
+	}
+
+	// Set basedOn if applicable
+	if style.BasedOn() != "" {
+		xmlStyle.BasedOn = &xml.BasedOn{Val: style.BasedOn()}
+	}
+
+	// For Heading styles and Normal, add qFormat
+	styleID := style.ID()
+	if styleID == "Normal" {
+		// Normal is the base quick format style
+		xmlStyle.QFormat = &struct{}{}
+		xmlStyle.UIPriority = &xml.UIPriority{Val: 0}
+	} else if len(styleID) >= 7 && styleID[:7] == "Heading" {
+		// Mark as quick format
+		xmlStyle.QFormat = &struct{}{}
+		// Next paragraph should be Normal
+		xmlStyle.Next = &xml.Next{Val: "Normal"}
+		// Set UI priority (Headings should have high priority)
+		if len(styleID) == 8 { // Heading1-9
+			priority := int(styleID[7] - '0')                        // Extract digit
+			xmlStyle.UIPriority = &xml.UIPriority{Val: priority + 8} // Priority 9-17
+		}
+	}
+
+	// Serialize properties based on style type
+	switch style.Type() {
+	case domain.StyleTypeParagraph:
+		xmlStyle.ParaProps = s.serializeParagraphStyleProperties(style)
+		xmlStyle.RunProps = s.serializeRunStyleProperties(style)
+	case domain.StyleTypeCharacter:
+		xmlStyle.RunProps = s.serializeRunStyleProperties(style)
+	}
+
+	return xmlStyle
+}
+
+func (s *DocumentSerializer) serializeParagraphStyleProperties(style domain.Style) *xml.StyleParagraphProperties {
+	props := &xml.StyleParagraphProperties{}
+	hasProps := false
+
+	// Try to access paragraph-specific properties via interface
+	if ps, ok := style.(interface{ OutlineLevel() int }); ok {
+		level := ps.OutlineLevel()
+		// Only include outline level for Heading styles (styleId starts with "Heading")
+		// Heading styles should have outline levels 0-8
+		styleID := style.ID()
+		if len(styleID) >= 7 && styleID[:7] == "Heading" && level >= 0 && level <= 8 {
+			props.OutlineLevel = &xml.OutlineLevel{Val: level}
+			hasProps = true
+		}
+	}
+
+	if ps, ok := style.(interface{ SpacingBefore() int }); ok {
+		if spacing := ps.SpacingBefore(); spacing > 0 {
+			if props.Spacing == nil {
+				props.Spacing = &xml.StyleSpacing{}
+			}
+			props.Spacing.Before = &spacing
+			hasProps = true
+		}
+	}
+
+	if ps, ok := style.(interface{ SpacingAfter() int }); ok {
+		if spacing := ps.SpacingAfter(); spacing > 0 {
+			if props.Spacing == nil {
+				props.Spacing = &xml.StyleSpacing{}
+			}
+			props.Spacing.After = &spacing
+			hasProps = true
+		}
+	}
+
+	if ps, ok := style.(interface{ KeepNext() bool }); ok {
+		if ps.KeepNext() {
+			props.KeepNext = &struct{}{}
+			hasProps = true
+		}
+	}
+
+	if ps, ok := style.(interface{ KeepLines() bool }); ok {
+		if ps.KeepLines() {
+			props.KeepLines = &struct{}{}
+			hasProps = true
+		}
+	}
+
+	if ps, ok := style.(interface{ Indentation() domain.Indentation }); ok {
+		indent := ps.Indentation()
+		if indent.Left != 0 || indent.Right != 0 || indent.FirstLine != 0 || indent.Hanging != 0 {
+			props.Indentation = &xml.StyleIndentation{
+				Left:      intPtrIfNotZero(indent.Left),
+				Right:     intPtrIfNotZero(indent.Right),
+				FirstLine: intPtrIfNotZero(indent.FirstLine),
+				Hanging:   intPtrIfNotZero(indent.Hanging),
+			}
+			hasProps = true
+		}
+	}
+
+	if !hasProps {
+		return nil
+	}
+	return props
+}
+
+func (s *DocumentSerializer) serializeRunStyleProperties(style domain.Style) *xml.RunProperties {
+	props := &xml.RunProperties{}
+	hasProps := false
+
+	// Font
+	font := style.Font()
+	if font.Name != "" && font.Name != constants.DefaultFontName {
+		props.Font = &xml.Font{
+			ASCII:    font.Name,
+			HAnsi:    font.Name,
+			EastAsia: font.EastAsia,
+			CS:       font.CS,
+		}
+		hasProps = true
+	}
+
+	// Bold
+	if rs, ok := style.(interface{ Bold() bool }); ok {
+		if rs.Bold() {
+			props.Bold = &xml.BoolValue{Val: boolPtr(true)}
+			hasProps = true
+		}
+	}
+
+	// Italic
+	if rs, ok := style.(interface{ Italic() bool }); ok {
+		if rs.Italic() {
+			props.Italic = &xml.BoolValue{Val: boolPtr(true)}
+			hasProps = true
+		}
+	}
+
+	// Color
+	if rs, ok := style.(interface{ Color() domain.Color }); ok {
+		color := rs.Color()
+		if color != domain.ColorBlack {
+			props.Color = &xml.Color{
+				Val: fmt.Sprintf("%02X%02X%02X", color.R, color.G, color.B),
+			}
+			hasProps = true
+		}
+	}
+
+	// Size
+	if rs, ok := style.(interface{ Size() int }); ok {
+		if size := rs.Size(); size > 0 && size != constants.DefaultFontSize {
+			props.Size = &xml.HalfPt{Val: size}
+			props.SizeCS = &xml.HalfPt{Val: size}
+			hasProps = true
+		}
+	}
+
+	// Underline
+	if rs, ok := style.(interface{ Underline() domain.UnderlineStyle }); ok {
+		if underline := rs.Underline(); underline != domain.UnderlineNone {
+			props.Underline = &xml.Underline{
+				Val: s.underlineStyleToString(underline),
+			}
+			hasProps = true
+		}
+	}
+
+	if !hasProps {
+		return nil
+	}
+	return props
+}
+
+func (s *DocumentSerializer) styleTypeToString(t domain.StyleType) string {
+	switch t {
+	case domain.StyleTypeParagraph:
+		return "paragraph"
+	case domain.StyleTypeCharacter:
+		return "character"
+	case domain.StyleTypeTable:
+		return "table"
+	case domain.StyleTypeNumbering:
+		return "numbering"
+	default:
+		return "paragraph"
+	}
+}
+
+func (s *DocumentSerializer) serializeSectionProperties(doc domain.Document) *xml.SectionProperties {
+	sections := doc.Sections()
+	if len(sections) == 0 {
+		return nil
+	}
+
+	section := sections[0]
+	sectPr := xml.NewSectionProperties()
+
+	pageSize := section.PageSize()
+	orient := section.Orientation()
+	landscape := orient == domain.OrientationLandscape
+	if pageSize.Width == 0 || pageSize.Height == 0 {
+		pageSize = domain.PageSizeLetter
+	}
+	sectPr.SetPageSize(pageSize.Width, pageSize.Height, landscape)
+
+	margins := section.Margins()
+	if margins == (domain.Margins{}) {
+		margins = domain.DefaultMargins
+	}
+	sectPr.SetPageMargins(margins.Top, margins.Right, margins.Bottom, margins.Left, margins.Header, margins.Footer)
+
+	if cols := section.Columns(); cols > 1 {
+		sectPr.SetColumns(cols)
+	}
+
+	if secWithMaps, ok := section.(interface {
+		HeadersAll() map[domain.HeaderType]domain.Header
+		FootersAll() map[domain.FooterType]domain.Footer
+	}); ok {
+		for headerType, header := range secWithMaps.HeadersAll() {
+			headerMeta, ok := header.(interface {
+				RelationshipID() string
+			})
+			if !ok {
+				continue
+			}
+			if relID := headerMeta.RelationshipID(); relID != "" {
+				sectPr.AddHeaderRef(s.headerTypeToString(headerType), relID)
+			}
+		}
+
+		for footerType, footer := range secWithMaps.FootersAll() {
+			footerMeta, ok := footer.(interface {
+				RelationshipID() string
+			})
+			if !ok {
+				continue
+			}
+			if relID := footerMeta.RelationshipID(); relID != "" {
+				sectPr.AddFooterRef(s.footerTypeToString(footerType), relID)
+			}
+		}
+	}
+
+	return sectPr
+}
+
+func (s *DocumentSerializer) headerTypeToString(ht domain.HeaderType) string {
+	switch ht {
+	case domain.HeaderFirst:
+		return "first"
+	case domain.HeaderEven:
+		return "even"
+	default:
+		return "default"
+	}
+}
+
+func (s *DocumentSerializer) footerTypeToString(ft domain.FooterType) string {
+	switch ft {
+	case domain.FooterFirst:
+		return "first"
+	case domain.FooterEven:
+		return "even"
+	default:
+		return "default"
+	}
+}
+
+func (s *DocumentSerializer) underlineStyleToString(style domain.UnderlineStyle) string {
+	switch style {
+	case domain.UnderlineNone:
+		return constants.UnderlineValueNone
+	case domain.UnderlineSingle:
+		return constants.UnderlineValueSingle
+	case domain.UnderlineDouble:
+		return constants.UnderlineValueDouble
+	case domain.UnderlineThick:
+		return constants.UnderlineValueThick
+	case domain.UnderlineDotted:
+		return constants.UnderlineValueDotted
+	case domain.UnderlineDashed:
+		return constants.UnderlineValueDashed
+	case domain.UnderlineWave:
+		return constants.UnderlineValueWave
+	default:
+		return constants.UnderlineValueSingle
+	}
 }

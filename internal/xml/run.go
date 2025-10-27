@@ -23,30 +23,31 @@ import "encoding/xml"
 type Run struct {
 	XMLName    xml.Name       `xml:"w:r"`
 	Properties *RunProperties `xml:"w:rPr,omitempty"`
-	
+
 	// Content can be text, fields, tabs, breaks, or drawings
 	// Using interface{} with custom marshaling for flexibility
-	Text       *Text          `xml:"w:t,omitempty"`
-	Tab        *struct{}      `xml:"w:tab,omitempty"`
-	Break      *Break         `xml:"w:br,omitempty"`
-	Drawing    *Drawing       `xml:"w:drawing,omitempty"`
-	
+	Text    *Text     `xml:"w:t,omitempty"`
+	Tab     *struct{} `xml:"w:tab,omitempty"`
+	Break   *Break    `xml:"w:br,omitempty"`
+	Drawing *Drawing  `xml:"w:drawing,omitempty"`
+
 	// Field support - complex fields use multiple runs
-	FieldChar  *FieldChar     `xml:"w:fldChar,omitempty"`
-	InstrText  *InstrText     `xml:"w:instrText,omitempty"`
+	FieldChar *FieldChar `xml:"w:fldChar,omitempty"`
+	InstrText *InstrText `xml:"w:instrText,omitempty"`
 }
 
 // RunProperties represents w:rPr element (run properties).
 type RunProperties struct {
 	XMLName   xml.Name   `xml:"w:rPr"`
+	Style     *RunStyle  `xml:"w:rStyle,omitempty"`
+	Font      *Font      `xml:"w:rFonts,omitempty"`
 	Bold      *BoolValue `xml:"w:b,omitempty"`
 	Italic    *BoolValue `xml:"w:i,omitempty"`
 	Strike    *BoolValue `xml:"w:strike,omitempty"`
-	Underline *Underline `xml:"w:u,omitempty"`
 	Color     *Color     `xml:"w:color,omitempty"`
 	Size      *HalfPt    `xml:"w:sz,omitempty"`
 	SizeCS    *HalfPt    `xml:"w:szCs,omitempty"` // Complex script size
-	Font      *Font      `xml:"w:rFonts,omitempty"`
+	Underline *Underline `xml:"w:u,omitempty"`
 	Highlight *Highlight `xml:"w:highlight,omitempty"`
 }
 
@@ -80,12 +81,18 @@ type HalfPt struct {
 // Font represents w:rFonts element.
 type Font struct {
 	ASCII    string `xml:"w:ascii,attr,omitempty"`
+	HAnsi    string `xml:"w:hAnsi,attr,omitempty"`
 	EastAsia string `xml:"w:eastAsia,attr,omitempty"`
 	CS       string `xml:"w:cs,attr,omitempty"`
 }
 
 // Highlight represents w:highlight element.
 type Highlight struct {
+	Val string `xml:"w:val,attr"`
+}
+
+// RunStyle represents w:rStyle element (run style reference).
+type RunStyle struct {
 	Val string `xml:"w:val,attr"`
 }
 

@@ -29,13 +29,13 @@ import "github.com/mmonterroca/docxgo/domain"
 // NewInlineDrawing creates an inline drawing (flows with text).
 func NewInlineDrawing(img domain.Image, drawingID int) *Drawing {
 	size := img.Size()
-	
+
 	return &Drawing{
 		Inline: &Inline{
-			DistT:  0,
-			DistB:  0,
-			DistL:  0,
-			DistR:  0,
+			DistT: 0,
+			DistB: 0,
+			DistL: 0,
+			DistR: 0,
 			Extent: &Extent{
 				Cx: size.WidthEMU,
 				Cy: size.HeightEMU,
@@ -60,13 +60,14 @@ func NewInlineDrawing(img domain.Image, drawingID int) *Drawing {
 func NewFloatingDrawing(img domain.Image, drawingID int) *Drawing {
 	size := img.Size()
 	pos := img.Position()
-	
+
 	// Convert position to anchor
 	anchor := &Anchor{
 		DistT:          114300, // Default distances (0.125 inch)
 		DistB:          114300,
 		DistL:          114300,
 		DistR:          114300,
+		SimplePosAttr:  false,
 		RelativeHeight: pos.ZOrder,
 		BehindDoc:      pos.BehindText,
 		Locked:         false,

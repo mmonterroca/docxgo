@@ -23,25 +23,23 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package xml
 
 import "encoding/xml"
 
 // Styles represents the styles.xml document.
 type Styles struct {
-	XMLName  xml.Name `xml:"w:styles"`
-	Xmlns    string   `xml:"xmlns:w,attr"`
+	XMLName     xml.Name     `xml:"w:styles"`
+	Xmlns       string       `xml:"xmlns:w,attr"`
 	DocDefaults *DocDefaults `xml:"w:docDefaults,omitempty"`
-	Styles   []*Style `xml:"w:style"`
+	Styles      []*Style     `xml:"w:style"`
 }
 
 // DocDefaults represents w:docDefaults element.
 type DocDefaults struct {
-	XMLName         xml.Name               `xml:"w:docDefaults"`
-	RunDefaults     *RunDefaults           `xml:"w:rPrDefault,omitempty"`
-	ParaDefaults    *ParagraphDefaults     `xml:"w:pPrDefault,omitempty"`
+	XMLName      xml.Name           `xml:"w:docDefaults"`
+	RunDefaults  *RunDefaults       `xml:"w:rPrDefault,omitempty"`
+	ParaDefaults *ParagraphDefaults `xml:"w:pPrDefault,omitempty"`
 }
 
 // RunDefaults represents default run properties.
@@ -58,18 +56,18 @@ type ParagraphDefaults struct {
 
 // Style represents w:style element.
 type Style struct {
-	XMLName       xml.Name                  `xml:"w:style"`
-	Type          string                    `xml:"w:type,attr"`           // paragraph, character, table, numbering
-	StyleID       string                    `xml:"w:styleId,attr"`
-	Default       *bool                     `xml:"w:default,attr,omitempty"`
-	CustomStyle   *bool                     `xml:"w:customStyle,attr,omitempty"`
-	Name          *StyleName                `xml:"w:name,omitempty"`
-	BasedOn       *BasedOn                  `xml:"w:basedOn,omitempty"`
-	Next          *Next                     `xml:"w:next,omitempty"`
-	UIPriority    *UIPriority               `xml:"w:uiPriority,omitempty"`
-	QFormat       *struct{}                 `xml:"w:qFormat,omitempty"`
-	RunProps      *RunProperties            `xml:"w:rPr,omitempty"`
-	ParaProps     *StyleParagraphProperties `xml:"w:pPr,omitempty"`
+	XMLName     xml.Name                  `xml:"w:style"`
+	Type        string                    `xml:"w:type,attr"` // paragraph, character, table, numbering
+	StyleID     string                    `xml:"w:styleId,attr"`
+	Default     *bool                     `xml:"w:default,attr,omitempty"`
+	CustomStyle *bool                     `xml:"w:customStyle,attr,omitempty"`
+	Name        *StyleName                `xml:"w:name,omitempty"`
+	BasedOn     *BasedOn                  `xml:"w:basedOn,omitempty"`
+	Next        *Next                     `xml:"w:next,omitempty"`
+	UIPriority  *UIPriority               `xml:"w:uiPriority,omitempty"`
+	QFormat     *struct{}                 `xml:"w:qFormat,omitempty"`
+	ParaProps   *StyleParagraphProperties `xml:"w:pPr,omitempty"` // Must come before rPr per OOXML spec
+	RunProps    *RunProperties            `xml:"w:rPr,omitempty"`
 }
 
 // StyleName represents w:name element.
@@ -99,12 +97,12 @@ type UIPriority struct {
 // StyleParagraphProperties represents w:pPr element (paragraph properties in styles).
 type StyleParagraphProperties struct {
 	XMLName         xml.Name          `xml:"w:pPr"`
-	Alignment       *Alignment        `xml:"w:jc,omitempty"`
-	SpacingBefore   *StyleSpacing     `xml:"w:spacing,omitempty"`
-	Indentation     *StyleIndentation `xml:"w:ind,omitempty"`
 	KeepNext        *struct{}         `xml:"w:keepNext,omitempty"`
 	KeepLines       *struct{}         `xml:"w:keepLines,omitempty"`
 	PageBreakBefore *struct{}         `xml:"w:pageBreakBefore,omitempty"`
+	Spacing         *StyleSpacing     `xml:"w:spacing,omitempty"`
+	Indentation     *StyleIndentation `xml:"w:ind,omitempty"`
+	Alignment       *Alignment        `xml:"w:jc,omitempty"`
 	OutlineLevel    *OutlineLevel     `xml:"w:outlineLvl,omitempty"`
 }
 
@@ -116,11 +114,11 @@ type Alignment struct {
 
 // StyleSpacing represents w:spacing element (paragraph spacing in styles).
 type StyleSpacing struct {
-	XMLName     xml.Name `xml:"w:spacing"`
-	Before      *int     `xml:"w:before,attr,omitempty"`      // Space before in twips
-	After       *int     `xml:"w:after,attr,omitempty"`       // Space after in twips
-	Line        *int     `xml:"w:line,attr,omitempty"`        // Line spacing
-	LineRule    string   `xml:"w:lineRule,attr,omitempty"`    // auto, exact, atLeast
+	XMLName  xml.Name `xml:"w:spacing"`
+	Before   *int     `xml:"w:before,attr,omitempty"`   // Space before in twips
+	After    *int     `xml:"w:after,attr,omitempty"`    // Space after in twips
+	Line     *int     `xml:"w:line,attr,omitempty"`     // Line spacing
+	LineRule string   `xml:"w:lineRule,attr,omitempty"` // auto, exact, atLeast
 }
 
 // StyleIndentation represents w:ind element (paragraph indentation in styles).

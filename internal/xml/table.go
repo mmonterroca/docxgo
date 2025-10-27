@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package xml
 
 import "encoding/xml"
@@ -40,9 +38,9 @@ type Table struct {
 // TableProperties represents w:tblPr element.
 type TableProperties struct {
 	XMLName xml.Name       `xml:"w:tblPr"`
+	Style   *TableStyle    `xml:"w:tblStyle,omitempty"`
 	Width   *TableWidth    `xml:"w:tblW,omitempty"`
 	Jc      *Justification `xml:"w:jc,omitempty"`
-	Style   *TableStyle    `xml:"w:tblStyle,omitempty"`
 }
 
 // TableStyle represents w:tblStyle element.

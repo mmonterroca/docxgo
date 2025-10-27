@@ -20,8 +20,12 @@ package core
 import (
 	"archive/zip"
 	"bytes"
+	"io"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/mmonterroca/docxgo/domain"
 )
 
 func TestDocument_WriteTo(t *testing.T) {
@@ -79,6 +83,134 @@ func TestDocument_WriteTo(t *testing.T) {
 		if !fileMap[required] {
 			t.Errorf("Required file missing: %s", required)
 		}
+	}
+
+	relsFile, err := zipReader.Open("word/_rels/document.xml.rels")
+	if err != nil {
+		t.Fatalf("Failed to open relationships file: %v", err)
+	}
+	defer relsFile.Close()
+
+	relsContent, err := io.ReadAll(relsFile)
+	if err != nil {
+		t.Fatalf("Failed to read relationships file: %v", err)
+	}
+
+	relsXML := string(relsContent)
+	for _, target := range []string{"Target=\"styles.xml\"", "Target=\"fontTable.xml\"", "Target=\"theme/theme1.xml\""} {
+		if !strings.Contains(relsXML, target) {
+			t.Errorf("Relationship missing for %s", target)
+		}
+	}
+
+	docFile, err := zipReader.Open("word/document.xml")
+	if err != nil {
+		t.Fatalf("Failed to open document.xml: %v", err)
+	}
+	defer docFile.Close()
+
+	docContent, err := io.ReadAll(docFile)
+	if err != nil {
+		t.Fatalf("Failed to read document.xml: %v", err)
+	}
+
+	if !strings.Contains(string(docContent), "w:sectPr") {
+		t.Error("Section properties not serialized")
+	}
+}
+
+func TestDocument_HeaderFooterSerialization(t *testing.T) {
+	doc := NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection failed: %v", err)
+	}
+
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header failed: %v", err)
+	}
+	headPara, err := header.AddParagraph()
+	if err != nil {
+		t.Fatalf("Header.AddParagraph failed: %v", err)
+	}
+	headRun, err := headPara.AddRun()
+	if err != nil {
+		t.Fatalf("Header paragraph AddRun failed: %v", err)
+	}
+	headRun.SetText("Header Text")
+
+	footer, err := section.Footer(domain.FooterDefault)
+	if err != nil {
+		t.Fatalf("Footer failed: %v", err)
+	}
+	footPara, err := footer.AddParagraph()
+	if err != nil {
+		t.Fatalf("Footer.AddParagraph failed: %v", err)
+	}
+	footRun, err := footPara.AddRun()
+	if err != nil {
+		t.Fatalf("Footer paragraph AddRun failed: %v", err)
+	}
+	footRun.SetText("Footer Text")
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		t.Fatalf("Not a valid ZIP: %v", err)
+	}
+
+	files := make(map[string]*zip.File)
+	for _, f := range zipReader.File {
+		files[f.Name] = f
+	}
+
+	if _, ok := files["word/header1.xml"]; !ok {
+		t.Fatal("header1.xml not found in DOCX package")
+	}
+	if _, ok := files["word/footer1.xml"]; !ok {
+		t.Fatal("footer1.xml not found in DOCX package")
+	}
+
+	docFile, err := files["word/document.xml"].Open()
+	if err != nil {
+		t.Fatalf("Failed to open document.xml: %v", err)
+	}
+	defer docFile.Close()
+
+	docContent, err := io.ReadAll(docFile)
+	if err != nil {
+		t.Fatalf("Failed to read document.xml: %v", err)
+	}
+
+	docXML := string(docContent)
+	if !strings.Contains(docXML, "w:headerReference") {
+		t.Error("Document missing headerReference")
+	}
+	if !strings.Contains(docXML, "w:footerReference") {
+		t.Error("Document missing footerReference")
+	}
+
+	relsFile, err := files["word/_rels/document.xml.rels"].Open()
+	if err != nil {
+		t.Fatalf("Failed to open document relations: %v", err)
+	}
+	defer relsFile.Close()
+
+	relsContent, err := io.ReadAll(relsFile)
+	if err != nil {
+		t.Fatalf("Failed to read document relations: %v", err)
+	}
+	relsXML := string(relsContent)
+	if !strings.Contains(relsXML, "header1.xml") {
+		t.Error("Relationship for header1.xml missing")
+	}
+	if !strings.Contains(relsXML, "footer1.xml") {
+		t.Error("Relationship for footer1.xml missing")
 	}
 }
 

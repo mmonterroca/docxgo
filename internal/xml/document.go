@@ -35,14 +35,16 @@ type Document struct {
 	XMLName xml.Name `xml:"w:document"`
 	XMLnsW  string   `xml:"xmlns:w,attr"`
 	XMLnsR  string   `xml:"xmlns:r,attr"`
+	XMLnsWP string   `xml:"xmlns:wp,attr,omitempty"`
 	Body    *Body    `xml:"w:body"`
 }
 
 // Body represents w:body element.
 type Body struct {
-	XMLName    xml.Name     `xml:"w:body"`
-	Paragraphs []*Paragraph `xml:"w:p,omitempty"`
-	Tables     []*Table     `xml:"w:tbl,omitempty"`
+	XMLName    xml.Name           `xml:"w:body"`
+	Paragraphs []*Paragraph       `xml:"w:p,omitempty"`
+	Tables     []*Table           `xml:"w:tbl,omitempty"`
+	SectPr     *SectionProperties `xml:"w:sectPr,omitempty"`
 }
 
 // Relationships represents the .rels file.

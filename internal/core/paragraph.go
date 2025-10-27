@@ -26,6 +26,7 @@ SOFTWARE.
 package core
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/mmonterroca/docxgo/domain"
@@ -56,10 +57,13 @@ type paragraph struct {
 	lineSpacing   domain.LineSpacing
 	idGen         IDGenerator
 	relManager    *manager.RelationshipManager
+	bookmarkID    string // ID for bookmark (if this paragraph needs one for TOC)
+	bookmarkName  string // Name for bookmark (e.g., "_Toc123456")
+	mediaManager  *manager.MediaManager
 }
 
 // NewParagraph creates a new Paragraph.
-func NewParagraph(id string, idGen IDGenerator, relManager *manager.RelationshipManager) domain.Paragraph {
+func NewParagraph(id string, idGen IDGenerator, relManager *manager.RelationshipManager, mediaManager *manager.MediaManager) domain.Paragraph {
 	return &paragraph{
 		id:            id,
 		runs:          make([]domain.Run, 0, constants.DefaultRunCapacity),
@@ -72,13 +76,14 @@ func NewParagraph(id string, idGen IDGenerator, relManager *manager.Relationship
 		lineSpacing:   domain.LineSpacing{Rule: domain.LineSpacingAuto, Value: constants.DefaultLineSpacing},
 		idGen:         idGen,
 		relManager:    relManager,
+		mediaManager:  mediaManager,
 	}
 }
 
 // AddRun adds a new text run to the paragraph.
 func (p *paragraph) AddRun() (domain.Run, error) {
 	id := p.idGen.NextRunID()
-	run := NewRun(id)
+	run := NewRun(id, p.relManager)
 	p.runs = append(p.runs, run)
 	return run, nil
 }
@@ -132,18 +137,10 @@ func (p *paragraph) AddImage(path string) (domain.Image, error) {
 		return nil, errors.Wrap(err, "Paragraph.AddImage")
 	}
 
-	// Add relationship for image
-	relID, err := p.relManager.AddImage(img.Target())
-	if err != nil {
-		return nil, errors.Wrap(err, "Paragraph.AddImage")
+	if err := p.attachImage(img, filepath.Base(path)); err != nil {
+		return nil, err
 	}
 
-	// Set relationship ID on image
-	if docxImg, ok := img.(*docxImage); ok {
-		docxImg.SetRelationshipID(relID)
-	}
-
-	p.images = append(p.images, img)
 	return img, nil
 }
 
@@ -155,18 +152,10 @@ func (p *paragraph) AddImageWithSize(path string, size domain.ImageSize) (domain
 		return nil, errors.Wrap(err, "Paragraph.AddImageWithSize")
 	}
 
-	// Add relationship for image
-	relID, err := p.relManager.AddImage(img.Target())
-	if err != nil {
-		return nil, errors.Wrap(err, "Paragraph.AddImageWithSize")
+	if err := p.attachImage(img, filepath.Base(path)); err != nil {
+		return nil, err
 	}
 
-	// Set relationship ID on image
-	if docxImg, ok := img.(*docxImage); ok {
-		docxImg.SetRelationshipID(relID)
-	}
-
-	p.images = append(p.images, img)
 	return img, nil
 }
 
@@ -178,19 +167,55 @@ func (p *paragraph) AddImageWithPosition(path string, size domain.ImageSize, pos
 		return nil, errors.Wrap(err, "Paragraph.AddImageWithPosition")
 	}
 
-	// Add relationship for image
-	relID, err := p.relManager.AddImage(img.Target())
-	if err != nil {
-		return nil, errors.Wrap(err, "Paragraph.AddImageWithPosition")
+	if err := p.attachImage(img, filepath.Base(path)); err != nil {
+		return nil, err
 	}
 
-	// Set relationship ID on image
+	return img, nil
+}
+
+// attachImage registers the image with the media and relationship managers and appends it as a drawing run.
+func (p *paragraph) attachImage(img domain.Image, sourceName string) error {
+	if p.mediaManager == nil {
+		return errors.InvalidState("Paragraph.attachImage", "media manager not initialized")
+	}
+
+	if sourceName == "" {
+		sourceName = img.ID()
+	}
+
+	_, mediaPath, err := p.mediaManager.Add(img.Data(), sourceName)
+	if err != nil {
+		return errors.Wrap(err, "Paragraph.attachImage")
+	}
+
+	relativePath := strings.TrimPrefix(mediaPath, "word/")
+	if docxImg, ok := img.(*docxImage); ok {
+		docxImg.setTarget(relativePath)
+	}
+
+	relID, err := p.relManager.AddImage(relativePath)
+	if err != nil {
+		return errors.Wrap(err, "Paragraph.attachImage")
+	}
+
 	if docxImg, ok := img.(*docxImage); ok {
 		docxImg.SetRelationshipID(relID)
 	}
 
+	run := NewRun(p.idGen.NextRunID(), p.relManager)
+	if setter, ok := run.(interface{ setImage(domain.Image) }); ok {
+		setter.setImage(img)
+	}
+
+	p.runs = append(p.runs, run)
 	p.images = append(p.images, img)
-	return img, nil
+	return nil
+}
+
+// setMediaManager allows container structures to inject the shared media manager after construction.
+func (p *paragraph) setMediaManager(mm *manager.MediaManager) {
+	p.mediaManager = mm
 }
 
 // Images returns all images in this paragraph.
@@ -240,6 +265,31 @@ func (p *paragraph) SetStyle(styleName string) error {
 	}
 	p.styleName = styleName
 	return nil
+}
+
+// StyleName returns the style name applied to this paragraph.
+// This is an internal method used by the serializer.
+func (p *paragraph) StyleName() string {
+	return p.styleName
+}
+
+// SetBookmark sets a bookmark for this paragraph (used for TOC).
+// This is an internal method used when generating TOC.
+func (p *paragraph) SetBookmark(id, name string) {
+	p.bookmarkID = id
+	p.bookmarkName = name
+}
+
+// BookmarkID returns the bookmark ID for this paragraph.
+// This is an internal method used by the serializer.
+func (p *paragraph) BookmarkID() string {
+	return p.bookmarkID
+}
+
+// BookmarkName returns the bookmark name for this paragraph.
+// This is an internal method used by the serializer.
+func (p *paragraph) BookmarkName() string {
+	return p.bookmarkName
 }
 
 // Alignment returns the paragraph's horizontal alignment.

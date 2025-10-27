@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package core
 
 import (
@@ -36,33 +34,35 @@ import (
 
 // table implements the domain.Table interface.
 type table struct {
-	id         string
-	rows       []domain.TableRow
-	cols       int
-	width      domain.TableWidth
-	alignment  domain.Alignment
-	style      domain.TableStyle
-	idGen      *manager.IDGenerator
-	relManager *manager.RelationshipManager
+	id           string
+	rows         []domain.TableRow
+	cols         int
+	width        domain.TableWidth
+	alignment    domain.Alignment
+	style        domain.TableStyle
+	idGen        *manager.IDGenerator
+	relManager   *manager.RelationshipManager
+	mediaManager *manager.MediaManager
 }
 
 // NewTable creates a new Table.
-func NewTable(id string, rows, cols int, idGen *manager.IDGenerator, relManager *manager.RelationshipManager) domain.Table {
+func NewTable(id string, rows, cols int, idGen *manager.IDGenerator, relManager *manager.RelationshipManager, mediaManager *manager.MediaManager) domain.Table {
 	t := &table{
-		id:         id,
-		rows:       make([]domain.TableRow, 0, rows),
-		cols:       cols,
-		width:      domain.TableWidth{Type: domain.WidthAuto, Value: 0},
-		alignment:  domain.AlignmentLeft,
-		style:      domain.TableStyle{},
-		idGen:      idGen,
-		relManager: relManager,
+		id:           id,
+		rows:         make([]domain.TableRow, 0, rows),
+		cols:         cols,
+		width:        domain.TableWidth{Type: domain.WidthAuto, Value: 0},
+		alignment:    domain.AlignmentLeft,
+		style:        domain.TableStyle{},
+		idGen:        idGen,
+		relManager:   relManager,
+		mediaManager: mediaManager,
 	}
 
 	// Create initial rows
 	for i := 0; i < rows; i++ {
 		rowID := idGen.NextRowID()
-		row := NewTableRow(rowID, cols, idGen, relManager)
+		row := NewTableRow(rowID, cols, idGen, relManager, mediaManager)
 		t.rows = append(t.rows, row)
 	}
 
@@ -88,7 +88,7 @@ func (t *table) Rows() []domain.TableRow {
 // AddRow adds a new row to the end of the table.
 func (t *table) AddRow() (domain.TableRow, error) {
 	rowID := t.idGen.NextRowID()
-	row := NewTableRow(rowID, t.cols, t.idGen, t.relManager)
+	row := NewTableRow(rowID, t.cols, t.idGen, t.relManager, t.mediaManager)
 	t.rows = append(t.rows, row)
 	return row, nil
 }
@@ -101,7 +101,7 @@ func (t *table) InsertRow(index int) (domain.TableRow, error) {
 	}
 
 	rowID := t.idGen.NextRowID()
-	row := NewTableRow(rowID, t.cols, t.idGen, t.relManager)
+	row := NewTableRow(rowID, t.cols, t.idGen, t.relManager, t.mediaManager)
 
 	// Insert at index
 	t.rows = append(t.rows[:index], append([]domain.TableRow{row}, t.rows[index:]...)...)
@@ -173,27 +173,29 @@ func (t *table) SetStyle(style domain.TableStyle) error {
 
 // tableRow implements the domain.TableRow interface.
 type tableRow struct {
-	id         string
-	cells      []domain.TableCell
-	height     int
-	idGen      *manager.IDGenerator
-	relManager *manager.RelationshipManager
+	id           string
+	cells        []domain.TableCell
+	height       int
+	idGen        *manager.IDGenerator
+	relManager   *manager.RelationshipManager
+	mediaManager *manager.MediaManager
 }
 
 // NewTableRow creates a new TableRow.
-func NewTableRow(id string, cols int, idGen *manager.IDGenerator, relManager *manager.RelationshipManager) domain.TableRow {
+func NewTableRow(id string, cols int, idGen *manager.IDGenerator, relManager *manager.RelationshipManager, mediaManager *manager.MediaManager) domain.TableRow {
 	row := &tableRow{
-		id:         id,
-		cells:      make([]domain.TableCell, 0, cols),
-		height:     0, // Auto height
-		idGen:      idGen,
-		relManager: relManager,
+		id:           id,
+		cells:        make([]domain.TableCell, 0, cols),
+		height:       0, // Auto height
+		idGen:        idGen,
+		relManager:   relManager,
+		mediaManager: mediaManager,
 	}
 
 	// Create cells
 	for i := 0; i < cols; i++ {
 		cellID := idGen.NextCellID()
-		cell := NewTableCell(cellID, idGen, relManager)
+		cell := NewTableCell(cellID, idGen, relManager, mediaManager)
 		row.cells = append(row.cells, cell)
 	}
 
@@ -244,10 +246,11 @@ type tableCell struct {
 	vMerge            domain.VerticalMergeType
 	idGen             *manager.IDGenerator
 	relManager        *manager.RelationshipManager
+	mediaManager      *manager.MediaManager
 }
 
 // NewTableCell creates a new TableCell.
-func NewTableCell(id string, idGen *manager.IDGenerator, relManager *manager.RelationshipManager) domain.TableCell {
+func NewTableCell(id string, idGen *manager.IDGenerator, relManager *manager.RelationshipManager, mediaManager *manager.MediaManager) domain.TableCell {
 	return &tableCell{
 		id:                id,
 		paragraphs:        make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
@@ -260,13 +263,14 @@ func NewTableCell(id string, idGen *manager.IDGenerator, relManager *manager.Rel
 		vMerge:            domain.VMergeNone,
 		idGen:             idGen,
 		relManager:        relManager,
+		mediaManager:      mediaManager,
 	}
 }
 
 // AddParagraph adds a paragraph to this cell.
 func (c *tableCell) AddParagraph() (domain.Paragraph, error) {
 	id := c.idGen.NextParagraphID()
-	para := NewParagraph(id, c.idGen, c.relManager)
+	para := NewParagraph(id, c.idGen, c.relManager, c.mediaManager)
 	c.paragraphs = append(c.paragraphs, para)
 	return para, nil
 }
@@ -340,15 +344,15 @@ func (c *tableCell) Merge(cols, rows int) error {
 		return errors.InvalidArgument("TableCell.Merge", "rows", rows,
 			"rows must be at least 1")
 	}
-	
+
 	// Set horizontal merge (gridSpan)
 	c.gridSpan = cols
-	
+
 	// Set vertical merge
 	if rows > 1 {
 		c.vMerge = domain.VMergeRestart
 	}
-	
+
 	return nil
 }
 
@@ -392,8 +396,8 @@ func (c *tableCell) AddTable(rows, cols int) (domain.Table, error) {
 		return nil, errors.InvalidArgument("TableCell.AddTable", "cols", cols,
 			"cols must be at least 1")
 	}
-	
-	table := NewTable(c.idGen.GenerateID("table"), rows, cols, c.idGen, c.relManager)
+
+	table := NewTable(c.idGen.GenerateID("table"), rows, cols, c.idGen, c.relManager, c.mediaManager)
 	c.tables = append(c.tables, table)
 	return table, nil
 }

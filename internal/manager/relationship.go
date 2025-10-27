@@ -23,11 +23,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package manager
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/mmonterroca/docxgo/internal/xml"
@@ -74,16 +73,18 @@ func (rm *RelationshipManager) Add(relType, target, targetMode string) (string, 
 	// Generate new ID
 	id := rm.idGen.NextRelID()
 
-	// Default to Internal if not specified
-	if targetMode == "" {
-		targetMode = "Internal"
+	// Only "External" requires TargetMode attribute. For internal
+	// relationships Word expects the attribute to be omitted entirely.
+	mode := strings.TrimSpace(targetMode)
+	if strings.EqualFold(mode, "internal") || mode == "" {
+		mode = ""
 	}
 
 	rel := &Relationship{
 		ID:         id,
 		Type:       relType,
 		Target:     target,
-		TargetMode: targetMode,
+		TargetMode: mode,
 	}
 
 	rm.relationships[id] = rel

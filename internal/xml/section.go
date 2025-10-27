@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package xml
 
 import "encoding/xml"
@@ -32,19 +30,19 @@ import "encoding/xml"
 // SectionProperties represents w:sectPr element (section properties).
 type SectionProperties struct {
 	XMLName     xml.Name     `xml:"w:sectPr"`
-	PageSize    *PageSize    `xml:"w:pgSz,omitempty"`
-	PageMargins *PageMargins `xml:"w:pgMar,omitempty"`
-	Columns     *Columns     `xml:"w:cols,omitempty"`
 	HeaderRef   []HeaderRef  `xml:"w:headerReference,omitempty"`
 	FooterRef   []FooterRef  `xml:"w:footerReference,omitempty"`
 	Type        *SectionType `xml:"w:type,omitempty"`
+	PageSize    *PageSize    `xml:"w:pgSz,omitempty"`
+	PageMargins *PageMargins `xml:"w:pgMar,omitempty"`
+	Columns     *Columns     `xml:"w:cols,omitempty"`
 }
 
 // PageSize represents w:pgSz element (page size).
 type PageSize struct {
 	XMLName xml.Name `xml:"w:pgSz"`
-	Width   int      `xml:"w:w,attr"`              // Width in twips
-	Height  int      `xml:"w:h,attr"`              // Height in twips
+	Width   int      `xml:"w:w,attr"`                // Width in twips
+	Height  int      `xml:"w:h,attr"`                // Height in twips
 	Orient  string   `xml:"w:orient,attr,omitempty"` // portrait or landscape
 }
 
@@ -63,9 +61,9 @@ type PageMargins struct {
 // Columns represents w:cols element (column definition).
 type Columns struct {
 	XMLName xml.Name `xml:"w:cols"`
-	Num     int      `xml:"w:num,attr,omitempty"`     // Number of columns
-	Space   int      `xml:"w:space,attr,omitempty"`   // Space between columns
-	Sep     *bool    `xml:"w:sep,attr,omitempty"`     // Draw separator line
+	Num     int      `xml:"w:num,attr,omitempty"`   // Number of columns
+	Space   int      `xml:"w:space,attr,omitempty"` // Space between columns
+	Sep     *bool    `xml:"w:sep,attr,omitempty"`   // Draw separator line
 }
 
 // HeaderRef represents w:headerReference element.
@@ -98,14 +96,13 @@ func NewSectionProperties() *SectionProperties {
 
 // SetPageSize sets the page size for the section.
 func (sp *SectionProperties) SetPageSize(width, height int, landscape bool) {
-	orient := "portrait"
-	if landscape {
-		orient = "landscape"
-	}
 	sp.PageSize = &PageSize{
 		Width:  width,
 		Height: height,
-		Orient: orient,
+	}
+
+	if landscape {
+		sp.PageSize.Orient = "landscape"
 	}
 }
 
@@ -124,7 +121,8 @@ func (sp *SectionProperties) SetPageMargins(top, right, bottom, left, header, fo
 // SetColumns sets the number of columns for the section.
 func (sp *SectionProperties) SetColumns(num int) {
 	sp.Columns = &Columns{
-		Num: num,
+		Num:   num,
+		Space: 720,
 	}
 }
 

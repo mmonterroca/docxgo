@@ -31,11 +31,15 @@ import (
 	"github.com/mmonterroca/docxgo/internal/manager"
 )
 
-func TestTableCellMerge_Horizontal(t *testing.T) {
+func newTestTable(id string, rows, cols int) domain.Table {
 	idGen := manager.NewIDGenerator()
 	relManager := manager.NewRelationshipManager(idGen)
+	mediaManager := manager.NewMediaManager(idGen)
+	return NewTable(id, rows, cols, idGen, relManager, mediaManager)
+}
 
-	table := NewTable("tbl1", 3, 4, idGen, relManager)
+func TestTableCellMerge_Horizontal(t *testing.T) {
+	table := newTestTable("tbl1", 3, 4)
 
 	// Get first row, first cell
 	row, err := table.Row(0)
@@ -65,10 +69,7 @@ func TestTableCellMerge_Horizontal(t *testing.T) {
 }
 
 func TestTableCellMerge_Vertical(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl2", 4, 3, idGen, relManager)
+	table := newTestTable("tbl2", 4, 3)
 
 	// Get first row, first cell
 	row, err := table.Row(0)
@@ -98,10 +99,7 @@ func TestTableCellMerge_Vertical(t *testing.T) {
 }
 
 func TestTableCellMerge_Both(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl3", 4, 4, idGen, relManager)
+	table := newTestTable("tbl3", 4, 4)
 
 	// Get cell at (0,0)
 	row, err := table.Row(0)
@@ -130,10 +128,7 @@ func TestTableCellMerge_Both(t *testing.T) {
 }
 
 func TestTableCellSetGridSpan(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl4", 2, 4, idGen, relManager)
+	table := newTestTable("tbl4", 2, 4)
 
 	row, _ := table.Row(0)
 	cell, _ := row.Cell(0)
@@ -154,10 +149,7 @@ func TestTableCellSetGridSpan(t *testing.T) {
 }
 
 func TestTableCellSetVMerge(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl5", 3, 2, idGen, relManager)
+	table := newTestTable("tbl5", 3, 2)
 
 	row, _ := table.Row(0)
 	cell, _ := row.Cell(0)
@@ -185,10 +177,7 @@ func TestTableCellSetVMerge(t *testing.T) {
 }
 
 func TestTableCellNestedTable(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl6", 2, 2, idGen, relManager)
+	table := newTestTable("tbl6", 2, 2)
 
 	row, _ := table.Row(0)
 	cell, _ := row.Cell(0)
@@ -221,10 +210,7 @@ func TestTableCellNestedTable(t *testing.T) {
 }
 
 func TestTableCellMultipleNestedTables(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl7", 1, 1, idGen, relManager)
+	table := newTestTable("tbl7", 1, 1)
 
 	row, _ := table.Row(0)
 	cell, _ := row.Cell(0)
@@ -249,10 +235,7 @@ func TestTableCellMultipleNestedTables(t *testing.T) {
 }
 
 func TestTableStyle(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl8", 3, 3, idGen, relManager)
+	table := newTestTable("tbl8", 3, 3)
 
 	// Default style
 	style := table.Style()
@@ -283,10 +266,7 @@ func TestTableStyle(t *testing.T) {
 }
 
 func TestTableCellMerge_InvalidArguments(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl9", 2, 2, idGen, relManager)
+	table := newTestTable("tbl9", 2, 2)
 	row, _ := table.Row(0)
 	cell, _ := row.Cell(0)
 
@@ -315,10 +295,7 @@ func TestTableCellMerge_InvalidArguments(t *testing.T) {
 }
 
 func TestTableCellAddTable_InvalidArguments(t *testing.T) {
-	idGen := manager.NewIDGenerator()
-	relManager := manager.NewRelationshipManager(idGen)
-
-	table := NewTable("tbl10", 1, 1, idGen, relManager)
+	table := newTestTable("tbl10", 1, 1)
 	row, _ := table.Row(0)
 	cell, _ := row.Cell(0)
 
