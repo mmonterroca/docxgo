@@ -112,7 +112,6 @@ See the [`examples/`](examples/) directory for more comprehensive examples:
 This library follows clean architecture principles with clear separation of concerns:
 
 ```
-```
 github.com/mmonterroca/docxgo/
 ├── domain/          # Core interfaces (public API)
 │   ├── document.go  # Document interface
