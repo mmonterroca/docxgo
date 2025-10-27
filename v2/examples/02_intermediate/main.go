@@ -13,9 +13,10 @@ func main() {
 		docx.WithTitle("Product Catalog"),
 		docx.WithAuthor("ACME Corporation"),
 		docx.WithSubject("Q1 2024 Product Lineup"),
-		docx.WithDefaultFont("Arial", 11),
-		docx.WithPageSize(docx.PageSizeLetter),
-		docx.WithMargins(docx.MarginsNormal),
+		docx.WithDefaultFont("Arial"),
+		docx.WithDefaultFontSize(22), // 11pt = 22 half-points
+		docx.WithPageSize(docx.Letter),
+		docx.WithMargins(docx.NormalMargins),
 	)
 
 	// Cover page
@@ -74,30 +75,29 @@ func main() {
 
 	builder.AddParagraph().End()
 
-	// Product table
-	builder.AddTable().
-		Width(8000).
-		Row().
-			Cell().Text("Product").Bold().Width(2000).End().
-			Cell().Text("Description").Bold().Width(4000).End().
-			Cell().Text("Price").Bold().Width(2000).End().
+	// Product table (4 rows x 3 cols)
+	builder.AddTable(4, 3).
+		Row(0).
+		Cell(0).Text("Product").Bold().End().
+		Cell(1).Text("Description").Bold().End().
+		Cell(2).Text("Price").Bold().End().
 		End().
-		Row().
-			Cell().Text("Laptop Pro X1").End().
-			Cell().Text("15-inch display, 16GB RAM, 512GB SSD").End().
-			Cell().Text("$1,299").Color(docx.Green).Bold().End().
+		Row(1).
+		Cell(0).Text("Laptop Pro X1").End().
+		Cell(1).Text("15-inch display, 16GB RAM, 512GB SSD").End().
+		Cell(2).Text("$1,299").Bold().End().
 		End().
-		Row().
-			Cell().Text("Wireless Earbuds").End().
-			Cell().Text("Active noise cancellation, 24h battery").End().
-			Cell().Text("$199").Color(docx.Green).Bold().End().
+		Row(2).
+		Cell(0).Text("Wireless Earbuds").End().
+		Cell(1).Text("Active noise cancellation, 24h battery").End().
+		Cell(2).Text("$199").Bold().End().
 		End().
-		Row().
-			Cell().Text("Smart Watch").End().
-			Cell().Text("Fitness tracking, heart rate monitor").End().
-			Cell().Text("$349").Color(docx.Green).Bold().End().
+		Row(3).
+		Cell(0).Text("Smart Watch").End().
+		Cell(1).Text("Fitness tracking, heart rate monitor").End().
+		Cell(2).Text("$349").Bold().End().
 		End().
-	End()
+		End()
 
 	builder.AddParagraph().End()
 
@@ -140,29 +140,28 @@ func main() {
 
 	builder.AddParagraph().End()
 
-	builder.AddTable().
-		Width(8000).
-		Row().
-			Cell().Text("Product").Bold().Width(2000).End().
-			Cell().Text("Description").Bold().Width(4000).End().
-			Cell().Text("Price").Bold().Width(2000).End().
+	builder.AddTable(4, 3).
+		Row(0).
+		Cell(0).Text("Product").Bold().End().
+		Cell(1).Text("Description").Bold().End().
+		Cell(2).Text("Price").Bold().End().
 		End().
-		Row().
-			Cell().Text("LED Desk Lamp").End().
-			Cell().Text("Adjustable brightness, USB charging port").End().
-			Cell().Text("$49").Color(docx.Green).Bold().End().
+		Row(1).
+		Cell(0).Text("LED Desk Lamp").End().
+		Cell(1).Text("Adjustable brightness, USB charging port").End().
+		Cell(2).Text("$49").Bold().End().
 		End().
-		Row().
-			Cell().Text("Garden Tool Set").End().
-			Cell().Text("10-piece set with carrying case").End().
-			Cell().Text("$89").Color(docx.Green).Bold().End().
+		Row(2).
+		Cell(0).Text("Garden Tool Set").End().
+		Cell(1).Text("10-piece set with carrying case").End().
+		Cell(2).Text("$89").Bold().End().
 		End().
-		Row().
-			Cell().Text("Indoor Plant Kit").End().
-			Cell().Text("Includes 3 plants, pots, and soil").End().
-			Cell().Text("$39").Color(docx.Green).Bold().End().
+		Row(3).
+		Cell(0).Text("Indoor Plant Kit").End().
+		Cell(1).Text("Includes 3 plants, pots, and soil").End().
+		Cell(2).Text("$39").Bold().End().
 		End().
-	End()
+		End()
 
 	builder.AddParagraph().End()
 
@@ -180,29 +179,28 @@ func main() {
 
 	builder.AddParagraph().End()
 
-	builder.AddTable().
-		Width(8000).
-		Row().
-			Cell().Text("Product").Bold().Width(2000).End().
-			Cell().Text("Description").Bold().Width(4000).End().
-			Cell().Text("Price").Bold().Width(2000).End().
+	builder.AddTable(4, 3).
+		Row(0).
+		Cell(0).Text("Product").Bold().End().
+		Cell(1).Text("Description").Bold().End().
+		Cell(2).Text("Price").Bold().End().
 		End().
-		Row().
-			Cell().Text("Hiking Backpack").End().
-			Cell().Text("40L capacity, waterproof, ergonomic").End().
-			Cell().Text("$129").Color(docx.Green).Bold().End().
+		Row(1).
+		Cell(0).Text("Hiking Backpack").End().
+		Cell(1).Text("40L capacity, waterproof, ergonomic").End().
+		Cell(2).Text("$129").Bold().End().
 		End().
-		Row().
-			Cell().Text("Camping Tent").End().
-			Cell().Text("4-person, weather-resistant, easy setup").End().
-			Cell().Text("$249").Color(docx.Green).Bold().End().
+		Row(2).
+		Cell(0).Text("Camping Tent").End().
+		Cell(1).Text("4-person, weather-resistant, easy setup").End().
+		Cell(2).Text("$249").Bold().End().
 		End().
-		Row().
-			Cell().Text("Running Shoes").End().
-			Cell().Text("Lightweight, cushioned, breathable").End().
-			Cell().Text("$119").Color(docx.Green).Bold().End().
+		Row(3).
+		Cell(0).Text("Running Shoes").End().
+		Cell(1).Text("Lightweight, cushioned, breathable").End().
+		Cell(2).Text("$119").Bold().End().
 		End().
-	End()
+		End()
 
 	builder.AddParagraph().End()
 	builder.AddParagraph().End()

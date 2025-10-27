@@ -12,9 +12,10 @@ func main() {
 	builder := docx.NewDocumentBuilder(
 		docx.WithTitle("Builder Pattern Demo"),
 		docx.WithAuthor("go-docx v2"),
-		docx.WithDefaultFont("Calibri", 11),
-		docx.WithPageSize(docx.PageSizeA4),
-		docx.WithMargins(docx.MarginsNormal),
+		docx.WithDefaultFont("Calibri"),
+		docx.WithDefaultFontSize(22), // 11pt = 22 half-points
+		docx.WithPageSize(docx.A4),
+		docx.WithMargins(docx.NormalMargins),
 	)
 
 	// Add title using builder fluent API
@@ -115,19 +116,19 @@ func main() {
 	// Create a simple 3x3 table
 	builder.AddTable(3, 3).
 		Row(0).
-			Cell(0).Text("Header 1").Bold().End().
-			Cell(1).Text("Header 2").Bold().End().
-			Cell(2).Text("Header 3").Bold().End().
+		Cell(0).Text("Header 1").Bold().End().
+		Cell(1).Text("Header 2").Bold().End().
+		Cell(2).Text("Header 3").Bold().End().
 		End().
 		Row(1).
-			Cell(0).Text("Row 1, Col 1").End().
-			Cell(1).Text("Row 1, Col 2").End().
-			Cell(2).Text("Row 1, Col 3").End().
+		Cell(0).Text("Row 1, Col 1").End().
+		Cell(1).Text("Row 1, Col 2").End().
+		Cell(2).Text("Row 1, Col 3").End().
 		End().
 		Row(2).
-			Cell(0).Text("Row 2, Col 1").End().
-			Cell(1).Text("Row 2, Col 2").Shading(docx.Blue).End().
-			Cell(2).Text("Row 2, Col 3").End().
+		Cell(0).Text("Row 2, Col 1").End().
+		Cell(1).Text("Row 2, Col 2").Shading(docx.Blue).End().
+		Cell(2).Text("Row 2, Col 3").End().
 		End().
 		End()
 

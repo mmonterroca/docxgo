@@ -23,15 +23,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package main
 
 import (
 	"fmt"
 	"log"
 
-	"github.com/mmonterroca/docxgo"
+	docx "github.com/mmonterroca/docxgo"
 )
 
 func main() {
@@ -148,8 +146,8 @@ func addTableOfContents(doc *docx.Document) error {
 
 	// Create TOC field with custom options
 	tocOptions := map[string]string{
-		"levels":      "1-3",      // Include heading levels 1-3
-		"hyperlinks":  "true",     // Enable hyperlinks
+		"levels":     "1-3",  // Include heading levels 1-3
+		"hyperlinks": "true", // Enable hyperlinks
 	}
 	tocField := docx.NewTOCField(tocOptions)
 
@@ -275,7 +273,7 @@ func addHyperlinks(doc *docx.Document) error {
 	}
 	linkRun.SetColor(docx.ColorBlue)
 	linkRun.SetUnderline(docx.UnderlineSingle)
-	
+
 	hyperlinkField := docx.NewHyperlinkField("https://github.com/mmonterroca/docxgo", "go-docx repository")
 	linkRun.AddField(hyperlinkField)
 
