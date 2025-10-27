@@ -98,7 +98,7 @@ func main() {
 			stylePara, _ := doc.AddParagraph()
 			stylePara.SetStyle(domain.StyleIDListParagraph)
 			styleRun, _ := stylePara.AddRun()
-			
+
 			// Get style to display its name
 			if style, err := styleMgr.GetStyle(styleID); err == nil {
 				styleRun.AddText(fmt.Sprintf("• %s (%s)", style.Name(), styleID))
