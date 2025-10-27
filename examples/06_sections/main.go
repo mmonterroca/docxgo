@@ -44,7 +44,7 @@ func main() {
 	headerRun, _ := headerPara.AddRun()
 	headerRun.AddText("Section & Layout Demo")
 	headerRun.SetBold(true)
-	headerRun.SetColor(0x4472C4) // Blue
+	headerRun.SetColor(domain.Color{R: 0x44, G: 0x72, B: 0xC4}) // Blue
 
 	// Add footer with page numbers
 	footer, err := section.Footer(domain.FooterDefault)

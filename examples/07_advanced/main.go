@@ -69,8 +69,8 @@ func setupHeader(header domain.Header) {
 
 	run, _ := para.AddRun()
 	run.AddText("go-docx v2 • Advanced Features Demo")
-	run.SetFontSize(10)
-	run.SetColor(0x4472C4) // Blue
+	run.SetSize(20) // 10pt in half-points
+	run.SetColor(domain.Color{R: 0x44, G: 0x72, B: 0xC4}) // Blue
 }
 
 func setupFooter(footer domain.Footer) {
@@ -80,26 +80,26 @@ func setupFooter(footer domain.Footer) {
 	// Left part: Document info
 	r1, _ := para.AddRun()
 	r1.AddText("Page ")
-	r1.SetFontSize(10)
+	r1.SetSize(20) // 10pt in half-points
 
 	// Page number field
 	r2, _ := para.AddRun()
 	pageField := docx.NewPageNumberField()
 	r2.AddField(pageField)
-	r2.SetFontSize(10)
+	r2.SetSize(20)
 
 	r3, _ := para.AddRun()
 	r3.AddText(" of ")
-	r3.SetFontSize(10)
+	r3.SetSize(20)
 
 	// Total pages field
 	r4, _ := para.AddRun()
 	totalField := docx.NewPageCountField()
 	r4.AddField(totalField)
-	r4.SetFontSize(10)
+	r4.SetSize(20)
 }
 
-func addCoverPage(doc *docx.Document) {
+func addCoverPage(doc domain.Document) {
 	// Title
 	title, _ := doc.AddParagraph()
 	title.SetStyle(domain.StyleIDTitle)
@@ -130,7 +130,7 @@ func addCoverPage(doc *docx.Document) {
 	doc.AddParagraph()
 }
 
-func addTableOfContents(doc *docx.Document) {
+func addTableOfContents(doc domain.Document) {
 	// TOC heading
 	tocHeading, _ := doc.AddParagraph()
 	tocHeading.SetStyle(domain.StyleIDHeading1)
@@ -158,13 +158,13 @@ func addTableOfContents(doc *docx.Document) {
 	instRun, _ := instruction.AddRun()
 	instRun.AddText("Note: To update this table of contents, open the document in Word, right-click the TOC, and select \"Update Field\", or press F9.")
 	instRun.SetItalic(true)
-	instRun.SetFontSize(10)
+	instRun.SetSize(20) // 10pt in half-points
 
 	doc.AddParagraph()
 	doc.AddParagraph()
 }
 
-func addIntroduction(doc *docx.Document) {
+func addIntroduction(doc domain.Document) {
 	// Heading 1
 	h1, _ := doc.AddParagraph()
 	h1.SetStyle(domain.StyleIDHeading1)
@@ -193,7 +193,7 @@ func addIntroduction(doc *docx.Document) {
 	doc.AddParagraph()
 }
 
-func addFeatures(doc *docx.Document) {
+func addFeatures(doc domain.Document) {
 	// Heading 1
 	h1, _ := doc.AddParagraph()
 	h1.SetStyle(domain.StyleIDHeading1)
@@ -316,7 +316,7 @@ func addFeatures(doc *docx.Document) {
 	doc.AddParagraph()
 }
 
-func addExamples(doc *docx.Document) {
+func addExamples(doc domain.Document) {
 	// Heading 1
 	h1, _ := doc.AddParagraph()
 	h1.SetStyle(domain.StyleIDHeading1)
@@ -341,7 +341,7 @@ func addExamples(doc *docx.Document) {
 		"https://github.com/mmonterroca/docxgo",
 		"go-docx GitHub repository",
 	)
-	r2.SetColor(0x0000FF) // Blue
+	r2.SetColor(domain.Color{R: 0x00, G: 0x00, B: 0xFF}) // Blue
 	r2.SetUnderline(domain.UnderlineSingle)
 	r2.AddField(linkField)
 
@@ -390,7 +390,7 @@ func addExamples(doc *docx.Document) {
 	mr5.AddText(", ")
 
 	mr6, _ := mixed.AddRun()
-	mr6.SetColor(0xFF0000) // Red
+	mr6.SetColor(domain.Color{R: 0xFF, G: 0x00, B: 0x00}) // Red
 	mr6.AddText("colored text")
 
 	mr7, _ := mixed.AddRun()
@@ -399,7 +399,7 @@ func addExamples(doc *docx.Document) {
 	mr8, _ := mixed.AddRun()
 	mr8.SetBold(true)
 	mr8.SetItalic(true)
-	mr8.SetColor(0x00AA00) // Green
+	mr8.SetColor(domain.Color{R: 0x00, G: 0xAA, B: 0x00}) // Green
 	mr8.AddText("combined formatting")
 
 	mr9, _ := mixed.AddRun()
@@ -408,7 +408,7 @@ func addExamples(doc *docx.Document) {
 	doc.AddParagraph()
 }
 
-func addConclusion(doc *docx.Document) {
+func addConclusion(doc domain.Document) {
 	// Heading 1
 	h1, _ := doc.AddParagraph()
 	h1.SetStyle(domain.StyleIDHeading1)

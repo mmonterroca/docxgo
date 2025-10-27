@@ -107,6 +107,23 @@ func (d *document) AddSection() (domain.Section, error) {
 	return nil, errors.Unsupported("Document.AddSection", "sections not yet implemented")
 }
 
+// AddPageBreak adds a page break to the document.
+func (d *document) AddPageBreak() error {
+	// Create a new paragraph
+	para, err := d.AddParagraph()
+	if err != nil {
+		return err
+	}
+
+	// Add a run with a page break
+	run, err := para.AddRun()
+	if err != nil {
+		return err
+	}
+
+	return run.AddBreak(domain.BreakTypePage)
+}
+
 // DefaultSection returns the default (first) section of the document.
 func (d *document) DefaultSection() (domain.Section, error) {
 	if len(d.sections) == 0 {

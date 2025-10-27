@@ -87,6 +87,9 @@ type Run interface {
 	// AddText is a convenience method that appends text to the run.
 	AddText(text string) error
 
+	// AddBreak adds a break to the run (page, column, or line break).
+	AddBreak(breakType BreakType) error
+
 	// AddField adds a field to this run (e.g., page number, TOC, hyperlink).
 	AddField(field Field) error
 }
@@ -112,6 +115,16 @@ var (
 	ColorRed   = Color{255, 0, 0}
 	ColorGreen = Color{0, 255, 0}
 	ColorBlue  = Color{0, 0, 255}
+)
+
+// BreakType represents the type of break.
+type BreakType int
+
+// Break type constants.
+const (
+	BreakTypePage   BreakType = iota // Page break
+	BreakTypeColumn                  // Column break
+	BreakTypeLine                    // Text wrapping break
 )
 
 // UnderlineStyle represents text underline styles.

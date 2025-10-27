@@ -100,6 +100,13 @@ const (
 	UnderlineWave   = domain.UnderlineWave
 )
 
+// Common break type constants exported for convenience.
+const (
+	BreakTypePage   = domain.BreakTypePage
+	BreakTypeColumn = domain.BreakTypeColumn
+	BreakTypeLine   = domain.BreakTypeLine
+)
+
 // Field creation functions
 
 // NewField creates a new field of the specified type.

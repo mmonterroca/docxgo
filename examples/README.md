@@ -32,6 +32,64 @@ cd 01_basic && go run main.go
 cd 02_intermediate && go run main.go
 ```
 
+### [04_fields/](./04_fields/) - Fields System (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Complete field system
+- Page numbers and page count fields
+- Table of Contents (TOC) with custom options
+- Hyperlinks to external URLs
+- Headers and footers
+- Page breaks
+
+**Run:**
+```bash
+cd 04_fields && go run main.go
+```
+
+### [05_styles/](./05_styles/) - Style Management (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Built-in style system
+- 40+ built-in paragraph styles (Normal, Heading1-9, Title, Subtitle, etc.)
+- Character-level formatting (bold, italic, color, font size)
+- Mixed formatting within paragraphs
+- Quote and list paragraph styles
+
+**Run:**
+```bash
+cd 05_styles && go run main.go
+```
+
+### [06_sections/](./06_sections/) - Sections and Page Layout (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Advanced page layout
+- Custom page sizes (A4, Letter, Legal, etc.)
+- Page orientation (portrait, landscape)
+- Custom margins
+- Headers and footers with dynamic fields
+- Multi-page documents
+
+**Run:**
+```bash
+cd 06_sections && go run main.go
+```
+
+### [07_advanced/](./07_advanced/) - Advanced Integration (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: All Phase 6 features combined
+- Professional cover page
+- Table of Contents with hyperlinks
+- Headers and footers
+- Multiple heading levels
+- Mixed formatting and styles
+- Page numbers (Page X of Y)
+- Hyperlinks
+- Quotes and emphasis
+
+**Run:**
+```bash
+cd 07_advanced && go run main.go
+```
+
 ### [08_images/](./08_images/) - Image Insertion
 **Status**: ✅ Fully functional  
 **Demonstrates**: Complete image handling
@@ -73,30 +131,15 @@ cd 09_advanced_tables && go run main.go
 cd basic && go run main.go
 ```
 
-## ⚠️ Examples Under Renovation
+## Testing All Examples
 
-The following examples are being updated to match the v2 API and have been moved to [`_wip/`](./_wip/) (work in progress):
-- `_wip/04_fields/` - Fields system (TOC, page numbers, hyperlinks)
-- `_wip/05_styles/` - Style management
-- `_wip/06_sections/` - Sections and page layout
-- `_wip/07_advanced/` - Advanced integration
-
-See [`_wip/README.md`](./_wip/README.md) for details on what needs to be updated.
-
-**Note:** These examples are excluded from CI/CD builds until they're updated.
-
-## Requirements
-
-- Go 1.21 or higher
-- Microsoft Word or LibreOffice to view generated files
-
-## Quick Test - Compile All Working Examples
+Run the included test script to verify all examples compile:
 
 ```bash
-# From the examples directory
-cd 01_basic && go build && cd ../02_intermediate && go build && cd ../08_images && go build && cd ../09_advanced_tables && go build && cd ../basic && go build && cd ..
-echo "✅ All working examples compiled successfully!"
+./test_all.sh
 ```
+
+This will test all 9 working examples and report results.
 
 ## Documentation
 

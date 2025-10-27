@@ -12,10 +12,7 @@ func main() {
 	// Create a new document
 	doc := docx.NewDocument()
 
-	// Access the style manager
-	styleMgr := doc.StyleManager()
-
-	// Create title with Heading1
+	// Create title with Title style
 	title, _ := doc.AddParagraph()
 	title.SetStyle(domain.StyleIDTitle)
 	titleRun, _ := title.AddRun()
@@ -65,46 +62,31 @@ func main() {
 	list2Run, _ := list2.AddRun()
 	list2Run.AddText("• Second item in the list")
 
-	// Footnote reference
-	footnote, _ := doc.AddParagraph()
-	footnote.SetStyle(domain.StyleIDFootnoteReference)
-	footnoteRun, _ := footnote.AddRun()
-	footnoteRun.AddText("1. This is a footnote reference style")
-
 	doc.AddParagraph()
 
 	// Heading 1
 	h1_2, _ := doc.AddParagraph()
 	h1_2.SetStyle(domain.StyleIDHeading1)
 	h1_2Run, _ := h1_2.AddRun()
-	h1_2Run.AddText("2. Style Information")
+	h1_2Run.AddText("2. Available Built-in Styles")
 
-	// List all built-in styles
+	// Description
 	infoPara, _ := doc.AddParagraph()
 	infoPara.SetStyle(domain.StyleIDNormal)
 	infoRun, _ := infoPara.AddRun()
 	infoRun.AddText("This document demonstrates several built-in styles:")
 
 	builtInStyles := []string{
-		domain.StyleIDNormal,
-		domain.StyleIDHeading1,
-		domain.StyleIDHeading2,
-		domain.StyleIDHeading3,
-		domain.StyleIDTitle,
-		domain.StyleIDSubtitle,
-		domain.StyleIDQuote,
-		domain.StyleIDIntenseQuote,
-		domain.StyleIDListParagraph,
-		domain.StyleIDFootnoteReference,
+		"Normal", "Heading1", "Heading2", "Heading3",
+		"Title", "Subtitle", "Quote", "IntenseQuote",
+		"ListParagraph", "Caption",
 	}
 
 	for _, styleID := range builtInStyles {
-		if styleMgr.HasStyle(styleID) {
-			stylePara, _ := doc.AddParagraph()
-			stylePara.SetStyle(domain.StyleIDListParagraph)
-			styleRun, _ := stylePara.AddRun()
-			styleRun.AddText(fmt.Sprintf("• %s ✓", styleID))
-		}
+		stylePara, _ := doc.AddParagraph()
+		stylePara.SetStyle(domain.StyleIDListParagraph)
+		styleRun, _ := stylePara.AddRun()
+		styleRun.AddText("• " + styleID)
 	}
 
 	doc.AddParagraph()
@@ -137,7 +119,7 @@ func main() {
 	r5.AddText(", and ")
 
 	r6, _ := mixedPara.AddRun()
-	r6.SetColor(0xFF0000) // Red
+	r6.SetColor(domain.Color{R: 255, G: 0, B: 0}) // Red
 	r6.AddText("colored text")
 
 	r7, _ := mixedPara.AddRun()

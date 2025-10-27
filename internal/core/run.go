@@ -46,7 +46,8 @@ type run struct {
 	underline domain.UnderlineStyle
 	strike    bool
 	highlight domain.HighlightColor
-	fields    []domain.Field // Fields embedded in this run
+	fields    []domain.Field      // Fields embedded in this run
+	breaks    []domain.BreakType  // Breaks in this run
 }
 
 // NewRun creates a new Run.
@@ -182,6 +183,31 @@ func (r *run) SetHighlight(color domain.HighlightColor) error {
 func (r *run) AddText(text string) error {
 	r.text += text
 	return nil
+}
+
+// AddBreak adds a break to the run (page, column, or line break).
+func (r *run) AddBreak(breakType domain.BreakType) error {
+	if breakType < domain.BreakTypePage || breakType > domain.BreakTypeLine {
+		return errors.InvalidArgument("Run.AddBreak", "breakType", breakType, "invalid break type")
+	}
+
+	if r.breaks == nil {
+		r.breaks = make([]domain.BreakType, 0, 1)
+	}
+
+	r.breaks = append(r.breaks, breakType)
+	return nil
+}
+
+// Breaks returns all breaks in this run.
+func (r *run) Breaks() []domain.BreakType {
+	if r.breaks == nil {
+		return nil
+	}
+	// Return a defensive copy
+	result := make([]domain.BreakType, len(r.breaks))
+	copy(result, r.breaks)
+	return result
 }
 
 // AddField adds a field to this run (e.g., page number, TOC, hyperlink).

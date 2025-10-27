@@ -30,14 +30,12 @@ import (
 	"log"
 
 	docx "github.com/mmonterroca/docxgo"
+	"github.com/mmonterroca/docxgo/domain"
 )
 
 func main() {
 	// Create a new document
-	doc, err := docx.New()
-	if err != nil {
-		log.Fatalf("Failed to create document: %v", err)
-	}
+	doc := docx.NewDocument()
 
 	// Example 1: Add page numbers to footer
 	if err := addPageNumbers(doc); err != nil {
@@ -69,7 +67,7 @@ func main() {
 }
 
 // addPageNumbers adds page numbers to the default footer
-func addPageNumbers(doc *docx.Document) error {
+func addPageNumbers(doc domain.Document) error {
 	// Get the default section
 	section, err := doc.DefaultSection()
 	if err != nil {
@@ -77,7 +75,7 @@ func addPageNumbers(doc *docx.Document) error {
 	}
 
 	// Get the default footer
-	footer, err := section.Footer(docx.FooterDefault)
+	footer, err := section.Footer(domain.FooterDefault)
 	if err != nil {
 		return fmt.Errorf("get footer: %w", err)
 	}
@@ -89,7 +87,7 @@ func addPageNumbers(doc *docx.Document) error {
 	}
 
 	// Set center alignment
-	para.SetAlignment(docx.AlignmentCenter)
+	para.SetAlignment(domain.AlignmentCenter)
 
 	// Add text before page number
 	run1, err := para.AddRun()
@@ -125,7 +123,7 @@ func addPageNumbers(doc *docx.Document) error {
 }
 
 // addTableOfContents adds a TOC at the beginning of the document
-func addTableOfContents(doc *docx.Document) error {
+func addTableOfContents(doc domain.Document) error {
 	// Add TOC heading
 	heading, err := doc.AddParagraph()
 	if err != nil {
@@ -165,7 +163,7 @@ func addTableOfContents(doc *docx.Document) error {
 }
 
 // addContent adds sample content with headings
-func addContent(doc *docx.Document) error {
+func addContent(doc domain.Document) error {
 	sections := []struct {
 		heading string
 		content string
@@ -240,7 +238,7 @@ func addContent(doc *docx.Document) error {
 }
 
 // addHyperlinks adds example hyperlinks to the document
-func addHyperlinks(doc *docx.Document) error {
+func addHyperlinks(doc domain.Document) error {
 	// Add section heading
 	heading, err := doc.AddParagraph()
 	if err != nil {
@@ -271,8 +269,8 @@ func addHyperlinks(doc *docx.Document) error {
 	if err != nil {
 		return fmt.Errorf("add link run: %w", err)
 	}
-	linkRun.SetColor(docx.ColorBlue)
-	linkRun.SetUnderline(docx.UnderlineSingle)
+	linkRun.SetColor(docx.Blue)
+	linkRun.SetUnderline(domain.UnderlineSingle)
 
 	hyperlinkField := docx.NewHyperlinkField("https://github.com/mmonterroca/docxgo", "go-docx repository")
 	linkRun.AddField(hyperlinkField)

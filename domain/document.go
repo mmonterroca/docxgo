@@ -99,6 +99,10 @@ type Document interface {
 	// Sections allow different page layouts within the same document.
 	AddSection() (Section, error)
 
+	// AddPageBreak adds a page break to the document.
+	// Creates a new paragraph with a page break run.
+	AddPageBreak() error
+
 	// DefaultSection returns the default (first) section of the document.
 	// Every document has at least one section.
 	DefaultSection() (Section, error)

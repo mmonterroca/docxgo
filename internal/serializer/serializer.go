@@ -42,6 +42,14 @@ func (s *RunSerializer) Serialize(run domain.Run) *xml.Run {
 		Properties: s.serializeProperties(run),
 		Text:       s.serializeText(run),
 	}
+
+	// Add breaks if any
+	if breaks := run.(interface{ Breaks() []domain.BreakType }).Breaks(); breaks != nil {
+		for _, br := range breaks {
+			xmlRun.Break = s.serializeBreak(br)
+		}
+	}
+
 	return xmlRun
 }
 
@@ -119,6 +127,23 @@ func (s *RunSerializer) serializeText(run domain.Run) *xml.Text {
 	}
 
 	return xmlText
+}
+
+func (s *RunSerializer) serializeBreak(breakType domain.BreakType) *xml.Break {
+	xmlBreak := &xml.Break{}
+
+	switch breakType {
+	case domain.BreakTypePage:
+		xmlBreak.Type = "page"
+	case domain.BreakTypeColumn:
+		xmlBreak.Type = "column"
+	case domain.BreakTypeLine:
+		xmlBreak.Type = "textWrapping"
+	default:
+		xmlBreak.Type = "textWrapping"
+	}
+
+	return xmlBreak
 }
 
 func (s *RunSerializer) underlineStyleToString(style domain.UnderlineStyle) string {
