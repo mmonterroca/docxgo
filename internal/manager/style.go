@@ -122,15 +122,15 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 		size         int // in half-points
 		bold         bool
 	}{
-		{domain.StyleIDHeading1, "heading 1", 0, 32, true},  // 16pt, outline level 0
-		{domain.StyleIDHeading2, "heading 2", 1, 26, true},  // 13pt, outline level 1
-		{domain.StyleIDHeading3, "heading 3", 2, 24, true},  // 12pt, outline level 2
-		{domain.StyleIDHeading4, "heading 4", 3, 24, true},  // 12pt, outline level 3
-		{domain.StyleIDHeading5, "heading 5", 4, 22, true},  // 11pt, outline level 4
-		{domain.StyleIDHeading6, "heading 6", 5, 22, false}, // 11pt, outline level 5
-		{domain.StyleIDHeading7, "heading 7", 6, 22, false}, // 11pt, outline level 6
-		{domain.StyleIDHeading8, "heading 8", 7, 22, false}, // 11pt, outline level 7
-		{domain.StyleIDHeading9, "heading 9", 8, 22, false}, // 11pt, outline level 8
+		{domain.StyleIDHeading1, "Heading 1", 0, 32, true},  // 16pt, outline level 0
+		{domain.StyleIDHeading2, "Heading 2", 1, 26, true},  // 13pt, outline level 1
+		{domain.StyleIDHeading3, "Heading 3", 2, 24, true},  // 12pt, outline level 2
+		{domain.StyleIDHeading4, "Heading 4", 3, 24, true},  // 12pt, outline level 3
+		{domain.StyleIDHeading5, "Heading 5", 4, 22, true},  // 11pt, outline level 4
+		{domain.StyleIDHeading6, "Heading 6", 5, 22, false}, // 11pt, outline level 5
+		{domain.StyleIDHeading7, "Heading 7", 6, 22, false}, // 11pt, outline level 6
+		{domain.StyleIDHeading8, "Heading 8", 7, 22, false}, // 11pt, outline level 7
+		{domain.StyleIDHeading9, "Heading 9", 8, 22, false}, // 11pt, outline level 8
 	}
 
 	for _, h := range headings {
@@ -177,6 +177,13 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	listPara.SetBasedOn(domain.StyleIDNormal)
 	listPara.SetIndentation(domain.Indentation{Left: 720})
 	sm.styles[domain.StyleIDListParagraph] = listPara
+
+	// Caption style (used for figure/table captions)
+	caption := newParagraphStyle(domain.StyleIDCaption, "caption", true)
+	caption.SetBasedOn(domain.StyleIDNormal)
+	caption.SetNext(domain.StyleIDNormal)
+	caption.SetSpacingAfter(200)
+	sm.styles[domain.StyleIDCaption] = caption
 
 	// TOC styles
 	// Note: TOC styles format the table of contents entries after generation

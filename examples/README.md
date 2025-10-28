@@ -32,6 +32,19 @@ cd 01_basic && go run main.go
 cd 02_intermediate && go run main.go
 ```
 
+### [03_toc/](./03_toc/) - Table of Contents (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Automatic Table of Contents generation
+- Cover page with Title and Subtitle styles
+- TOC field configured for Heading 1 and Heading 2
+- Placeholder result so the TOC looks polished before updating
+- Chapters, sub-sections, and appendix content driven by heading styles
+
+**Run:**
+```bash
+cd 03_toc && go run main.go
+```
+
 ### [04_fields/](./04_fields/) - Fields System (NEW!)
 **Status**: ✅ Fully functional  
 **Demonstrates**: Complete field system
@@ -182,6 +195,7 @@ After running `./run_all_examples.sh`, you'll have:
 examples/
 ├── 01_basic/01_basic_builder.docx (4.1KB)
 ├── 02_intermediate/02_intermediate_builder.docx (4.7KB)
+├── 03_toc/03_toc_demo.docx (4.3KB)
 ├── 04_fields/fields_example.docx (4.0KB)
 ├── 05_styles/05_styles_demo.docx (3.7KB)
 ├── 06_sections/06_sections_demo.docx (3.9KB)

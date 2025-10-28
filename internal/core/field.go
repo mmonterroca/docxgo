@@ -190,6 +190,17 @@ func (f *docxField) Update() error {
 	return nil
 }
 
+// SetResult allows callers to inject a pre-rendered field result.
+// This is primarily useful for examples so the initial document shows
+// friendly placeholder text before Word updates the field values.
+func (f *docxField) SetResult(result string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.result = result
+	f.isDirty = false
+}
+
 // getDefaultCode returns the default field code for the field type.
 func (f *docxField) getDefaultCode() string {
 	switch f.fieldType {

@@ -28,6 +28,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	docx "github.com/mmonterroca/docxgo"
 	"github.com/mmonterroca/docxgo/domain"
@@ -206,6 +207,11 @@ func addContent(doc domain.Document) error {
 		},
 	}
 
+	var lastHeading1 string
+	const sequenceBookmarkName = "_RefFigureSequence1"
+	const sequenceBookmarkID = "200"
+	sequenceNumber := "1"
+
 	for _, section := range sections {
 		// Add heading
 		heading, err := doc.AddParagraph()
@@ -219,6 +225,10 @@ func addContent(doc domain.Document) error {
 		}
 		run.AddText(section.heading)
 
+		if section.level == "Heading1" {
+			lastHeading1 = section.heading
+		}
+
 		// Add content
 		para, err := doc.AddParagraph()
 		if err != nil {
@@ -229,6 +239,156 @@ func addContent(doc domain.Document) error {
 			return fmt.Errorf("add content run: %w", err)
 		}
 		contentRun.AddText(section.content)
+
+		if section.heading == "Date and Time" {
+			datePara, err := doc.AddParagraph()
+			if err != nil {
+				return fmt.Errorf("add date paragraph: %w", err)
+			}
+			dateLabelRun, err := datePara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add date label run: %w", err)
+			}
+			dateLabelRun.AddText("Current date: ")
+
+			dateFieldRun, err := datePara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add date field run: %w", err)
+			}
+			dateField := docx.NewField(domain.FieldTypeDate)
+			if err := dateField.SetCode(`DATE \@ "MMMM d, yyyy"`); err != nil {
+				return fmt.Errorf("configure date field: %w", err)
+			}
+			if err := dateFieldRun.AddField(dateField); err != nil {
+				return fmt.Errorf("add date field: %w", err)
+			}
+
+			timePara, err := doc.AddParagraph()
+			if err != nil {
+				return fmt.Errorf("add time paragraph: %w", err)
+			}
+			timeLabelRun, err := timePara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add time label run: %w", err)
+			}
+			timeLabelRun.AddText("Current time: ")
+
+			timeFieldRun, err := timePara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add time field run: %w", err)
+			}
+			timeField := docx.NewField(domain.FieldTypeTime)
+			if err := timeField.SetCode(`TIME \@ "HH:mm"`); err != nil {
+				return fmt.Errorf("configure time field: %w", err)
+			}
+			if err := timeFieldRun.AddField(timeField); err != nil {
+				return fmt.Errorf("add time field: %w", err)
+			}
+
+			timePara.SetSpacingAfter(200)
+		} else if section.heading == "Advanced Features" {
+			stylePara, err := doc.AddParagraph()
+			if err != nil {
+				return fmt.Errorf("add style-ref paragraph: %w", err)
+			}
+			styleRun, err := stylePara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add style-ref label run: %w", err)
+			}
+			styleRun.AddText("Running header (STYLEREF Heading 1): ")
+
+			styleFieldRun, err := stylePara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add style-ref field run: %w", err)
+			}
+			styleField := docx.NewStyleRefField("Heading 1")
+			if err := styleField.SetCode(`STYLEREF "Heading 1" \* MERGEFORMAT`); err != nil {
+				return fmt.Errorf("configure style-ref field: %w", err)
+			}
+			if setter, ok := styleField.(interface{ SetResult(string) }); ok {
+				display := lastHeading1
+				if strings.TrimSpace(display) == "" {
+					display = "Heading 1 (update fields)"
+				}
+				setter.SetResult(display)
+			}
+			if err := styleFieldRun.AddField(styleField); err != nil {
+				return fmt.Errorf("add style-ref field: %w", err)
+			}
+
+			seqPara, err := doc.AddParagraph()
+			if err != nil {
+				return fmt.Errorf("add sequence paragraph: %w", err)
+			}
+			if err := seqPara.SetStyle("Caption"); err != nil {
+				return fmt.Errorf("set caption style: %w", err)
+			}
+			seqLabelRun, err := seqPara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add sequence label run: %w", err)
+			}
+			seqLabelRun.AddText("Figure ")
+
+			seqFieldRun, err := seqPara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add sequence field run: %w", err)
+			}
+			seqField := docx.NewField(domain.FieldTypeSeq)
+			if err := seqField.SetCode(`SEQ Figure \* ARABIC`); err != nil {
+				return fmt.Errorf("configure sequence field: %w", err)
+			}
+			if setter, ok := seqField.(interface{ SetResult(string) }); ok {
+				setter.SetResult(sequenceNumber)
+			}
+			if err := seqFieldRun.AddField(seqField); err != nil {
+				return fmt.Errorf("add sequence field: %w", err)
+			}
+
+			seqTitleRun, err := seqPara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add sequence title run: %w", err)
+			}
+			seqTitleRun.AddText(" – Sample sequence field")
+
+			if bookmarkable, ok := seqPara.(interface{ SetBookmark(string, string) }); ok {
+				bookmarkable.SetBookmark(sequenceBookmarkID, sequenceBookmarkName)
+			}
+
+			seqPara.SetSpacingAfter(200)
+		} else if section.heading == "Cross-References" {
+			refPara, err := doc.AddParagraph()
+			if err != nil {
+				return fmt.Errorf("add cross-reference paragraph: %w", err)
+			}
+			refIntroRun, err := refPara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add cross-reference intro run: %w", err)
+			}
+			refIntroRun.AddText("See ")
+
+			refFieldRun, err := refPara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add cross-reference field run: %w", err)
+			}
+			refField := docx.NewField(domain.FieldTypeRef)
+			if err := refField.SetCode(fmt.Sprintf("REF %s \\h", sequenceBookmarkName)); err != nil {
+				return fmt.Errorf("configure cross-reference field: %w", err)
+			}
+			if setter, ok := refField.(interface{ SetResult(string) }); ok {
+				setter.SetResult(fmt.Sprintf("Figure %s", sequenceNumber))
+			}
+			if err := refFieldRun.AddField(refField); err != nil {
+				return fmt.Errorf("add cross-reference field: %w", err)
+			}
+
+			refSuffixRun, err := refPara.AddRun()
+			if err != nil {
+				return fmt.Errorf("add cross-reference suffix run: %w", err)
+			}
+			refSuffixRun.AddText(" for the sequence field output above.")
+
+			refPara.SetSpacingAfter(200)
+		}
 
 		// Add spacing
 		para.SetSpacingAfter(200) // 200 twips
