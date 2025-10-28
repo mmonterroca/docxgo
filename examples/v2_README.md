@@ -68,6 +68,15 @@ This directory contains comprehensive examples demonstrating the features of go-
 - Working hyperlinks
 - Complete document structure
 
+### [11 - Multi-Section Layouts](./11_multi_section/)
+**Status**: ✅ Complete (Phase 6)  
+**Demonstrates**: Multi-section documents with per-section settings.
+- Section breaks (Next Page, Continuous)
+- Landscape and portrait sections in a single document
+- Independent headers/footers per section
+- Column configuration per section
+- Dynamic fields spanning across sections
+
 ## Running the Examples
 
 Each example is a standalone Go program. Navigate to the example directory and run:
@@ -107,6 +116,7 @@ Each example creates a `.docx` file in its directory:
 - `05_styles/05_styles_demo.docx`
 - `06_sections/06_sections_demo.docx`
 - `07_advanced/07_advanced_demo.docx`
+- `11_multi_section/11_multi_section_demo.docx`
 
 ## Opening Documents
 

@@ -51,6 +51,129 @@ func TestDocumentBuilder_Build(t *testing.T) {
 	})
 }
 
+func TestDocumentBuilder_Sections(t *testing.T) {
+	t.Run("configures default section", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.DefaultSection().
+			PageSize(domain.PageSizeA4).
+			Orientation(domain.OrientationLandscape).
+			Margins(domain.Margins{Top: 720, Right: 1440, Bottom: 720, Left: 1440, Header: 360, Footer: 360}).
+			Columns(2).
+			End()
+		builder.AddParagraph().Text("section content").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		sections := doc.Sections()
+		if len(sections) != 1 {
+			t.Fatalf("expected 1 section, got %d", len(sections))
+		}
+
+		sec := sections[0]
+		if sec.PageSize() != domain.PageSizeA4 {
+			t.Errorf("expected A4 page size, got %+v", sec.PageSize())
+		}
+		if sec.Orientation() != domain.OrientationLandscape {
+			t.Errorf("expected landscape orientation, got %v", sec.Orientation())
+		}
+		if sec.Columns() != 2 {
+			t.Errorf("expected 2 columns, got %d", sec.Columns())
+		}
+		m := sec.Margins()
+		if m.Top != 720 || m.Bottom != 720 || m.Header != 360 || m.Footer != 360 {
+			t.Errorf("unexpected margins %+v", m)
+		}
+	})
+
+	t.Run("adds additional section with break", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddParagraph().Text("Before section break").End()
+
+		builder.AddSection(domain.SectionBreakTypeEvenPage).
+			Columns(3).
+			Orientation(domain.OrientationPortrait).
+			End()
+
+		builder.AddParagraph().Text("After section break").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		sections := doc.Sections()
+		if len(sections) != 2 {
+			t.Fatalf("expected 2 sections, got %d", len(sections))
+		}
+		if sections[1].Columns() != 3 {
+			t.Errorf("expected 3 columns on second section, got %d", sections[1].Columns())
+		}
+
+		blocks := doc.Blocks()
+		foundBreak := false
+		for _, block := range blocks {
+			if block.SectionBreak != nil {
+				foundBreak = true
+				if block.SectionBreak.Type != domain.SectionBreakTypeEvenPage {
+					t.Errorf("expected even page break, got %v", block.SectionBreak.Type)
+				}
+			}
+		}
+		if !foundBreak {
+			t.Fatalf("expected section break block in document")
+		}
+	})
+
+	t.Run("records errors when section configuration fails", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.DefaultSection().Columns(0).End()
+
+		if _, err := builder.Build(); err == nil {
+			t.Fatal("expected error due to invalid column count, got nil")
+		}
+	})
+
+	t.Run("configures header via section builder", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		secBuilder := builder.DefaultSection()
+		header, err := secBuilder.Header(domain.HeaderDefault)
+		if err != nil {
+			t.Fatalf("expected header, got error %v", err)
+		}
+
+		para, err := header.AddParagraph()
+		if err != nil {
+			t.Fatalf("expected paragraph in header, got %v", err)
+		}
+		run, err := para.AddRun()
+		if err != nil {
+			t.Fatalf("expected run in header paragraph, got %v", err)
+		}
+		if err := run.SetText("Header text"); err != nil {
+			t.Fatalf("expected to set header text, got %v", err)
+		}
+
+		secBuilder.End()
+		builder.AddParagraph().Text("body content").End()
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		section := doc.Sections()[0]
+		storedHeader, err := section.Header(domain.HeaderDefault)
+		if err != nil {
+			t.Fatalf("expected header from section, got %v", err)
+		}
+		if len(storedHeader.Paragraphs()) == 0 {
+			t.Fatal("expected header to contain paragraphs")
+		}
+	})
+}
+
 func TestParagraphBuilder_Text(t *testing.T) {
 	t.Run("adds single text run", func(t *testing.T) {
 		builder := NewDocumentBuilder()

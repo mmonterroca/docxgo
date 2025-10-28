@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package manager
 
 import (
@@ -54,6 +52,11 @@ type paragraphStyle struct {
 	keepLines       bool
 	pageBreakBefore bool
 	outlineLevel    int
+	runBold         bool
+	runItalic       bool
+	runUnderline    domain.UnderlineStyle
+	runColor        domain.Color
+	runSize         int
 }
 
 // newParagraphStyle creates a new paragraph style.
@@ -71,6 +74,9 @@ func newParagraphStyle(id, name string, builtIn bool) *paragraphStyle {
 		spacingAfter:  0,
 		lineSpacing:   240, // Single spacing (240 = 1.0)
 		outlineLevel:  0,   // Body text level
+		runUnderline:  domain.UnderlineNone,
+		runColor:      domain.ColorBlack,
+		runSize:       constants.DefaultFontSize,
 	}
 }
 
@@ -346,5 +352,98 @@ func (ps *paragraphStyle) SetOutlineLevel(level int) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	ps.outlineLevel = level
+	return nil
+}
+
+// Bold returns whether the default run is bold.
+func (ps *paragraphStyle) Bold() bool {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.runBold
+}
+
+// SetBold sets bold on the default run formatting.
+func (ps *paragraphStyle) SetBold(bold bool) error {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.runBold = bold
+	return nil
+}
+
+// Italic returns whether the default run is italic.
+func (ps *paragraphStyle) Italic() bool {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.runItalic
+}
+
+// SetItalic sets italic on the default run formatting.
+func (ps *paragraphStyle) SetItalic(italic bool) error {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.runItalic = italic
+	return nil
+}
+
+// Underline returns the underline style for the default run.
+func (ps *paragraphStyle) Underline() domain.UnderlineStyle {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.runUnderline
+}
+
+// SetUnderline sets underline style for the default run.
+func (ps *paragraphStyle) SetUnderline(style domain.UnderlineStyle) error {
+	if style < domain.UnderlineNone || style > domain.UnderlineWave {
+		return errors.NewValidationError(
+			"ParagraphStyle.SetUnderline",
+			"style",
+			style,
+			"invalid underline style",
+		)
+	}
+
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.runUnderline = style
+	return nil
+}
+
+// Color returns the default run color.
+func (ps *paragraphStyle) Color() domain.Color {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.runColor
+}
+
+// SetColor sets the default run color.
+func (ps *paragraphStyle) SetColor(color domain.Color) error {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.runColor = color
+	return nil
+}
+
+// Size returns the default run font size in half-points.
+func (ps *paragraphStyle) Size() int {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.runSize
+}
+
+// SetSize sets the default run font size in half-points.
+func (ps *paragraphStyle) SetSize(halfPoints int) error {
+	if halfPoints < constants.MinFontSize || halfPoints > constants.MaxFontSize {
+		return errors.NewValidationError(
+			"ParagraphStyle.SetSize",
+			"halfPoints",
+			halfPoints,
+			"font size must be between 2 and 3276 half-points (1pt - 1638pt)",
+		)
+	}
+
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.runSize = halfPoints
 	return nil
 }

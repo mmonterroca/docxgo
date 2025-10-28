@@ -36,8 +36,8 @@ func TestZipWriter_WriteDocument(t *testing.T) {
 		XMLnsW: constants.NamespaceMain,
 		XMLnsR: constants.NamespaceRelationships,
 		Body: &xmlstructs.Body{
-			Paragraphs: []*xmlstructs.Paragraph{
-				{
+			Content: []interface{}{
+				&xmlstructs.Paragraph{
 					Elements: []interface{}{
 						&xmlstructs.Run{
 							Text: &xmlstructs.Text{Content: "Hello, World!"},
@@ -156,8 +156,8 @@ func TestZipWriter_DocumentXML(t *testing.T) {
 		XMLnsW: constants.NamespaceMain,
 		XMLnsR: constants.NamespaceRelationships,
 		Body: &xmlstructs.Body{
-			Paragraphs: []*xmlstructs.Paragraph{
-				{
+			Content: []interface{}{
+				&xmlstructs.Paragraph{
 					Elements: []interface{}{
 						&xmlstructs.Run{
 							Text: &xmlstructs.Text{Content: "Test paragraph"},

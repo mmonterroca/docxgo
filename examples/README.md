@@ -131,6 +131,20 @@ cd 08_images && go run main.go
 cd 09_advanced_tables && go run main.go
 ```
 
+### [11_multi_section/](./11_multi_section/) - Multi-Section Layouts (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Independent layouts per section
+- Section breaks (Next Page, Continuous)
+- Per-section headers and footers
+- Portrait ↔ landscape transitions
+- Unique margin and column settings per section
+- Dynamic page numbering maintained across sections
+
+**Run:**
+```bash
+cd 11_multi_section && go run main.go
+```
+
 ### [basic/](./basic/) - Simple API Example
 **Status**: ✅ Fully functional  
 **Demonstrates**: Direct domain API (non-builder)
@@ -201,7 +215,8 @@ examples/
 ├── 06_sections/06_sections_demo.docx (3.9KB)
 ├── 07_advanced/07_advanced_demo.docx (4.6KB)
 ├── 08_images/08_images_output.docx (4.2KB)
-└── 09_advanced_tables/09_advanced_tables_output.docx (4.8KB)
+├── 09_advanced_tables/09_advanced_tables_output.docx (4.8KB)
+└── 11_multi_section/11_multi_section_demo.docx (4.4KB)
 ```
 
 **All documents are ready to open in**:

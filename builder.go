@@ -54,6 +54,133 @@ type DocumentBuilder struct {
 	errors []error
 }
 
+// SectionBuilder provides a fluent API for configuring document sections.
+type SectionBuilder struct {
+	section domain.Section
+	parent  *DocumentBuilder
+	err     error
+}
+
+func (sb *SectionBuilder) recordError(err error) {
+	if err == nil {
+		return
+	}
+	if sb.err == nil {
+		sb.err = err
+	}
+	if sb.parent != nil {
+		sb.parent.errors = append(sb.parent.errors, err)
+	}
+}
+
+func (sb *SectionBuilder) ensureSection(op string) bool {
+	if sb == nil {
+		return false
+	}
+	if sb.err != nil {
+		return false
+	}
+	if sb.section == nil {
+		sb.recordError(errors.InvalidState(op, "section is nil"))
+		return false
+	}
+	return true
+}
+
+// PageSize sets the page size for the section.
+
+func (sb *SectionBuilder) PageSize(size domain.PageSize) *SectionBuilder {
+	if !sb.ensureSection("SectionBuilder.PageSize") {
+		return sb
+	}
+
+	if err := sb.section.SetPageSize(size); err != nil {
+		sb.recordError(err)
+	}
+	return sb
+}
+
+// Orientation sets the page orientation for the section.
+func (sb *SectionBuilder) Orientation(orient domain.Orientation) *SectionBuilder {
+	if !sb.ensureSection("SectionBuilder.Orientation") {
+		return sb
+	}
+	if err := sb.section.SetOrientation(orient); err != nil {
+		sb.recordError(err)
+	}
+	return sb
+}
+
+// Margins sets the page margins for the section.
+func (sb *SectionBuilder) Margins(margins domain.Margins) *SectionBuilder {
+	if !sb.ensureSection("SectionBuilder.Margins") {
+		return sb
+	}
+	if err := sb.section.SetMargins(margins); err != nil {
+		sb.recordError(err)
+	}
+	return sb
+}
+
+// Columns sets the column layout for the section.
+func (sb *SectionBuilder) Columns(count int) *SectionBuilder {
+	if !sb.ensureSection("SectionBuilder.Columns") {
+		return sb
+	}
+	if err := sb.section.SetColumns(count); err != nil {
+		sb.recordError(err)
+	}
+	return sb
+}
+
+// Header returns the requested header for direct manipulation.
+func (sb *SectionBuilder) Header(headerType domain.HeaderType) (domain.Header, error) {
+	if sb == nil {
+		return nil, errors.InvalidState("SectionBuilder.Header", "section is nil")
+	}
+	if !sb.ensureSection("SectionBuilder.Header") {
+		return nil, sb.err
+	}
+	head, err := sb.section.Header(headerType)
+	if err != nil {
+		sb.recordError(err)
+		return nil, err
+	}
+	return head, nil
+}
+
+// Footer returns the requested footer for direct manipulation.
+func (sb *SectionBuilder) Footer(footerType domain.FooterType) (domain.Footer, error) {
+	if sb == nil {
+		return nil, errors.InvalidState("SectionBuilder.Footer", "section is nil")
+	}
+	if !sb.ensureSection("SectionBuilder.Footer") {
+		return nil, sb.err
+	}
+	foot, err := sb.section.Footer(footerType)
+	if err != nil {
+		sb.recordError(err)
+		return nil, err
+	}
+	return foot, nil
+}
+
+// Section exposes the underlying domain.Section for advanced scenarios.
+func (sb *SectionBuilder) Section() domain.Section {
+	if sb == nil {
+		return nil
+	}
+	return sb.section
+}
+
+// End returns control to the DocumentBuilder.
+func (sb *SectionBuilder) End() *DocumentBuilder {
+	if sb == nil {
+		return nil
+	}
+	return sb.parent
+}
+
 // NewDocumentBuilder creates a new document builder with optional configuration.
 //
 // Example:
@@ -129,6 +256,39 @@ func (b *DocumentBuilder) AddTable(rows, cols int) *TableBuilder {
 		table:  table,
 		parent: b,
 	}
+}
+
+// DefaultSection returns a SectionBuilder for configuring the document's default section.
+// Errors are accumulated and surfaced during Build().
+func (b *DocumentBuilder) DefaultSection() *SectionBuilder {
+	section, err := b.doc.DefaultSection()
+	sb := &SectionBuilder{
+		section: section,
+		parent:  b,
+	}
+	if err != nil {
+		sb.recordError(err)
+	}
+	return sb
+}
+
+// AddSection inserts a new section with the specified break type (default NextPage).
+// Returns a SectionBuilder for configuring the new section.
+func (b *DocumentBuilder) AddSection(breakType ...domain.SectionBreakType) *SectionBuilder {
+	bt := domain.SectionBreakTypeNextPage
+	if len(breakType) > 0 {
+		bt = breakType[0]
+	}
+
+	section, err := b.doc.AddSectionWithBreak(bt)
+	sb := &SectionBuilder{
+		section: section,
+		parent:  b,
+	}
+	if err != nil {
+		sb.recordError(err)
+	}
+	return sb
 }
 
 // SetMetadata sets the document metadata.

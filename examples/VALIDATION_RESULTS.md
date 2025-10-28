@@ -1,6 +1,6 @@
 # Examples Validation Results
 
-**Date**: October 27, 2025  
+**Date**: October 28, 2025  
 **Version**: v2.0.0-beta  
 **Status**: ✅ ALL PASSED
 
@@ -8,10 +8,10 @@
 
 ## 📊 Summary
 
-- **Total Examples**: 8
-- **Passed**: 8 (100%)
+- **Total Examples**: 9
+- **Passed**: 9 (100%)
 - **Failed**: 0 (0%)
-- **Files Generated**: 8 .docx files
+- **Files Generated**: 9 .docx files
 
 ---
 
@@ -142,6 +142,24 @@
 - ✅ Invoice-style layout
 - ✅ Table styles
 - ✅ Cell shading and formatting
+
+---
+
+### 9. 11_multi_section - Multi-Section Layouts
+**File**: `11_multi_section/11_multi_section_demo.docx`  
+**Status**: ✅ PASS
+
+**Features Validated**:
+- ✅ Section breaks (Next Page, Continuous)
+- ✅ Landscape section with two-column layout
+- ✅ Portrait sections sharing continuous page numbering
+- ✅ Per-section headers and footers
+- ✅ Dynamic fields across section boundaries
+- ✅ Independent margins per section
+
+**Notes**:
+- Page numbers remain sequential even with layout changes
+- Headers update to reflect each section's context
 
 ---
 

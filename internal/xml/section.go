@@ -96,9 +96,14 @@ func NewSectionProperties() *SectionProperties {
 
 // SetPageSize sets the page size for the section.
 func (sp *SectionProperties) SetPageSize(width, height int, landscape bool) {
+	pgWidth, pgHeight := width, height
+	if landscape && width < height {
+		pgWidth, pgHeight = height, width
+	}
+
 	sp.PageSize = &PageSize{
-		Width:  width,
-		Height: height,
+		Width:  pgWidth,
+		Height: pgHeight,
 	}
 
 	if landscape {

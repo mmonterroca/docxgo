@@ -728,25 +728,44 @@ func (s *DocumentSerializer) NextDrawingID() int {
 	return s.drawingCounter
 }
 
-// SerializeBody converts document content to xml.Body.
+// SerializeBody converts document content to xml.Body while preserving insertion order.
 func (s *DocumentSerializer) SerializeBody(doc domain.Document) *xml.Body {
+	blocks := doc.Blocks()
 	body := &xml.Body{
-		Paragraphs: make([]*xml.Paragraph, 0, len(doc.Paragraphs())),
-		Tables:     make([]*xml.Table, 0, len(doc.Tables())),
+		Content: make([]interface{}, 0, len(blocks)),
 	}
 
-	// For now, serialize all paragraphs then all tables
-	// TODO: Maintain insertion order
-	for _, para := range doc.Paragraphs() {
-		body.Paragraphs = append(body.Paragraphs, s.paraSerializer.Serialize(para))
+	for _, block := range blocks {
+		switch {
+		case block.Paragraph != nil:
+			body.Content = append(body.Content, s.paraSerializer.Serialize(block.Paragraph))
+		case block.Table != nil:
+			body.Content = append(body.Content, s.tableSerializer.Serialize(block.Table))
+		case block.SectionBreak != nil && block.SectionBreak.Section != nil:
+			sectPr := s.serializeSectionProperties(block.SectionBreak.Section)
+			if sectPr == nil {
+				continue
+			}
+
+			if block.SectionBreak.Type >= domain.SectionBreakTypeNextPage &&
+				block.SectionBreak.Type <= domain.SectionBreakTypeOddPage {
+				sectPr.Type = &xml.SectionType{Val: s.sectionBreakTypeToString(block.SectionBreak.Type)}
+			}
+
+			para := &xml.Paragraph{
+				Properties: &xml.ParagraphProperties{
+					SectionProperties: sectPr,
+				},
+			}
+			body.Content = append(body.Content, para)
+		}
 	}
 
-	for _, table := range doc.Tables() {
-		body.Tables = append(body.Tables, s.tableSerializer.Serialize(table))
-	}
-
-	if sectPr := s.serializeSectionProperties(doc); sectPr != nil {
-		body.SectPr = sectPr
+	sections := doc.Sections()
+	if len(sections) > 0 {
+		if sectPr := s.serializeSectionProperties(sections[len(sections)-1]); sectPr != nil {
+			body.SectPr = sectPr
+		}
 	}
 
 	return body
@@ -1132,13 +1151,11 @@ func (s *DocumentSerializer) styleTypeToString(t domain.StyleType) string {
 	}
 }
 
-func (s *DocumentSerializer) serializeSectionProperties(doc domain.Document) *xml.SectionProperties {
-	sections := doc.Sections()
-	if len(sections) == 0 {
+func (s *DocumentSerializer) serializeSectionProperties(section domain.Section) *xml.SectionProperties {
+	if section == nil {
 		return nil
 	}
 
-	section := sections[0]
 	sectPr := xml.NewSectionProperties()
 
 	pageSize := section.PageSize()
@@ -1189,6 +1206,21 @@ func (s *DocumentSerializer) serializeSectionProperties(doc domain.Document) *xm
 	}
 
 	return sectPr
+}
+
+func (s *DocumentSerializer) sectionBreakTypeToString(bt domain.SectionBreakType) string {
+	switch bt {
+	case domain.SectionBreakTypeNextPage:
+		return "nextPage"
+	case domain.SectionBreakTypeContinuous:
+		return "continuous"
+	case domain.SectionBreakTypeEvenPage:
+		return "evenPage"
+	case domain.SectionBreakTypeOddPage:
+		return "oddPage"
+	default:
+		return "nextPage"
+	}
 }
 
 func (s *DocumentSerializer) headerTypeToString(ht domain.HeaderType) string {

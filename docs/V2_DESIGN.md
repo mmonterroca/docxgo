@@ -9,6 +9,7 @@
 
 > **📖 For API usage, see [V2_API_GUIDE.md](./V2_API_GUIDE.md)**  
 > **📊 For implementation status, see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)**
+> **🛠️ Planning & Roadmap live in [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md); this document remains the canonical architecture reference.**
 
 ---
 
@@ -1264,7 +1265,7 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 3. 🚧 Phase 12 - Beta Testing & Release
 4. Stable v2.0.0 release (Q1 2026)
 
-**Last Updated**: October 26, 2025  
+**Last Updated**: October 28, 2025  
 **Status**: ✅ Phase 11 Complete - Code Quality & Optimization  
 **Progress**: ~95% to v2.0.0 (10/12 phases complete)
 

@@ -18,20 +18,24 @@ func main() {
 		log.Fatalf("Failed to get default section: %v", err)
 	}
 
+	// Multi-section documents are now supported; this example focuses on
+	// configuring the default section to showcase the page layout knobs.
+
 	// Configure page layout
 	section.SetPageSize(domain.PageSizeA4)
-	section.SetOrientation(domain.OrientationPortrait)
+	section.SetOrientation(domain.OrientationLandscape)
 
 	// Set margins (in twips: 1440 = 1 inch)
 	margins := domain.Margins{
-		Top:    1440, // 1 inch
-		Right:  1440, // 1 inch
-		Bottom: 1440, // 1 inch
-		Left:   1440, // 1 inch
-		Header: 720,  // 0.5 inch
-		Footer: 720,  // 0.5 inch
+		Top:    1080, // 0.75 in
+		Right:  1800, // 1.25 in to emphasize the change
+		Bottom: 1080,
+		Left:   1800,
+		Header: 720, // 0.5 inch
+		Footer: 720, // 0.5 inch
 	}
 	section.SetMargins(margins)
+	section.SetColumns(2)
 
 	// Add header to default section
 	header, err := section.Header(domain.HeaderDefault)
@@ -87,7 +91,7 @@ func main() {
 	desc1, _ := doc.AddParagraph()
 	desc1.SetStyle(domain.StyleIDNormal)
 	desc1Run, _ := desc1.AddRun()
-	desc1Run.AddText("This document demonstrates section management and page layout control:")
+	desc1Run.AddText("This document demonstrates the available section layout controls (landscape orientation, custom margins, and two-column layout applied to the entire section):")
 
 	// List items
 	item1, _ := doc.AddParagraph()
@@ -98,12 +102,12 @@ func main() {
 	item2, _ := doc.AddParagraph()
 	item2.SetStyle(domain.StyleIDListParagraph)
 	item2Run, _ := item2.AddRun()
-	item2Run.AddText("• Orientation: Portrait")
+	item2Run.AddText("• Orientation: Landscape")
 
 	item3, _ := doc.AddParagraph()
 	item3.SetStyle(domain.StyleIDListParagraph)
 	item3Run, _ := item3.AddRun()
-	item3Run.AddText("• Margins: 1 inch on all sides")
+	item3Run.AddText("• Margins: 0.75 in top/bottom, 1.25 in left/right")
 
 	item4, _ := doc.AddParagraph()
 	item4.SetStyle(domain.StyleIDListParagraph)
@@ -114,6 +118,11 @@ func main() {
 	item5.SetStyle(domain.StyleIDListParagraph)
 	item5Run, _ := item5.AddRun()
 	item5Run.AddText("• Footer margin: 0.5 inch")
+
+	item6, _ := doc.AddParagraph()
+	item6.SetStyle(domain.StyleIDListParagraph)
+	item6Run, _ := item6.AddRun()
+	item6Run.AddText("• Columns: 2 (news-style layout)")
 
 	doc.AddParagraph()
 
@@ -215,12 +224,12 @@ func main() {
 	col1, _ := doc.AddParagraph()
 	col1.SetStyle(domain.StyleIDListParagraph)
 	col1Run, _ := col1.AddRun()
-	col1Run.AddText("• Single column (default, used here)")
+	col1Run.AddText("• Single column (default)")
 
 	col2, _ := doc.AddParagraph()
 	col2.SetStyle(domain.StyleIDListParagraph)
 	col2Run, _ := col2.AddRun()
-	col2Run.AddText("• Two columns (newspaper style)")
+	col2Run.AddText("• Two columns (newspaper style – applied in this demo)")
 
 	col3, _ := doc.AddParagraph()
 	col3.SetStyle(domain.StyleIDListParagraph)
@@ -248,9 +257,10 @@ func main() {
 
 	fmt.Println("Document created successfully: 06_sections_demo.docx")
 	fmt.Println("\nThe document demonstrates:")
-	fmt.Println("- A4 page size with portrait orientation")
-	fmt.Println("- 1-inch margins on all sides")
+	fmt.Println("- A4 page size with landscape orientation")
+	fmt.Println("- Custom margins (0.75\" top/bottom, 1.25\" left/right)")
 	fmt.Println("- Custom header with document title")
 	fmt.Println("- Footer with dynamic page numbers (Page X of Y)")
+	fmt.Println("- Two-column layout applied to the section")
 	fmt.Println("- Multiple pages to show consistent layout")
 }

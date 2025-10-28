@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package domain
 
 // Section represents a section in a document.
@@ -59,6 +57,37 @@ type Section interface {
 
 	// Footer returns the footer for this section.
 	Footer(footerType FooterType) (Footer, error)
+}
+
+// SectionBreakType represents the type of transition between sections.
+type SectionBreakType int
+
+// Section break type constants.
+const (
+	// SectionBreakTypeNextPage inserts a section break that starts the next section on a new page.
+	SectionBreakTypeNextPage SectionBreakType = iota
+	// SectionBreakTypeContinuous keeps the next section on the same page (continuous section).
+	SectionBreakTypeContinuous
+	// SectionBreakTypeEvenPage starts the next section on the next even-numbered page.
+	SectionBreakTypeEvenPage
+	// SectionBreakTypeOddPage starts the next section on the next odd-numbered page.
+	SectionBreakTypeOddPage
+)
+
+// SectionBreak describes a section boundary inside the document body.
+type SectionBreak struct {
+	// Section contains the page settings that apply to the section ending at this break.
+	Section Section
+	// Type defines how the next section should start when this break is encountered.
+	Type SectionBreakType
+}
+
+// Block represents a top-level document element in insertion order.
+// Exactly one of Paragraph, Table, or SectionBreak will be non-nil.
+type Block struct {
+	Paragraph    Paragraph
+	Table        Table
+	SectionBreak *SectionBreak
 }
 
 // PageSize represents page dimensions in twips.
@@ -111,8 +140,8 @@ type HeaderType int
 // Header type constants for different page scenarios.
 const (
 	HeaderDefault HeaderType = iota // Default header for all pages
-	HeaderFirst                      // Header for first page
-	HeaderEven                       // Header for even pages
+	HeaderFirst                     // Header for first page
+	HeaderEven                      // Header for even pages
 )
 
 // FooterType represents different footer types.
@@ -121,8 +150,8 @@ type FooterType int
 // Footer type constants for different page scenarios.
 const (
 	FooterDefault FooterType = iota // Default footer for all pages
-	FooterFirst                      // Footer for first page
-	FooterEven                       // Footer for even pages
+	FooterFirst                     // Footer for first page
+	FooterEven                      // Footer for even pages
 )
 
 // Header represents a page header.

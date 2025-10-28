@@ -41,10 +41,9 @@ type Document struct {
 
 // Body represents w:body element.
 type Body struct {
-	XMLName    xml.Name           `xml:"w:body"`
-	Paragraphs []*Paragraph       `xml:"w:p,omitempty"`
-	Tables     []*Table           `xml:"w:tbl,omitempty"`
-	SectPr     *SectionProperties `xml:"w:sectPr,omitempty"`
+	XMLName xml.Name           `xml:"w:body"`
+	Content []interface{}      `xml:",any"`
+	SectPr  *SectionProperties `xml:"w:sectPr,omitempty"`
 }
 
 // Relationships represents the .rels file.

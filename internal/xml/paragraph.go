@@ -67,11 +67,12 @@ type BookmarkEnd struct {
 
 // ParagraphProperties represents w:pPr element.
 type ParagraphProperties struct {
-	XMLName       xml.Name           `xml:"w:pPr"`
-	Style         *ParagraphStyleRef `xml:"w:pStyle,omitempty"`
-	Justification *Justification     `xml:"w:jc,omitempty"`
-	Indentation   *Indentation       `xml:"w:ind,omitempty"`
-	Spacing       *Spacing           `xml:"w:spacing,omitempty"`
+	XMLName           xml.Name           `xml:"w:pPr"`
+	Style             *ParagraphStyleRef `xml:"w:pStyle,omitempty"`
+	Justification     *Justification     `xml:"w:jc,omitempty"`
+	Indentation       *Indentation       `xml:"w:ind,omitempty"`
+	Spacing           *Spacing           `xml:"w:spacing,omitempty"`
+	SectionProperties *SectionProperties `xml:"w:sectPr,omitempty"`
 }
 
 // ParagraphStyleRef represents w:pStyle element (reference to a style).

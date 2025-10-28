@@ -207,7 +207,7 @@ Configure page size, margins, and orientation:
 	// ...
 
 	// Create a new section with different layout
-	section2, _ := doc.AddSection()
+	section2, _ := doc.AddSectionWithBreak(domain.SectionBreakTypeNextPage)
 	section2.SetOrientation(domain.OrientationPortrait)
 
 	// Content after this point uses section2 settings

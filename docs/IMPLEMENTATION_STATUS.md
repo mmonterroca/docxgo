@@ -1,6 +1,6 @@
 # go-docx v2 Implementation Status
 
-**Last Updated**: October 27, 2025  
+**Last Updated**: October 28, 2025  
 **Version**: 2.0.0-beta
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
@@ -129,6 +129,11 @@ This document tracks the implementation status of all v2 features, helping devel
   - ✅ First page header/footer
   - ✅ Even page header/footer
   - ✅ Header/footer content (paragraphs, runs, fields)
+- ✅ Multi-section documents:
+  - ✅ `Document.AddSection()` and `AddSectionWithBreak()` (Next, Continuous, Even, Odd)
+  - ✅ Section breaks serialized with per-section `w:sectPr`
+  - ✅ Independent headers/footers and layout per section
+  - ✅ Blocks maintain insertion order across sections
 
 ### Styles
 - ✅ Style manager
@@ -169,7 +174,7 @@ This document tracks the implementation status of all v2 features, helping devel
 - ✅ V2 API Guide (V2_API_GUIDE.md)
 - ✅ V2 Design Document (V2_DESIGN.md)
 - ✅ Migration Guide (MIGRATION.md)
-- ✅ Working examples (9 examples in examples/)
+- ✅ Working examples (10 examples in examples/)
 - ✅ Package-level godoc
 - ✅ README with quick start
 - ✅ CHANGELOG
@@ -178,44 +183,6 @@ This document tracks the implementation status of all v2 features, helping devel
 ---
 
 ## 🚧 Partially Implemented Features
-
-### Multi-Section Documents
-**Status**: 🟡 Partial (70%)  
-**File**: `internal/core/document.go:110`  
-**Function**: `AddSection()`
-
-**Implemented**:
-- ✅ Default section support
-- ✅ Section interface fully defined
-- ✅ Headers/footers per section
-- ✅ Page layout per section
-
-**Missing**:
-- ⏳ Creating additional sections (`AddSection()` returns Unsupported error)
-- ⏳ Section breaks (continuous, next page, even page, odd page)
-- ⏳ Different first page per section
-- ⏳ Maintaining section order
-
-**Impact**: MEDIUM  
-**Priority**: MEDIUM (for v2.1.0)  
-**Effort Estimate**: 8-12 hours
-
-**Use Cases**:
-- Documents with different page orientations (portrait + landscape)
-- Documents with different margins per section
-- Reports with different headers per chapter
-
-**Workaround**: Use `DefaultSection()` for single-section documents. For multi-section needs, create separate documents and merge manually.
-
-**Implementation Tasks** (for contributors):
-1. Order tracking (~2 hours): Add insertion order tracking to Document
-2. Section breaks (~3 hours): Implement section break types, XML serialization
-3. API enhancement (~2 hours): Implement `AddSection()` properly
-4. XML generation (~2 hours): Serialize multiple sections
-5. Tests (~2 hours): Multi-section creation and break tests
-6. Example (~1 hour): `examples/11_multi_section/`
-
----
 
 ### Style System
 **Status**: 🟡 Partial (85%)  
@@ -306,23 +273,6 @@ This document tracks the implementation status of all v2 features, helping devel
 
 ---
 
-### Multi-Section Documents (Planned for v2.1)
-**Priority**: MEDIUM  
-**Estimated Effort**: 8-12 hours  
-**Target Release**: v2.1.0 (Q2 2026)
-
-**Features**:
-- ⏳ Create documents with multiple sections
-- ⏳ Different page layouts per section
-- ⏳ Section breaks of all types
-- ⏳ Per-section headers/footers
-
-**Use Cases**: Professional documents with varying layouts, reports with different orientations per section.
-
-**Value**: MEDIUM - Professional documents often need this
-
----
-
 ### Custom Styles (Planned for v2.2)
 **Priority**: LOW  
 **Estimated Effort**: 6-8 hours  
@@ -388,17 +338,6 @@ This document tracks the implementation status of all v2 features, helping devel
 ---
 
 ## 🔧 Known Limitations and Workarounds
-
-### 1. Multi-Section Documents
-**File**: `internal/core/document.go:110`  
-**Limitation**: Cannot create documents with multiple sections (`AddSection()` returns Unsupported error).  
-**Message**: "multi-section documents not yet implemented - use DefaultSection() instead"
-
-**Workaround**: Use `DefaultSection()` for single-section documents. For multi-section needs, create separate documents and merge manually, or wait for v2.1.0.
-
-**Planned for**: v2.1.0 (Q2 2026)
-
----
 
 ### 2. Style Retrieval
 **File**: `internal/core/paragraph.go:231`  
@@ -519,18 +458,17 @@ This document tracks the implementation status of all v2 features, helping devel
 ---
 
 ### v2.1.0 (Q2 2026)
-**Focus**: Document reading and multi-section support
+**Focus**: Document reading
 
 **Features**:
 - ⏳ Document reading (Phase 10) - 15-20 hours
-- ⏳ Multi-section documents - 8-12 hours
-- ⏳ Additional examples and documentation
+- ⏳ Additional examples and documentation focused on read/modify workflows
 
-**Total Effort**: 23-32 hours
+**Total Effort**: 15-20 hours
 
 **Timeline**:
 - Week 1-2: Implement `OpenDocument()`, XML deserialization, roundtrip tests
-- Week 3: Implement `AddSection()`, section breaks, tests
+- Week 3: Hook parsed content into domain model, add modification APIs
 - Week 4: Integration testing, documentation, examples
 
 ---
@@ -556,44 +494,13 @@ This document tracks the implementation status of all v2 features, helping devel
 
 ### Active TODOs in Code
 
-#### 1. Serialization Order Optimization (Non-Critical)
-**File**: `internal/serializer/serializer.go:544`  
-**Comment**: `// TODO: Maintain insertion order`
-
-**Code Context**:
-```go
-// SerializeBody converts document content to xml.Body.
-func (s *DocumentSerializer) SerializeBody(doc domain.Document) *xml.Body {
-    // For now, serialize all paragraphs then all tables
-    // TODO: Maintain insertion order
-    for _, para := range doc.Paragraphs() {
-        body.Paragraphs = append(body.Paragraphs, s.paraSerializer.Serialize(para))
-    }
-    for _, table := range doc.Tables() {
-        body.Tables = append(body.Tables, s.tableSerializer.Serialize(table))
-    }
-}
-```
-
-**Issue**: Paragraphs and tables are serialized in separate groups instead of maintaining insertion order
-
-**Impact**: LOW - Documents are valid, but element order may differ from insertion order  
-**Priority**: LOW - Optimization, not a bug  
-**Effort**: 2-4 hours
-
-**Current Behavior**: All paragraphs appear first, then all tables  
-**Expected Behavior**: Elements should appear in the order they were added  
-**Workaround**: Design documents with all paragraphs first, then tables
-
-**Plan**: Track insertion order with timestamps or indices, refactor Body structure to support mixed elements
-
-**Target**: v2.2.0 (Q3 2026+)
+None. All previously tracked TODOs have been addressed as of October 2025.
 
 ---
 
 ### Summary
 
-**Total TODOs**: 1 (non-critical optimization)  
+**Total TODOs**: 0  
 **Blocking Issues**: 0  
 **Beta-Ready**: ✅ Yes
 
@@ -613,13 +520,6 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 - **Files**: New parser in `internal/reader/`
 - **Skills needed**: XML parsing, OOXML specification knowledge
 - **Value**: Opens up major new use cases
-
-**2. Multi-Section Documents** - 8-12 hours
-- **Impact**: MEDIUM - Professional documents often need this
-- **Complexity**: MEDIUM
-- **Files**: `internal/core/document.go`, `internal/serializer/`
-- **Skills needed**: Go, XML serialization
-- **Value**: Enables complex document layouts
 
 #### Medium Priority (v2.2.0 - Q3 2026+)
 
@@ -680,14 +580,13 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 - ✅ All development phases (1-9, 11) complete
 - ✅ Documentation current and accurate
 - ✅ 1 non-critical TODO (optimization - can wait)
-- ✅ 3 documented limitations (all have workarounds)
+- ✅ 2 documented limitations (both have workarounds)
 - ✅ Clean architecture implemented
 - ✅ Interface-based design
 - ✅ Comprehensive error handling
 
 **What's NOT Blocking Beta**:
 - ❌ Serialization order TODO - minor optimization, not a bug
-- ❌ Multi-section documents - niche feature, workaround exists
 - ❌ Style retrieval - rarely needed, workaround exists
 - ❌ Document reading - planned for v2.1.0
 
@@ -745,19 +644,13 @@ The library is production-ready for 95% of use cases.
 ### For v2.1.0 (Q2 2026)
 
 **Priority Order**:
-1. **Implement Document Reading FIRST** (higher value)
-   - Enables template editing
-   - Enables batch processing
-   - Popular request from community
-   - 15-20 hours effort
+1. **Implement Document Reading** (higher value)
+  - Enables template editing
+  - Enables batch processing
+  - Popular request from community
+  - 15-20 hours effort
 
-2. **Then Multi-Section Documents** (if needed)
-   - Check user demand during beta
-   - May not be needed for most users
-   - Implement only if requested
-   - 8-12 hours effort
-
-**Decision**: Base v2.1.0 features on actual user demand discovered during beta testing.
+**Decision**: Base any follow-up enhancements on user demand discovered during beta testing.
 
 ---
 
@@ -781,7 +674,7 @@ The library is production-ready for 95% of use cases.
 
 ---
 
-**Last Updated**: October 27, 2025  
+**Last Updated**: October 28, 2025  
 **Next Review**: After v2.0.0-beta release (early November 2025)  
 **Status**: ✅ Ready for beta release  
 **Maintained by**: Misael Monterroca ([@mmonterroca](https://github.com/mmonterroca))

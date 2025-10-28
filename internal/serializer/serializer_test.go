@@ -240,12 +240,16 @@ func TestDocumentSerializer(t *testing.T) {
 		t.Fatal("expected body to be set")
 	}
 
-	if len(xmlDoc.Body.Paragraphs) != 1 {
-		t.Errorf("expected 1 paragraph, got %d", len(xmlDoc.Body.Paragraphs))
+	if len(xmlDoc.Body.Content) != 2 {
+		t.Fatalf("expected 2 body elements, got %d", len(xmlDoc.Body.Content))
 	}
 
-	if len(xmlDoc.Body.Tables) != 1 {
-		t.Errorf("expected 1 table, got %d", len(xmlDoc.Body.Tables))
+	if _, ok := xmlDoc.Body.Content[0].(*xmlstructs.Paragraph); !ok {
+		t.Errorf("expected first body element to be paragraph, got %T", xmlDoc.Body.Content[0])
+	}
+
+	if _, ok := xmlDoc.Body.Content[1].(*xmlstructs.Table); !ok {
+		t.Errorf("expected second body element to be table, got %T", xmlDoc.Body.Content[1])
 	}
 
 	if xmlDoc.XMLnsW == "" {
@@ -290,6 +294,19 @@ func TestDocumentSerializer_CompleteXML(t *testing.T) {
 		t.Error("expected <w:body> element")
 	}
 
+	body := xmlDoc.Body
+	if body == nil {
+		t.Fatal("expected body to be set")
+	}
+
+	if len(body.Content) == 0 {
+		t.Error("expected document body content")
+	}
+
+	if body.SectPr == nil {
+		t.Error("expected final section properties")
+	}
+
 	// Serialize core properties
 	coreProps := ser.SerializeCoreProperties(meta)
 	propsData, err := stdxml.MarshalIndent(coreProps, "", "  ")
@@ -303,6 +320,80 @@ func TestDocumentSerializer_CompleteXML(t *testing.T) {
 	}
 	if !contains(propsStr, "Test Suite") {
 		t.Error("expected creator in core properties")
+	}
+}
+
+func TestDocumentSerializer_SectionBreaks(t *testing.T) {
+	doc := core.NewDocument()
+
+	defaultSection, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("failed to obtain default section: %v", err)
+	}
+	_ = defaultSection.SetOrientation(domain.OrientationLandscape)
+	_ = defaultSection.SetColumns(2)
+
+	para1, _ := doc.AddParagraph()
+	run1, _ := para1.AddRun()
+	run1.SetText("Section one")
+
+	newSection, err := doc.AddSectionWithBreak(domain.SectionBreakTypeEvenPage)
+	if err != nil {
+		t.Fatalf("failed to add section: %v", err)
+	}
+	_ = newSection.SetColumns(3)
+
+	para2, _ := doc.AddParagraph()
+	run2, _ := para2.AddRun()
+	run2.SetText("Section two")
+
+	ser := serializer.NewDocumentSerializer()
+	xmlDoc := ser.SerializeDocument(doc)
+	body := xmlDoc.Body
+	if body == nil {
+		t.Fatal("expected body to be set")
+	}
+
+	if len(body.Content) != 3 {
+		t.Fatalf("expected 3 body elements (para, break, para), got %d", len(body.Content))
+	}
+
+	breakPara, ok := body.Content[1].(*xmlstructs.Paragraph)
+	if !ok {
+		t.Fatalf("expected second element to be paragraph break, got %T", body.Content[1])
+	}
+
+	if breakPara.Properties == nil || breakPara.Properties.SectionProperties == nil {
+		t.Fatal("expected section properties on break paragraph")
+	}
+	breakSect := breakPara.Properties.SectionProperties
+	if breakSect.Type == nil || breakSect.Type.Val != "evenPage" {
+		t.Errorf("expected section break type evenPage, got %v", breakSect.Type)
+	}
+	if breakSect.PageSize == nil || breakSect.PageSize.Orient != "landscape" {
+		t.Errorf("expected landscape orientation on break, got %+v", breakSect.PageSize)
+	}
+	if breakSect.PageSize.Width <= breakSect.PageSize.Height {
+		t.Errorf("expected width greater than height for landscape, got %+v", breakSect.PageSize)
+	}
+	if breakSect.Columns == nil || breakSect.Columns.Num != 2 {
+		t.Errorf("expected 2 columns on first section, got %+v", breakSect.Columns)
+	}
+
+	if body.SectPr == nil {
+		t.Fatal("expected final section properties on body")
+	}
+	if body.SectPr.Columns == nil || body.SectPr.Columns.Num != 3 {
+		t.Errorf("expected 3 columns on final section, got %+v", body.SectPr.Columns)
+	}
+	if body.SectPr.Type != nil {
+		t.Errorf("did not expect section type on final section, got %+v", body.SectPr.Type)
+	}
+	if body.SectPr.PageSize == nil {
+		t.Fatal("expected final section page size")
+	}
+	if body.SectPr.PageSize.Width >= body.SectPr.PageSize.Height {
+		t.Errorf("expected portrait dimensions on final section, got %+v", body.SectPr.PageSize)
 	}
 }
 

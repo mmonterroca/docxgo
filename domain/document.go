@@ -99,6 +99,10 @@ type Document interface {
 	// Sections allow different page layouts within the same document.
 	AddSection() (Section, error)
 
+	// AddSectionWithBreak adds a new section specifying how the transition
+	// to the new section should behave (next page, continuous, even page, odd page).
+	AddSectionWithBreak(breakType SectionBreakType) (Section, error)
+
 	// AddPageBreak adds a page break to the document.
 	// Creates a new paragraph with a page break run.
 	AddPageBreak() error
@@ -122,6 +126,11 @@ type Document interface {
 	// Sections returns all sections in the document.
 	// The returned slice is a copy and modifications won't affect the document.
 	Sections() []Section
+
+	// Blocks returns all top-level content elements (paragraphs, tables,
+	// and section breaks) in the order they were added to the document.
+	// The returned slice is a copy and modifications won't affect the document.
+	Blocks() []Block
 
 	// WriteTo writes the document to the provided writer in .docx format.
 	// Returns the number of bytes written and any error encountered.

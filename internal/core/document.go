@@ -55,16 +55,18 @@ import (
 
 // document implements the domain.Document interface.
 type document struct {
-	paragraphs   []domain.Paragraph
-	tables       []domain.Table
-	sections     []domain.Section
-	metadata     *domain.Metadata
-	idGen        *manager.IDGenerator
-	relManager   *manager.RelationshipManager
-	mediaManager *manager.MediaManager
-	styleManager domain.StyleManager
-	headerCount  int
-	footerCount  int
+	paragraphs    []domain.Paragraph
+	tables        []domain.Table
+	sections      []domain.Section
+	blocks        []domain.Block
+	metadata      *domain.Metadata
+	idGen         *manager.IDGenerator
+	relManager    *manager.RelationshipManager
+	mediaManager  *manager.MediaManager
+	styleManager  domain.StyleManager
+	headerCount   int
+	footerCount   int
+	activeSection *docxSection
 }
 
 // NewDocument creates a new Document.
@@ -75,6 +77,7 @@ func NewDocument() domain.Document {
 		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
 		tables:       make([]domain.Table, 0, constants.DefaultTableCapacity),
 		sections:     make([]domain.Section, 0, 1),
+		blocks:       make([]domain.Block, 0, constants.DefaultParagraphCapacity),
 		metadata:     &domain.Metadata{},
 		idGen:        idGen,
 		relManager:   relManager,
@@ -88,16 +91,49 @@ func NewDocument() domain.Document {
 	return doc
 }
 
+// ensureActiveSection guarantees the document has a current section and returns it.
+func (d *document) ensureActiveSection() (*docxSection, error) {
+	if len(d.sections) == 0 {
+		section := NewSection(d.relManager, d.idGen, d.mediaManager)
+		coreSection, ok := section.(*docxSection)
+		if !ok {
+			return nil, errors.InvalidState("Document.ensureActiveSection", "unexpected section implementation type")
+		}
+		d.sections = append(d.sections, section)
+		d.activeSection = coreSection
+	}
+
+	if d.activeSection == nil {
+		last := d.sections[len(d.sections)-1]
+		coreSection, ok := last.(*docxSection)
+		if !ok {
+			return nil, errors.InvalidState("Document.ensureActiveSection", "unexpected section implementation type")
+		}
+		d.activeSection = coreSection
+	}
+
+	return d.activeSection, nil
+}
+
 // AddParagraph adds a new paragraph to the document.
 func (d *document) AddParagraph() (domain.Paragraph, error) {
+	if _, err := d.ensureActiveSection(); err != nil {
+		return nil, err
+	}
+
 	id := d.idGen.NextParagraphID()
 	para := NewParagraph(id, d.idGen, d.relManager, d.mediaManager)
 	d.paragraphs = append(d.paragraphs, para)
+	d.blocks = append(d.blocks, domain.Block{Paragraph: para})
 	return para, nil
 }
 
 // AddTable adds a new table with the specified dimensions.
 func (d *document) AddTable(rows, cols int) (domain.Table, error) {
+	if _, err := d.ensureActiveSection(); err != nil {
+		return nil, err
+	}
+
 	if rows < constants.MinTableRows || rows > constants.MaxTableRows {
 		return nil, errors.InvalidArgument("Document.AddTable", "rows", rows,
 			"rows must be between 1 and 1000")
@@ -110,14 +146,44 @@ func (d *document) AddTable(rows, cols int) (domain.Table, error) {
 	id := d.idGen.NextTableID()
 	table := NewTable(id, rows, cols, d.idGen, d.relManager, d.mediaManager)
 	d.tables = append(d.tables, table)
+	d.blocks = append(d.blocks, domain.Block{Table: table})
 	return table, nil
 }
 
-// AddSection adds a new section to the document.
-// Note: Currently only DefaultSection() is fully supported.
-// Multi-section documents will be implemented in a future release.
+// AddSection adds a new section to the document using a next-page break.
 func (d *document) AddSection() (domain.Section, error) {
-	return nil, errors.Unsupported("Document.AddSection", "multi-section documents not yet implemented - use DefaultSection() instead")
+	return d.AddSectionWithBreak(domain.SectionBreakTypeNextPage)
+}
+
+// AddSectionWithBreak adds a new section specifying the section break behavior.
+func (d *document) AddSectionWithBreak(breakType domain.SectionBreakType) (domain.Section, error) {
+	if breakType < domain.SectionBreakTypeNextPage || breakType > domain.SectionBreakTypeOddPage {
+		return nil, errors.InvalidArgument("Document.AddSectionWithBreak", "breakType", breakType,
+			"section break type must be between NextPage and OddPage")
+	}
+
+	currentSection, err := d.ensureActiveSection()
+	if err != nil {
+		return nil, err
+	}
+
+	d.blocks = append(d.blocks, domain.Block{
+		SectionBreak: &domain.SectionBreak{
+			Section: currentSection,
+			Type:    breakType,
+		},
+	})
+
+	newSection := NewSection(d.relManager, d.idGen, d.mediaManager)
+	coreSection, ok := newSection.(*docxSection)
+	if !ok {
+		return nil, errors.InvalidState("Document.AddSectionWithBreak", "unexpected section implementation type")
+	}
+
+	d.sections = append(d.sections, newSection)
+	d.activeSection = coreSection
+
+	return newSection, nil
 }
 
 // AddPageBreak adds a page break to the document.
@@ -139,12 +205,12 @@ func (d *document) AddPageBreak() error {
 
 // DefaultSection returns the default (first) section of the document.
 func (d *document) DefaultSection() (domain.Section, error) {
-	if len(d.sections) == 0 {
-		// Create default section if it doesn't exist
-		section := NewSection(d.relManager, d.idGen, d.mediaManager)
-		d.sections = append(d.sections, section)
-		return section, nil
+	_, err := d.ensureActiveSection()
+	if err != nil {
+		return nil, err
 	}
+
+	// ensureActiveSection always keeps sections slice populated.
 	return d.sections[0], nil
 }
 
@@ -168,6 +234,13 @@ func (d *document) Sections() []domain.Section {
 	sections := make([]domain.Section, len(d.sections))
 	copy(sections, d.sections)
 	return sections
+}
+
+// Blocks returns all top-level document content in insertion order.
+func (d *document) Blocks() []domain.Block {
+	blocks := make([]domain.Block, len(d.blocks))
+	copy(blocks, d.blocks)
+	return blocks
 }
 
 // generateHeadingBookmarks generates bookmarks for all headings in the document.

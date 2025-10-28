@@ -142,9 +142,10 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 		style.SetKeepNext(true)
 		style.SetKeepLines(true)
 
-		// Set font through the base Style interface
 		font := domain.Font{Name: "Calibri Light"}
 		style.SetFont(font)
+		style.SetSize(h.size)
+		style.SetBold(h.bold)
 
 		sm.styles[h.id] = style
 	}
@@ -152,17 +153,28 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	// Title and Subtitle
 	title := newParagraphStyle(domain.StyleIDTitle, "Title", true)
 	title.SetBasedOn(domain.StyleIDNormal)
+	title.SetAlignment(domain.AlignmentCenter)
 	title.SetSpacingAfter(180)
+	title.SetFont(domain.Font{Name: "Calibri Light"})
+	title.SetSize(52) // 26pt
+	title.SetBold(true)
 	sm.styles[domain.StyleIDTitle] = title
 
 	subtitle := newParagraphStyle(domain.StyleIDSubtitle, "Subtitle", true)
 	subtitle.SetBasedOn(domain.StyleIDNormal)
+	subtitle.SetAlignment(domain.AlignmentCenter)
+	subtitle.SetFont(domain.Font{Name: "Calibri"})
+	subtitle.SetSize(28) // 14pt
+	subtitle.SetItalic(true)
+	subtitle.SetColor(domain.Color{R: 90, G: 90, B: 90})
 	sm.styles[domain.StyleIDSubtitle] = subtitle
 
 	// Quote styles
 	quote := newParagraphStyle(domain.StyleIDQuote, "Quote", true)
 	quote.SetBasedOn(domain.StyleIDNormal)
 	quote.SetIndentation(domain.Indentation{Left: 720, Right: 720}) // 0.5 inch
+	quote.SetItalic(true)
+	quote.SetColor(domain.Color{R: 89, G: 89, B: 89})
 	sm.styles[domain.StyleIDQuote] = quote
 
 	intenseQuote := newParagraphStyle(domain.StyleIDIntenseQuote, "Intense Quote", true)
@@ -170,12 +182,18 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	intenseQuote.SetIndentation(domain.Indentation{Left: 720, Right: 720})
 	intenseQuote.SetSpacingBefore(120)
 	intenseQuote.SetSpacingAfter(120)
+	intenseQuote.SetAlignment(domain.AlignmentCenter)
+	intenseQuote.SetItalic(true)
+	intenseQuote.SetBold(true)
+	intenseQuote.SetColor(domain.Color{R: 79, G: 129, B: 189})
+	intenseQuote.SetSize(28) // 14pt
 	sm.styles[domain.StyleIDIntenseQuote] = intenseQuote
 
 	// List Paragraph
 	listPara := newParagraphStyle(domain.StyleIDListParagraph, "List Paragraph", true)
 	listPara.SetBasedOn(domain.StyleIDNormal)
 	listPara.SetIndentation(domain.Indentation{Left: 720})
+	listPara.SetSpacingAfter(80)
 	sm.styles[domain.StyleIDListParagraph] = listPara
 
 	// Caption style (used for figure/table captions)
@@ -183,6 +201,7 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	caption.SetBasedOn(domain.StyleIDNormal)
 	caption.SetNext(domain.StyleIDNormal)
 	caption.SetSpacingAfter(200)
+	caption.SetItalic(true)
 	sm.styles[domain.StyleIDCaption] = caption
 
 	// TOC styles
@@ -221,10 +240,12 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	// Header and Footer
 	header := newParagraphStyle(domain.StyleIDHeader, "Header", true)
 	header.SetBasedOn(domain.StyleIDNormal)
+	header.SetSize(20) // 10pt
 	sm.styles[domain.StyleIDHeader] = header
 
 	footer := newParagraphStyle(domain.StyleIDFooter, "Footer", true)
 	footer.SetBasedOn(domain.StyleIDNormal)
+	footer.SetSize(20)
 	sm.styles[domain.StyleIDFooter] = footer
 
 	// Body Text variants

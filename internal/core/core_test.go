@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package core_test
 
 import (
@@ -49,7 +47,7 @@ func TestNewDocument(t *testing.T) {
 
 func TestDocument_AddParagraph(t *testing.T) {
 	doc := core.NewDocument()
-	
+
 	para, err := doc.AddParagraph()
 	if err != nil {
 		t.Fatalf("AddParagraph failed: %v", err)
@@ -66,7 +64,7 @@ func TestDocument_AddParagraph(t *testing.T) {
 
 func TestDocument_AddTable(t *testing.T) {
 	doc := core.NewDocument()
-	
+
 	table, err := doc.AddTable(3, 4)
 	if err != nil {
 		t.Fatalf("AddTable failed: %v", err)
@@ -83,9 +81,61 @@ func TestDocument_AddTable(t *testing.T) {
 	}
 }
 
+func TestDocument_AddSectionWithBreak(t *testing.T) {
+	doc := core.NewDocument()
+
+	para1, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph failed: %v", err)
+	}
+	_, _ = para1.AddRun()
+
+	secondSection, err := doc.AddSectionWithBreak(domain.SectionBreakTypeContinuous)
+	if err != nil {
+		t.Fatalf("AddSectionWithBreak failed: %v", err)
+	}
+	if secondSection == nil {
+		t.Fatal("expected non-nil section")
+	}
+
+	_, err = doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph after section failed: %v", err)
+	}
+
+	sections := doc.Sections()
+	if len(sections) != 2 {
+		t.Fatalf("expected 2 sections, got %d", len(sections))
+	}
+
+	blocks := doc.Blocks()
+	if len(blocks) != 3 {
+		t.Fatalf("expected 3 blocks (paragraph, break, paragraph), got %d", len(blocks))
+	}
+
+	if blocks[0].Paragraph == nil {
+		t.Error("expected first block to be a paragraph")
+	}
+	if blocks[1].SectionBreak == nil {
+		t.Fatal("expected second block to be a section break")
+	}
+	if blocks[1].SectionBreak.Type != domain.SectionBreakTypeContinuous {
+		t.Errorf("expected section break type Continuous, got %v", blocks[1].SectionBreak.Type)
+	}
+	if blocks[2].Paragraph == nil {
+		t.Error("expected third block to be a paragraph")
+	}
+
+	// Mutating returned slice must not affect document internals.
+	blocks[0] = domain.Block{}
+	if len(doc.Blocks()) != 3 {
+		t.Error("mutating returned blocks slice should not affect document")
+	}
+}
+
 func TestDocument_AddTable_InvalidDimensions(t *testing.T) {
 	doc := core.NewDocument()
-	
+
 	tests := []struct {
 		name string
 		rows int
@@ -237,9 +287,9 @@ func TestParagraph_Indentation(t *testing.T) {
 	para, _ := doc.AddParagraph()
 
 	indent := domain.Indentation{
-		Left:      720,  // 0.5 inch
+		Left:      720, // 0.5 inch
 		Right:     720,
-		FirstLine: 360,  // 0.25 inch
+		FirstLine: 360, // 0.25 inch
 	}
 
 	err := para.SetIndent(indent)
