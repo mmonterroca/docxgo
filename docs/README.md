@@ -20,7 +20,7 @@ This index helps you find the right documentation for your needs.
 → **[MIGRATION.md](../MIGRATION.md)** - Step-by-step migration from v1 to v2
 
 ### See Working Examples
-→ **[examples/README.md](../examples/README.md)** - 9 working examples  
+→ **[examples/README.md](../examples/README.md)** - 11 working examples (including read/modify)  
 → **[examples/v2_README.md](../examples/v2_README.md)** - v2-specific examples
 
 ### Understand Error Handling

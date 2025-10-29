@@ -195,7 +195,7 @@ Run the included test script to verify all examples compile:
 ./test_all.sh
 ```
 
-This will test all 9 working examples and report results.
+This will test all 11 working examples and report results.
 
 ---
 

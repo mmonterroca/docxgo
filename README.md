@@ -51,7 +51,7 @@ go get github.com/mmonterroca/docxgo
 
 ## Quick Start
 
-### Using Builder Pattern (Recommended)
+### Option 1: Simple API (Direct Domain Interfaces)
 
 ```go
 package main
@@ -62,23 +62,43 @@ import (
 )
 
 func main() {
-    // Option 1: Simple API (direct domain interfaces)
+    // Create document
     doc := docx.NewDocument()
     
+    // Add paragraph with formatted text
     para, _ := doc.AddParagraph()
     run, _ := para.AddRun()
     run.SetText("Hello, World!")
     run.SetBold(true)
     run.SetColor(docx.Red)
     
-    doc.SaveAs("simple.docx")
-    
-    // Option 2: Builder API (fluent, chainable)
+    // Save document
+    if err := doc.SaveAs("simple.docx"); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+### Option 2: Builder API (Fluent, Chainable - Recommended)
+
+```go
+package main
+
+import (
+    "log"
+    docx "github.com/mmonterroca/docxgo"
+    "github.com/mmonterroca/docxgo/domain"
+)
+
+func main() {
+    // Create builder with options
     builder := docx.NewDocumentBuilder(
-        docx.WithDefaultFont("Calibri", 11),
-        docx.WithPageSize(docx.PageSizeA4),
         docx.WithTitle("My Report"),
         docx.WithAuthor("John Doe"),
+        docx.WithDefaultFont("Calibri"),
+        docx.WithDefaultFontSize(22), // 11pt in half-points
+        docx.WithPageSize(docx.A4),
+        docx.WithMargins(docx.NormalMargins),
     )
     
     // Add content using fluent API
@@ -86,7 +106,8 @@ func main() {
         Text("Project Report").
         Bold().
         FontSize(16).
-        Alignment(docx.AlignmentCenter).
+        Color(docx.Blue).
+        Alignment(domain.AlignmentCenter).
         End()
     
     builder.AddParagraph().
@@ -102,6 +123,48 @@ func main() {
     }
     
     if err := doc.SaveAs("report.docx"); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+### Option 3: Read and Modify Existing Documents 🆕
+
+```go
+package main
+
+import (
+    "log"
+    docx "github.com/mmonterroca/docxgo"
+)
+
+func main() {
+    // Open existing document
+    doc, err := docx.OpenDocument("template.docx")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Read existing content
+    paragraphs := doc.Paragraphs()
+    for _, para := range paragraphs {
+        // Modify existing text
+        runs := para.Runs()
+        for _, run := range runs {
+            if run.Text() == "PLACEHOLDER" {
+                run.SetText("Updated Value")
+                run.SetBold(true)
+            }
+        }
+    }
+    
+    // Add new content
+    newPara, _ := doc.AddParagraph()
+    newRun, _ := newPara.AddRun()
+    newRun.SetText("This paragraph was added by the reader")
+    
+    // Save modified document
+    if err := doc.SaveAs("modified.docx"); err != nil {
         log.Fatal(err)
     }
 }
@@ -240,11 +303,12 @@ github.com/mmonterroca/docxgo/
 
 ### 🚧 In Development
 
-**Phase 10: Document Reading** (Not Started)
-- Open and read existing .docx files
-- Parse document structure
-- Modify existing documents
-- Roundtrip testing (create → save → open → verify)
+**Phase 10: Document Reading** (60% Complete - Core Features Working ✅)
+- ✅ Open and read existing .docx files
+- ✅ Parse document structure (paragraphs, runs, tables)
+- ✅ Modify existing documents (edit text, formatting, add content)
+- ✅ Style preservation (Title, Subtitle, Headings, Quote, Normal)
+- 🚧 Advanced features (headers/footers, complex tables, images in existing docs)
 
 **Phase 12: Beta Testing & Release** (In Progress)
 - Community feedback integration
@@ -287,15 +351,15 @@ if err != nil {
 }
 
 // Builder pattern accumulates errors
-doc := docx.NewDocument()
-doc.AddParagraph().
+builder := docx.NewDocumentBuilder()
+builder.AddParagraph().
     Text("Hello").
     FontSize(9999). // Invalid - error recorded
     Bold().
     End()
 
 // All errors surface at Build()
-finalDoc, err := doc.Build()
+doc, err := builder.Build()
 if err != nil {
     // Returns first accumulated error with full context
     log.Fatal(err)
