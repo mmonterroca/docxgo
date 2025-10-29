@@ -1,6 +1,7 @@
 linters-settings:
   errcheck:
-    ignore: fmt:.*
+    exclude-functions:
+      - fmt:.*
     ignoretests: true
 
   goimports:
@@ -64,11 +65,11 @@ output:
     - format: "colored-line-number"
   print-issued-lines: true
   print-linter-name: true
-  uniq-by-line: true
 
 issues:
   # Fix found issues (if it's supported by the linter)
   fix: false
   exclude-use-default: false
+  uniq-by-line: true
   exclude:
     - "Error return value of .((os.)?std(out|err)..*|.*Close|.*Seek|.*Flush|os.Remove(All)?|.*print(f|ln)?|os.(Un)?Setenv). is not check"
