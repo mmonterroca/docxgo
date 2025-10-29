@@ -176,7 +176,7 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 
 		switch child.Name.Local {
 		case "r":
-			if _, err := hydrateRun(para, child, ctx, state, nil); err != nil {
+			if err := hydrateRun(para, child, ctx, state, nil); err != nil {
 				return err
 			}
 		case "hyperlink":
@@ -411,9 +411,9 @@ func applyParagraphNumbering(para domain.Paragraph, props *Element) error {
 	return nil
 }
 
-func hydrateRun(para domain.Paragraph, elem *Element, ctx *reconstructContext, state *fieldState, extraFields []domain.Field) (domain.Run, error) {
+func hydrateRun(para domain.Paragraph, elem *Element, ctx *reconstructContext, state *fieldState, extraFields []domain.Field) error {
 	if para == nil || elem == nil {
-		return nil, nil
+		return nil
 	}
 
 	var (
@@ -438,7 +438,7 @@ func hydrateRun(para domain.Paragraph, elem *Element, ctx *reconstructContext, s
 		case "fldChar":
 			if state != nil {
 				if err := state.handleFieldChar(child); err != nil {
-					return nil, err
+					return err
 				}
 			}
 		case "instrText":
@@ -458,35 +458,35 @@ func hydrateRun(para domain.Paragraph, elem *Element, ctx *reconstructContext, s
 	}
 
 	if !createRun {
-		return nil, nil
+		return nil
 	}
 
 	run, err := para.AddRun()
 	if err != nil {
-		return nil, errors.Wrap(err, opHydrateRun)
+		return errors.Wrap(err, opHydrateRun)
 	}
 
 	if textBuilder.Len() > 0 {
 		if err := run.SetText(textBuilder.String()); err != nil {
-			return nil, errors.Wrap(err, opHydrateRun)
+			return errors.Wrap(err, opHydrateRun)
 		}
 	}
 
 	if props != nil {
 		if err := applyRunProperties(run, props); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	for _, br := range breaks {
 		if err := run.AddBreak(br); err != nil {
-			return nil, errors.Wrap(err, opHydrateRun)
+			return errors.Wrap(err, opHydrateRun)
 		}
 	}
 
 	if state != nil {
 		if err := state.attachToRun(run); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -501,19 +501,19 @@ func hydrateRun(para domain.Paragraph, elem *Element, ctx *reconstructContext, s
 			accessor.SetProperty("display", run.Text())
 		}
 		if err := run.AddField(field); err != nil {
-			return nil, errors.Wrap(err, opHydrateRun)
+			return errors.Wrap(err, opHydrateRun)
 		}
 	}
 
 	if len(drawings) > 0 {
 		for _, drawing := range drawings {
 			if err := hydrateDrawing(para, run, drawing, ctx); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
 
-	return run, nil
+	return nil
 }
 
 func applyRunProperties(run domain.Run, props *Element) error {
@@ -681,7 +681,7 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 			extraFields = []domain.Field{field}
 		}
 
-		if _, err := hydrateRun(para, child, ctx, state, extraFields); err != nil {
+		if err := hydrateRun(para, child, ctx, state, extraFields); err != nil {
 			return errors.Wrap(err, opHydrateHyperlink)
 		}
 	}
@@ -720,7 +720,7 @@ func hydrateSimpleField(para domain.Paragraph, elem *Element, ctx *reconstructCo
 			}
 		}
 
-		if _, err := hydrateRun(para, child, ctx, state, extra); err != nil {
+		if err := hydrateRun(para, child, ctx, state, extra); err != nil {
 			return errors.Wrap(err, opHydrateSimpleField)
 		}
 	}
@@ -1303,8 +1303,7 @@ func extractQuotedStrings(input string) []string {
 	start := 0
 
 	for i, r := range input {
-		switch r {
-		case '"':
+		if r == '"' {
 			if inQuote {
 				results = append(results, input[start:i])
 				inQuote = false
