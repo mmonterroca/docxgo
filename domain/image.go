@@ -42,9 +42,9 @@ const (
 
 // ImageSize represents image dimensions.
 type ImageSize struct {
-	WidthPx  int // Width in pixels
-	HeightPx int // Height in pixels
-	WidthEMU int // Width in EMUs (English Metric Units, 914400 EMU = 1 inch)
+	WidthPx   int // Width in pixels
+	HeightPx  int // Height in pixels
+	WidthEMU  int // Width in EMUs (English Metric Units, 914400 EMU = 1 inch)
 	HeightEMU int // Height in EMUs
 }
 

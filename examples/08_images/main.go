@@ -30,7 +30,7 @@ import (
 func createSampleImage(path string, width, height int, fillColor color.RGBA) error {
 	// Create a simple colored rectangle
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	
+
 	// Fill with gradient or solid color
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {

@@ -42,7 +42,7 @@ func createTestImage(t *testing.T, width, height int) string {
 
 	// Create a simple test image
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	
+
 	// Fill with a gradient
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
@@ -58,7 +58,7 @@ func createTestImage(t *testing.T, width, height int) string {
 	// Save to temp file
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, "test_image.png")
-	
+
 	f, err := os.Create(filePath)
 	if err != nil {
 		t.Fatalf("Failed to create test image file: %v", err)
@@ -169,7 +169,7 @@ func TestNewImage(t *testing.T) {
 
 func TestNewImageWithSize(t *testing.T) {
 	imgPath := createTestImage(t, 800, 600)
-	
+
 	customSize := domain.NewImageSize(400, 300)
 	img, err := NewImageWithSize("img2", imgPath, customSize)
 	if err != nil {
@@ -187,7 +187,7 @@ func TestNewImageWithSize(t *testing.T) {
 
 func TestNewImageWithPosition(t *testing.T) {
 	imgPath := createTestImage(t, 200, 150)
-	
+
 	size := domain.NewImageSize(200, 150)
 	pos := domain.ImagePosition{
 		Type:       domain.ImagePositionFloating,
@@ -329,7 +329,7 @@ func TestDetectImageFormat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create image with test format detection
 			imgPath := createTestImage(t, 50, 50)
-			
+
 			// Rename to test extension
 			tmpDir := filepath.Dir(imgPath)
 			newPath := filepath.Join(tmpDir, tt.filename)

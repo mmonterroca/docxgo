@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package xml
 
 import "encoding/xml"
@@ -39,10 +37,10 @@ type FieldSimple struct {
 
 // FieldChar represents w:fldChar element (field character).
 type FieldChar struct {
-	XMLName  xml.Name `xml:"w:fldChar"`
-	FldType  string   `xml:"w:fldCharType,attr"` // begin, separate, end
-	Dirty    *bool    `xml:"w:dirty,attr,omitempty"`
-	FldLock  *bool    `xml:"w:fldLock,attr,omitempty"`
+	XMLName xml.Name `xml:"w:fldChar"`
+	FldType string   `xml:"w:fldCharType,attr"` // begin, separate, end
+	Dirty   *bool    `xml:"w:dirty,attr,omitempty"`
+	FldLock *bool    `xml:"w:fldLock,attr,omitempty"`
 }
 
 // InstrText represents w:instrText element (field instruction text).

@@ -69,7 +69,7 @@ func setupHeader(header domain.Header) {
 
 	run, _ := para.AddRun()
 	run.AddText("go-docx v2 • Advanced Features Demo")
-	run.SetSize(20) // 10pt in half-points
+	run.SetSize(20)                                       // 10pt in half-points
 	run.SetColor(domain.Color{R: 0x44, G: 0x72, B: 0xC4}) // Blue
 }
 
