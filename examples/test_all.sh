@@ -16,7 +16,6 @@ EXAMPLES=(
     "08_images"
     "09_advanced_tables"
     "11_multi_section"
-    "basic"
 )
 
 FAILED=()
