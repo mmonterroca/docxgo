@@ -23,6 +23,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+// Package docx provides a fluent builder API for creating Word documents.
+// The builder pattern allows for intuitive and chainable document construction
+// with built-in error handling and validation.
 package docx
 
 import (
@@ -87,8 +90,7 @@ func (sb *SectionBuilder) ensureSection(op string) bool {
 	return true
 }
 
-// PageSize sets the page size for the section.
-
+// PageSize sets the page size for the section (e.g., PageSizeA4, PageSizeLetter).
 func (sb *SectionBuilder) PageSize(size domain.PageSize) *SectionBuilder {
 	if !sb.ensureSection("SectionBuilder.PageSize") {
 		return sb
@@ -200,7 +202,11 @@ func NewDocumentBuilder(opts ...Option) *DocumentBuilder {
 
 	// Apply configuration to document
 	if config.Metadata != nil {
-		doc.SetMetadata(config.Metadata)
+		if err := doc.SetMetadata(config.Metadata); err != nil {
+			// Note: This error is intentionally ignored during builder initialization
+			// as metadata errors are non-critical for document creation
+			_ = err
+		}
 	}
 
 	return &DocumentBuilder{

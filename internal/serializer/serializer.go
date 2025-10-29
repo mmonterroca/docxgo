@@ -1100,6 +1100,10 @@ func (s *DocumentSerializer) serializeStyle(style domain.Style) *xml.Style {
 		xmlStyle.RunProps = s.serializeRunStyleProperties(style)
 	case domain.StyleTypeCharacter:
 		xmlStyle.RunProps = s.serializeRunStyleProperties(style)
+	case domain.StyleTypeTable:
+		// Table styles are handled differently, no props to serialize here
+	case domain.StyleTypeNumbering:
+		// Numbering styles are handled differently, no props to serialize here
 	}
 
 	return xmlStyle
@@ -1331,6 +1335,8 @@ func (s *DocumentSerializer) sectionBreakTypeToString(bt domain.SectionBreakType
 
 func (s *DocumentSerializer) headerTypeToString(ht domain.HeaderType) string {
 	switch ht {
+	case domain.HeaderDefault:
+		return "default"
 	case domain.HeaderFirst:
 		return "first"
 	case domain.HeaderEven:
@@ -1342,6 +1348,8 @@ func (s *DocumentSerializer) headerTypeToString(ht domain.HeaderType) string {
 
 func (s *DocumentSerializer) footerTypeToString(ft domain.FooterType) string {
 	switch ft {
+	case domain.FooterDefault:
+		return "default"
 	case domain.FooterFirst:
 		return "first"
 	case domain.FooterEven:

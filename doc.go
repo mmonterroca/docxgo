@@ -53,7 +53,9 @@ Create a simple document:
 	    // Add a paragraph with formatted text
 	    para, _ := doc.AddParagraph()
 	    run, _ := para.AddRun()
-	    run.SetText("Hello, World!")
+	    if err := run.SetText("Hello, World!"); err != nil {
+	        log.Fatal(err)
+	    }
 	    run.SetBold(true)
 	    run.SetSize(28) // 14pt (size is in half-points)
 
@@ -107,14 +109,18 @@ Create and populate tables:
 	cell, _ := row0.Cell(0)
 	para, _ := cell.AddParagraph()
 	run, _ := para.AddRun()
-	run.SetText("Header 1")
+	if err := run.SetText("Header 1"); err != nil {
+	    log.Fatal(err)
+	}
 	run.SetBold(true)
 
 	// Access other cells
 	cell2, _ := row0.Cell(1)
 	para2, _ := cell2.AddParagraph()
 	run2, _ := para2.AddRun()
-	run2.SetText("Header 2")
+	if err := run2.SetText("Header 2"); err != nil {
+	    log.Fatal(err)
+	}
 	run2.SetBold(true)
 
 	// Merge cells

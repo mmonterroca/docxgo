@@ -272,12 +272,16 @@ func TestDocumentSerializer_CompleteXML(t *testing.T) {
 		Creator: "Test Suite",
 		Subject: "Testing",
 	}
-	doc.SetMetadata(meta)
+	if err := doc.SetMetadata(meta); err != nil {
+		t.Fatalf("SetMetadata failed: %v", err)
+	}
 
 	// Add content
 	para, _ := doc.AddParagraph()
 	run, _ := para.AddRun()
-	run.SetText("Hello, World!")
+	if err := run.SetText("Hello, World!"); err != nil {
+		t.Fatalf("SetText failed: %v", err)
+	}
 	run.SetBold(true)
 
 	ser := serializer.NewDocumentSerializer()

@@ -213,11 +213,6 @@ func (p *paragraph) attachImage(img domain.Image, sourceName string) error {
 	return nil
 }
 
-// setMediaManager allows container structures to inject the shared media manager after construction.
-func (p *paragraph) setMediaManager(mm *manager.MediaManager) {
-	p.mediaManager = mm
-}
-
 // Images returns all images in this paragraph.
 func (p *paragraph) Images() []domain.Image {
 	images := make([]domain.Image, len(p.images))

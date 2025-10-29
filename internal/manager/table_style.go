@@ -22,8 +22,6 @@ type tableStyle struct {
 
 // newTableStyle creates a new table style.
 // Note: builtIn parameter is used in tests to create custom styles.
-//
-//nolint:unparam // builtIn=true in production, false in tests
 func newTableStyle(id, name string, builtIn bool) *tableStyle {
 	return &tableStyle{
 		id:        id,
