@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mmonterroca/docxgo"
+	docx "github.com/mmonterroca/docxgo"
 	"github.com/mmonterroca/docxgo/domain"
 )
 
@@ -92,39 +92,39 @@ func createShowcaseDocument() string {
 	para1, _ := doc.AddParagraph()
 	r1, _ := para1.AddRun()
 	r1.AddText("This paragraph demonstrates ")
-	
+
 	r2, _ := para1.AddRun()
 	r2.AddText("bold text")
 	r2.SetBold(true)
-	
+
 	r3, _ := para1.AddRun()
 	r3.AddText(", ")
-	
+
 	r4, _ := para1.AddRun()
 	r4.AddText("italic text")
 	r4.SetItalic(true)
-	
+
 	r5, _ := para1.AddRun()
 	r5.AddText(", ")
-	
+
 	r6, _ := para1.AddRun()
 	r6.AddText("underlined text")
 	r6.SetUnderline(domain.UnderlineSingle)
-	
+
 	r7, _ := para1.AddRun()
 	r7.AddText(", ")
-	
+
 	r8, _ := para1.AddRun()
 	r8.AddText("colored text")
 	r8.SetColor(docx.Red)
-	
+
 	r9, _ := para1.AddRun()
 	r9.AddText(", and ")
-	
+
 	r10a, _ := para1.AddRun()
 	r10a.AddText("large text")
 	r10a.SetSize(32) // 16pt in half-points
-	
+
 	r11, _ := para1.AddRun()
 	r11.AddText(".")
 
@@ -284,7 +284,7 @@ func modifyDocument(doc domain.Document) {
 	// PART 1: Modify existing content
 	fmt.Println("   → Modifying existing paragraphs...")
 	paragraphs := doc.Paragraphs()
-	
+
 	// Change the title color
 	if len(paragraphs) > 0 {
 		title := paragraphs[0]
