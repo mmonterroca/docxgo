@@ -417,3 +417,193 @@ func containsSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+func TestRunSerializer_Underline(t *testing.T) {
+	tests := []struct {
+		name      string
+		style     domain.UnderlineStyle
+		wantEmpty bool
+	}{
+		{"Single", domain.UnderlineSingle, false},
+		{"Double", domain.UnderlineDouble, false},
+		{"Thick", domain.UnderlineThick, false},
+		{"Dotted", domain.UnderlineDotted, false},
+		{"Dashed", domain.UnderlineDashed, false},
+		{"Wave", domain.UnderlineWave, false},
+		{"None", domain.UnderlineNone, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := core.NewDocument()
+			para, _ := doc.AddParagraph()
+			run, _ := para.AddRun()
+			run.SetText("Underlined")
+			run.SetUnderline(tt.style)
+
+			ser := serializer.NewRunSerializer()
+			xmlRun := ser.Serialize(run)
+
+			if !tt.wantEmpty {
+				if xmlRun.Properties == nil || xmlRun.Properties.Underline == nil {
+					t.Error("expected underline to be set")
+				}
+			}
+		})
+	}
+}
+
+func TestRunSerializer_Highlight(t *testing.T) {
+	tests := []struct {
+		name  string
+		color domain.HighlightColor
+	}{
+		{"Yellow", domain.HighlightYellow},
+		{"Green", domain.HighlightGreen},
+		{"Cyan", domain.HighlightCyan},
+		{"Magenta", domain.HighlightMagenta},
+		{"Blue", domain.HighlightBlue},
+		{"Red", domain.HighlightRed},
+		{"DarkBlue", domain.HighlightDarkBlue},
+		{"DarkGreen", domain.HighlightDarkGreen},
+		{"LightGray", domain.HighlightLightGray},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := core.NewDocument()
+			para, _ := doc.AddParagraph()
+			run, _ := para.AddRun()
+			run.SetText("Highlighted")
+			run.SetHighlight(tt.color)
+
+			ser := serializer.NewRunSerializer()
+			xmlRun := ser.Serialize(run)
+
+			if xmlRun.Properties == nil || xmlRun.Properties.Highlight == nil {
+				t.Error("expected highlight to be set")
+			}
+		})
+	}
+}
+
+func TestParagraphSerializer_LineSpacing(t *testing.T) {
+	tests := []struct {
+		name    string
+		spacing domain.LineSpacing
+	}{
+		{"Exact", domain.LineSpacing{Rule: domain.LineSpacingExact, Value: 360}},
+		{"AtLeast", domain.LineSpacing{Rule: domain.LineSpacingAtLeast, Value: 480}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := core.NewDocument()
+			para, _ := doc.AddParagraph()
+			para.SetLineSpacing(tt.spacing)
+
+			ser := serializer.NewParagraphSerializer()
+			xmlPara := ser.Serialize(para)
+
+			if xmlPara.Properties == nil || xmlPara.Properties.Spacing == nil {
+				t.Error("expected spacing to be set")
+			}
+		})
+	}
+}
+
+func TestParagraphSerializer_Alignment(t *testing.T) {
+	tests := []struct {
+		name      string
+		alignment domain.Alignment
+		expected  string
+	}{
+		{"Center", domain.AlignmentCenter, "center"},
+		{"Right", domain.AlignmentRight, "right"},
+		{"Justify", domain.AlignmentJustify, "both"},
+		{"Distribute", domain.AlignmentDistribute, "distribute"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := core.NewDocument()
+			para, _ := doc.AddParagraph()
+			para.SetAlignment(tt.alignment)
+
+			ser := serializer.NewParagraphSerializer()
+			xmlPara := ser.Serialize(para)
+
+			if xmlPara.Properties == nil || xmlPara.Properties.Justification == nil {
+				t.Errorf("expected justification to be set for alignment %v", tt.alignment)
+			} else if xmlPara.Properties.Justification.Val != tt.expected {
+				t.Errorf("expected %s, got %s", tt.expected, xmlPara.Properties.Justification.Val)
+			}
+		})
+	}
+}
+
+func TestTableSerializer_VerticalAlignment(t *testing.T) {
+	tests := []struct {
+		name  string
+		align domain.VerticalAlignment
+	}{
+		{"Top", domain.VerticalAlignTop},
+		{"Center", domain.VerticalAlignCenter},
+		{"Bottom", domain.VerticalAlignBottom},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := core.NewDocument()
+			table, _ := doc.AddTable(1, 1)
+			row, _ := table.Row(0)
+			cell, _ := row.Cell(0)
+			cell.SetVerticalAlignment(tt.align)
+
+			ser := serializer.NewTableSerializer()
+			xmlTable := ser.Serialize(table)
+
+			if len(xmlTable.Rows) == 0 {
+				t.Fatal("expected at least one row")
+			}
+			if len(xmlTable.Rows[0].Cells) == 0 {
+				t.Fatal("expected at least one cell")
+			}
+		})
+	}
+}
+
+func TestTableSerializer_CellWidth(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 2)
+	row, _ := table.Row(0)
+	
+	cell1, _ := row.Cell(0)
+	cell1.SetWidth(2000) // width in twips
+	
+	cell2, _ := row.Cell(1)
+	cell2.SetWidth(3000)
+
+	ser := serializer.NewTableSerializer()
+	xmlTable := ser.Serialize(table)
+
+	if len(xmlTable.Rows) == 0 || len(xmlTable.Rows[0].Cells) < 2 {
+		t.Fatal("expected cells to be serialized")
+	}
+}
+
+func TestRunSerializer_WithTextBreaks(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	run, _ := para.AddRun()
+	run.SetText("Line 1\nLine 2\nLine 3")
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	runs := collectRuns(xmlPara)
+	// Should have multiple runs due to newline expansion
+	if len(runs) < 3 {
+		t.Errorf("expected at least 3 elements (text+break+text), got %d", len(runs))
+	}
+}
