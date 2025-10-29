@@ -28,6 +28,7 @@ package manager
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -95,6 +96,65 @@ func (mm *MediaManager) Add(data []byte, filename string) (id, path string, err 
 
 	mm.files[id] = file
 	return id, path, nil
+}
+
+// RegisterExisting registers a media file that already exists in the DOCX package.
+// It preserves the original path, name, and content type so round-tripping does not
+// duplicate or rename embedded assets when hydrating documents.
+func (mm *MediaManager) RegisterExisting(id, path, contentType string, data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", errors.InvalidArgument("MediaManager.RegisterExisting", "data", data, "media data cannot be empty")
+	}
+	if path == "" {
+		return "", errors.InvalidArgument("MediaManager.RegisterExisting", "path", path, "media path cannot be empty")
+	}
+
+	m := strings.ReplaceAll(path, "\\", "/")
+	m = strings.TrimSpace(m)
+
+	mm.mu.Lock()
+	defer mm.mu.Unlock()
+
+	if id == "" {
+		id = mm.idGen.NextImageID()
+	}
+
+	filename := filepath.Base(m)
+	if filename == "" {
+		filename = id
+	}
+
+	if !strings.HasPrefix(m, constants.PathMediaPrefix) {
+		m = constants.PathMediaPrefix + strings.TrimPrefix(m, "/")
+	}
+
+	if contentType == "" {
+		ext := strings.ToLower(filepath.Ext(filename))
+		contentType = mm.detectContentType(ext)
+	}
+
+	// Update counter so future generated names do not collide with hydrated ones.
+	lowerName := strings.ToLower(filename)
+	if strings.HasPrefix(lowerName, "image") {
+		digits := strings.TrimPrefix(lowerName, "image")
+		digits = strings.TrimSuffix(digits, strings.ToLower(filepath.Ext(filename)))
+		if n, err := strconv.Atoi(digits); err == nil && n > mm.counter {
+			mm.counter = n
+		}
+	}
+
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+
+	mm.files[id] = &MediaFile{
+		ID:          id,
+		Name:        filename,
+		Path:        m,
+		ContentType: contentType,
+		Data:        copyData,
+	}
+
+	return id, nil
 }
 
 // Get retrieves a media file by ID.

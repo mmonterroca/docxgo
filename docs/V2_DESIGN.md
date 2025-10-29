@@ -1,12 +1,13 @@
 # go-docx v2.0 - Clean Architecture Design
 
 **Status**: ✅ v2.0.0-beta Ready  
-**Progress**: ~95% (Phases 1-9, 11 complete | Phase 10 planned for v2.1)  
+**Progress**: ~95% (Phases 1-9, 11 complete | Phase 10 reader in progress for v2.1)  
 **Target**: v2.0.0-beta in Q4 2025, v2.0.0 in Q1 2026  
 **Breaking Changes**: Yes (major version bump from original fork)
 
 > **Project Note**: This project originated as a fork of `fumiama/go-docx` but has been completely rewritten with a clean architecture design. The current version represents a ground-up rebuild focused on maintainability, type safety, and modern Go practices.
 
+> **✅ Validation Status**: All examples pass DocxValidator (strict OOXML schema). Ready for beta release.  
 > **📖 For API usage, see [V2_API_GUIDE.md](./V2_API_GUIDE.md)**  
 > **📊 For implementation status, see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)**
 > **🛠️ Planning & Roadmap live in [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md); this document remains the canonical architecture reference.**
@@ -718,6 +719,8 @@ Part 2 (commit e78d809):
 - ✅ Fixed package naming conflicts and interface definitions
 - ✅ All tests passing (100% success rate)
 - ✅ Example verified working (generates 4.8KB document)
+- ✅ Table look serialization simplified (strict-compliant bitmask only)
+- ✅ Removed w:docDefaults from styles.xml (strict schema compliance)
 
 **Actual effort**: 15 hours
 **Priority**: HIGH - Essential for professional documents
@@ -725,34 +728,35 @@ Part 2 (commit e78d809):
 ### Phase 10: Document Reading (Week 16)
 **Goal**: Implement .docx file reading and modification
 
-**Status**: Not Started
-- [ ] Unpack infrastructure (internal/reader/) (~300 lines)
-  - [ ] ZIP extraction
-  - [ ] XML parsing
-  - [ ] Relationship loading
-- [ ] XML deserialization (internal/xml/) (~400 lines)
-  - [ ] Document.xml parser
-  - [ ] Styles.xml parser
-  - [ ] Relationships parser
-  - [ ] Media loading
-- [ ] Domain object creation (internal/core/) (~300 lines)
-  - [ ] XML → Paragraph conversion
-  - [ ] XML → Run conversion
-  - [ ] XML → Table conversion
-  - [ ] Section/Header/Footer loading
-- [ ] Public API (docx.go) (~100 lines)
-  - [ ] OpenDocument(path string) function
-  - [ ] Document.Reload() method
-  - [ ] Document modification workflow
-- [ ] Tests (reader_test.go) (~500 lines)
-  - [ ] Open existing document tests
-  - [ ] Roundtrip tests (create → save → open → verify)
-  - [ ] Modification tests
-  - [ ] Complex document reading
-- [ ] Example (v2/examples/10_modify_document/) (~200 lines)
-  - [ ] Open and modify existing document
-  - [ ] Add content to existing document
-  - [ ] Update metadata
+**Status**: 🟡 In Progress (scaffolding + inline image hydration complete)
+- [x] Reader infrastructure (`internal/reader/`, ~300 LOC)
+  - [x] ZIP extraction and content type detection
+  - [x] Relationship resolution and media staging
+  - [x] Shared utilities reused from writer pipeline
+- [ ] XML deserialization (`internal/xml/`, ~400 LOC)
+  - [ ] Document.xml → structured model (generic XML tree ready, mapping TBD)
+  - [x] Preserve numbering.xml payload for pass-through
+  - [ ] Styles.xml import (preserve unknown nodes)
+  - [ ] Relationship and media mapping
+- [ ] Domain reconstruction (`internal/core/`, ~300 LOC)
+  - [ ] Build sections, paragraphs, runs, tables from XML *(paragraph spacing/alignment/indentation, run text + formatting, breaks/tabs/fields, basic table hydration, inline image reconstruction, and paragraph numbering references complete)*
+  - [x] Rehydrate inline media (images/drawings) and register media assets in managers
+  - [x] Hydrate paragraph numbering references (numPr) and register numbering.xml
+  - [x] Hydrate per-section layout (margins, headers/footers)
+  - [ ] Rehydrate managers (IDs, styles, media)
+  - [ ] Preserve forward compatibility fields where possible
+- [ ] Public API (`docx.go`, ~120 LOC)
+  - [ ] `OpenDocument(path string, opts ...Option)` *(basic path/stream/bytes helpers in place; awaits richer reconstruction before marking complete)*
+  - [ ] `Open(r io.Reader)`, future `Document.Reload()` hook
+  - [ ] Validation + error taxonomy alignment
+- [ ] Quality bar (`internal/core/reader_test.go`, ~500 LOC)
+  - [ ] Fixture coverage: simple, advanced, images, tables
+  - [ ] Round-trip regression (create → save → open → mutate → save)
+  - [ ] Concurrency guard rails and failure scenarios
+- [ ] Developer experience (~200 LOC)
+  - [ ] `examples/10_modify_document/main.go` walk-through
+  - [ ] Documentation updates (API guide, implementation status)
+  - [ ] CHANGELOG entry + migration guidance
 
 **Estimated effort**: 15-20 hours
 **Priority**: MEDIUM - Nice to have for v2.0.0, essential for v2.1.0
@@ -1123,6 +1127,11 @@ type docxDocument struct {
 - Large document handling
 - Concurrent access
 
+### Validation Tooling
+- DocxValidator (strict schema) integrated in example regression suite
+- Current status: ✅ All 12 generated examples pass strict OOXML validation
+- Regression guard: examples script filters legacy artifacts and runs validator on all fresh outputs
+
 ### Benchmark Tests
 ```go
 BenchmarkDocumentCreation
@@ -1260,13 +1269,13 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 ---
 
 **Next Steps:**
-1. ✅ Complete Phases 1-9, 11 (Core, Images, Tables, Quality)
+1. � Tag v2.0.0-beta release
 2. 🚧 Phase 10 - Document Reading (15-20 hours remaining)
 3. 🚧 Phase 12 - Beta Testing & Release
 4. Stable v2.0.0 release (Q1 2026)
 
-**Last Updated**: October 28, 2025  
-**Status**: ✅ Phase 11 Complete - Code Quality & Optimization  
+**Last Updated**: October 29, 2025  
+**Status**: ✅ Ready for v2.0.0-beta release  
 **Progress**: ~95% to v2.0.0 (10/12 phases complete)
 
 **Current State:**
@@ -1276,7 +1285,7 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 - ✅ Advanced tables: Complete (merging, nesting, 8 styles)
 - ✅ Code quality: EXCELLENT (0 warnings, 50.7% coverage, production-ready errors)
 - ✅ Documentation: Comprehensive (1,500+ lines of godoc, guides, and analysis)
-- 🚧 Reading existing .docx: Not started (Phase 10)
+- 🚧 Reading existing .docx: In progress (inline media + numbering hydrated; sections pending)
 - 🚧 Beta testing: Not started (Phase 12)
 - Target: v2.0.0-beta ready, stable release Q1 2026
 

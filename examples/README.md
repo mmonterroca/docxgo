@@ -131,6 +131,19 @@ cd 08_images && go run main.go
 cd 09_advanced_tables && go run main.go
 ```
 
+### [10_paragraph_spacing/](./10_paragraph_spacing/) - Paragraph Spacing (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Line and paragraph spacing controls
+- Set spacing before and after paragraphs (twips)
+- Configure exact vs. at-least line spacing rules
+- Mix typography blocks for comparison
+- Save finished document ready for inspection
+
+**Run:**
+```bash
+cd 10_paragraph_spacing && go run main.go
+```
+
 ### [11_multi_section/](./11_multi_section/) - Multi-Section Layouts (NEW!)
 **Status**: ✅ Fully functional  
 **Demonstrates**: Independent layouts per section

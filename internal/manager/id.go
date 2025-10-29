@@ -151,3 +151,16 @@ func (g *IDGenerator) Reset() {
 	g.footnoteCounter.Store(0)
 	g.endnoteCounter.Store(0)
 }
+
+// EnsureRelCounterAtLeast ensures the relationship counter is at least the provided value.
+func (g *IDGenerator) EnsureRelCounterAtLeast(value uint64) {
+	for {
+		current := g.relCounter.Load()
+		if current >= value {
+			return
+		}
+		if g.relCounter.CompareAndSwap(current, value) {
+			return
+		}
+	}
+}

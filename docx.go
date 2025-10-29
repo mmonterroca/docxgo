@@ -26,9 +26,13 @@ SOFTWARE.
 package docx
 
 import (
+	"io"
+
 	"github.com/mmonterroca/docxgo/domain"
 	"github.com/mmonterroca/docxgo/internal/core"
+	"github.com/mmonterroca/docxgo/internal/reader"
 	"github.com/mmonterroca/docxgo/pkg/color"
+	"github.com/mmonterroca/docxgo/pkg/errors"
 )
 
 // NewDocument creates a new empty Word document.
@@ -43,6 +47,63 @@ import (
 //	doc.SaveToFile("hello.docx")
 func NewDocument() domain.Document {
 	return core.NewDocument()
+}
+
+// OpenDocument loads an existing .docx file from disk into a domain.Document.
+// The returned document can be inspected or modified using the same APIs as a
+// newly created document. Unknown elements are preserved internally so future
+// writes keep original content whenever possible.
+func OpenDocument(path string) (domain.Document, error) {
+	const op = "docx.OpenDocument"
+
+	pkg, err := reader.LoadPackageFromPath(path)
+	if err != nil {
+		return nil, errors.Wrap(err, op)
+	}
+
+	return reconstructFromPackage(pkg, op)
+}
+
+// OpenDocumentFromBytes loads a .docx archive provided as an in-memory byte
+// slice. This is useful when documents are already buffered or retrieved from
+// external services.
+func OpenDocumentFromBytes(data []byte) (domain.Document, error) {
+	const op = "docx.OpenDocumentFromBytes"
+
+	pkg, err := reader.LoadPackageFromBytes(data)
+	if err != nil {
+		return nil, errors.Wrap(err, op)
+	}
+
+	return reconstructFromPackage(pkg, op)
+}
+
+// OpenDocumentFromReader loads a .docx archive from any io.Reader.
+// The stream is buffered in memory to satisfy the random-access requirements
+// of the DOCX zip container.
+func OpenDocumentFromReader(r io.Reader) (domain.Document, error) {
+	const op = "docx.OpenDocumentFromReader"
+
+	pkg, err := reader.LoadPackageFromStream(r)
+	if err != nil {
+		return nil, errors.Wrap(err, op)
+	}
+
+	return reconstructFromPackage(pkg, op)
+}
+
+func reconstructFromPackage(pkg *reader.Package, op string) (domain.Document, error) {
+	parsed, err := reader.ParsePackage(pkg)
+	if err != nil {
+		return nil, errors.Wrap(err, op)
+	}
+
+	doc, err := reader.ReconstructDocument(parsed)
+	if err != nil {
+		return nil, errors.Wrap(err, op)
+	}
+
+	return doc, nil
 }
 
 // Version is the library version.

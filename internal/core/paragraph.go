@@ -55,6 +55,7 @@ type paragraph struct {
 	spacingBefore int
 	spacingAfter  int
 	lineSpacing   domain.LineSpacing
+	numbering     *domain.NumberingReference
 	idGen         IDGenerator
 	relManager    *manager.RelationshipManager
 	bookmarkID    string // ID for bookmark (if this paragraph needs one for TOC)
@@ -211,6 +212,59 @@ func (p *paragraph) attachImage(img domain.Image, sourceName string) error {
 	p.runs = append(p.runs, run)
 	p.images = append(p.images, img)
 	return nil
+}
+
+// RegisterHydratedImage records an image that was rehydrated from an existing document.
+// It preserves media metadata so the image can be written back without renaming.
+func (p *paragraph) RegisterHydratedImage(img domain.Image, mediaPath, contentType string, data []byte) error {
+	if img == nil {
+		return errors.InvalidArgument("Paragraph.RegisterHydratedImage", "image", nil, "image cannot be nil")
+	}
+	if mediaPath == "" {
+		return errors.InvalidArgument("Paragraph.RegisterHydratedImage", "mediaPath", mediaPath, "media path cannot be empty")
+	}
+	if len(data) == 0 {
+		return errors.InvalidArgument("Paragraph.RegisterHydratedImage", "data", data, "image data cannot be empty")
+	}
+
+	if p.mediaManager != nil {
+		if _, err := p.mediaManager.RegisterExisting(img.ID(), mediaPath, contentType, data); err != nil {
+			return errors.Wrap(err, "Paragraph.RegisterHydratedImage")
+		}
+	}
+
+	p.images = append(p.images, img)
+	return nil
+}
+
+// AttachHydratedImageToRun associates a rehydrated image with the provided run and registers it with the media manager.
+func (p *paragraph) AttachHydratedImageToRun(r domain.Run, img domain.Image, mediaPath, contentType string, data []byte) error {
+	if r == nil {
+		return errors.InvalidArgument("Paragraph.AttachHydratedImageToRun", "run", nil, "run cannot be nil")
+	}
+	if img == nil {
+		return errors.InvalidArgument("Paragraph.AttachHydratedImageToRun", "image", nil, "image cannot be nil")
+	}
+
+	coreRun, ok := r.(*run)
+	if !ok {
+		return errors.InvalidArgument("Paragraph.AttachHydratedImageToRun", "run", r, "unexpected run implementation")
+	}
+
+	coreRun.setImage(img)
+
+	relID := ""
+	if accessor, ok := img.(interface{ RelationshipID() string }); ok {
+		relID = accessor.RelationshipID()
+	}
+
+	if relID != "" && coreRun.relManager != nil {
+		target := img.Target()
+		if err := coreRun.relManager.RegisterExisting(relID, constants.RelTypeImage, target, "Internal"); err != nil {
+			return errors.Wrap(err, "Paragraph.AttachHydratedImageToRun")
+		}
+	}
+	return p.RegisterHydratedImage(img, mediaPath, contentType, data)
 }
 
 // Images returns all images in this paragraph.
@@ -381,4 +435,38 @@ func (p *paragraph) SetLineSpacing(spacing domain.LineSpacing) error {
 	}
 	p.lineSpacing = spacing
 	return nil
+}
+
+// Numbering returns the numbering reference applied to the paragraph, if any.
+func (p *paragraph) Numbering() (domain.NumberingReference, bool) {
+	if p == nil || p.numbering == nil {
+		return domain.NumberingReference{}, false
+	}
+	return *p.numbering, true
+}
+
+// SetNumbering applies a numbering reference (list id + level) to the paragraph.
+func (p *paragraph) SetNumbering(ref domain.NumberingReference) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetNumbering", "paragraph is nil")
+	}
+	if ref.Level < domain.NumberingLevelMin || ref.Level > domain.NumberingLevelMax {
+		return errors.InvalidArgument("Paragraph.SetNumbering", "ref.Level", ref.Level,
+			"numbering level must be between 0 and 8")
+	}
+	if ref.ID < 0 {
+		return errors.InvalidArgument("Paragraph.SetNumbering", "ref.ID", ref.ID,
+			"numbering id cannot be negative")
+	}
+	copyRef := ref
+	p.numbering = &copyRef
+	return nil
+}
+
+// ClearNumbering removes any numbering reference from the paragraph.
+func (p *paragraph) ClearNumbering() {
+	if p == nil {
+		return
+	}
+	p.numbering = nil
 }

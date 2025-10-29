@@ -36,6 +36,7 @@ import (
 	"strings"
 
 	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/pkg/constants"
 	"github.com/mmonterroca/docxgo/pkg/errors"
 )
 
@@ -116,6 +117,67 @@ func NewImageWithPosition(id, path string, size domain.ImageSize, pos domain.Ima
 	docxImg.position = pos
 
 	return img, nil
+}
+
+// NewImageFromPackage creates an image from raw package data and target.
+func NewImageFromPackage(target string, data []byte, contentType string) (domain.Image, error) {
+	if target == "" {
+		return nil, errors.InvalidArgument("NewImageFromPackage", "target", target, "image target cannot be empty")
+	}
+	if len(data) == 0 {
+		return nil, errors.InvalidArgument("NewImageFromPackage", "data", data, "image data cannot be empty")
+	}
+
+	normalized := strings.ReplaceAll(target, "\\", "/")
+	normalized = strings.TrimSpace(normalized)
+	normalized = strings.TrimPrefix(normalized, "./")
+	normalized = strings.TrimPrefix(normalized, "/")
+
+	for strings.HasPrefix(normalized, "../") {
+		normalized = strings.TrimPrefix(normalized, "../")
+	}
+
+	relative := normalized
+	if strings.HasPrefix(relative, "word/") {
+		relative = strings.TrimPrefix(relative, "word/")
+	}
+
+	base := filepath.Base(relative)
+	if base == "" {
+		return nil, errors.InvalidArgument("NewImageFromPackage", "target", target, "image target missing file name")
+	}
+
+	id := strings.TrimSuffix(base, filepath.Ext(base))
+	if id == "" {
+		id = base
+	}
+
+	format := detectImageFormat(relative)
+	if format == "" {
+		format = formatFromContentType(contentType)
+	}
+	if format == "" {
+		return nil, errors.InvalidArgument("NewImageFromPackage", "target", target, "unsupported or unknown image format")
+	}
+
+	size, err := getImageDimensions(data)
+	if err != nil {
+		return nil, errors.Wrap(err, "NewImageFromPackage")
+	}
+
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+
+	return &docxImage{
+		id:           id,
+		format:       format,
+		size:         size,
+		originalSize: size,
+		data:         copyData,
+		target:       relative,
+		description:  "",
+		position:     domain.DefaultImagePosition(),
+	}, nil
 }
 
 // ID returns the unique image ID.
@@ -200,6 +262,12 @@ func (img *docxImage) Position() domain.ImagePosition {
 	return img.position
 }
 
+// SetPosition sets the image position metadata.
+func (img *docxImage) SetPosition(pos domain.ImagePosition) error {
+	img.position = pos
+	return nil
+}
+
 // detectImageFormat detects the image format from file extension.
 func detectImageFormat(path string) domain.ImageFormat {
 	ext := strings.ToLower(filepath.Ext(path))
@@ -220,6 +288,23 @@ func detectImageFormat(path string) domain.ImageFormat {
 		return domain.ImageFormatSVG
 	case "webp":
 		return domain.ImageFormatWEBP
+	default:
+		return ""
+	}
+}
+
+func formatFromContentType(contentType string) domain.ImageFormat {
+	switch strings.ToLower(contentType) {
+	case constants.ContentTypePNG:
+		return domain.ImageFormatPNG
+	case constants.ContentTypeJPEG:
+		return domain.ImageFormatJPEG
+	case constants.ContentTypeGIF:
+		return domain.ImageFormatGIF
+	case constants.ContentTypeBMP:
+		return domain.ImageFormatBMP
+	case constants.ContentTypeTIFF:
+		return domain.ImageFormatTIFF
 	default:
 		return ""
 	}

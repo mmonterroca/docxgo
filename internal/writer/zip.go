@@ -40,6 +40,12 @@ type ZipWriter struct {
 	serializer *serializer.DocumentSerializer
 }
 
+// NumberingPart represents numbering.xml data that should be preserved in the DOCX package.
+type NumberingPart struct {
+	Data   []byte
+	Target string
+}
+
 // NewZipWriter creates a new ZipWriter.
 func NewZipWriter(w io.Writer) *ZipWriter {
 	return &ZipWriter{
@@ -49,9 +55,11 @@ func NewZipWriter(w io.Writer) *ZipWriter {
 }
 
 // WriteDocument writes a complete .docx document structure.
-func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Relationships, coreProps *xmlstructs.CoreProperties, appProps *xmlstructs.AppProperties, styles *xmlstructs.Styles, media []*manager.MediaFile, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer) error {
+func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Relationships, coreProps *xmlstructs.CoreProperties, appProps *xmlstructs.AppProperties, styles *xmlstructs.Styles, media []*manager.MediaFile, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, numbering *NumberingPart) error {
+	numberingPart := sanitizeNumberingPart(numbering)
+
 	// Write [Content_Types].xml with optional header/footer overrides
-	if err := zw.writeContentTypes(headers, footers, media); err != nil {
+	if err := zw.writeContentTypes(headers, footers, media, numberingPart); err != nil {
 		return fmt.Errorf("write content types: %w", err)
 	}
 
@@ -66,7 +74,7 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 	}
 
 	// Write word/_rels/document.xml.rels
-	if err := zw.writeDocumentRels(rels); err != nil {
+	if err := zw.writeDocumentRels(rels, numberingPart); err != nil {
 		return fmt.Errorf("write document rels: %w", err)
 	}
 
@@ -124,6 +132,12 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 		}
 	}
 
+	if numberingPart != nil {
+		if err := zw.writeRaw(fmt.Sprintf("word/%s", numberingPart.Target), numberingPart.Data); err != nil {
+			return fmt.Errorf("write numbering part: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -133,7 +147,7 @@ func (zw *ZipWriter) Close() error {
 }
 
 // writeContentTypes writes [Content_Types].xml
-func (zw *ZipWriter) writeContentTypes(headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, media []*manager.MediaFile) error {
+func (zw *ZipWriter) writeContentTypes(headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, media []*manager.MediaFile, numbering *NumberingPart) error {
 	ct := &xmlstructs.ContentTypes{
 		Xmlns: constants.NamespaceContentTypes,
 		Defaults: []*xmlstructs.Default{
@@ -196,6 +210,10 @@ func (zw *ZipWriter) writeContentTypes(headers map[string]*xmlstructs.Header, fo
 		addOverride(fmt.Sprintf("/word/%s", name), constants.ContentTypeFooter)
 	}
 
+	if numbering != nil {
+		addOverride(fmt.Sprintf("/word/%s", numbering.Target), constants.ContentTypeNumbering)
+	}
+
 	return zw.writeXML("[Content_Types].xml", ct)
 }
 
@@ -231,7 +249,7 @@ func (zw *ZipWriter) writeMainDocument(doc *xmlstructs.Document) error {
 }
 
 // writeDocumentRels writes word/_rels/document.xml.rels
-func (zw *ZipWriter) writeDocumentRels(rels *xmlstructs.Relationships) error {
+func (zw *ZipWriter) writeDocumentRels(rels *xmlstructs.Relationships, numbering *NumberingPart) error {
 	if rels == nil {
 		rels = &xmlstructs.Relationships{
 			Xmlns:         constants.NamespacePackageRels,
@@ -279,6 +297,10 @@ func (zw *ZipWriter) writeDocumentRels(rels *xmlstructs.Relationships) error {
 	ensureRel(constants.RelTypeTheme, "theme/theme1.xml")
 	ensureRel(constants.RelTypeSettings, "settings.xml")
 	ensureRel(constants.RelTypeWebSettings, "webSettings.xml")
+
+	if numbering != nil {
+		ensureRel(constants.RelTypeNumbering, numbering.Target)
+	}
 
 	return zw.writeXML("word/_rels/document.xml.rels", rels)
 }
@@ -525,4 +547,31 @@ func (zw *ZipWriter) writeMediaFiles(media []*manager.MediaFile) error {
 		}
 	}
 	return nil
+}
+
+func sanitizeNumberingPart(part *NumberingPart) *NumberingPart {
+	if part == nil || len(part.Data) == 0 {
+		return nil
+	}
+	return &NumberingPart{
+		Data:   part.Data,
+		Target: sanitizeNumberingTarget(part.Target),
+	}
+}
+
+func sanitizeNumberingTarget(target string) string {
+	trimmed := strings.TrimSpace(target)
+	trimmed = strings.TrimPrefix(trimmed, "./")
+	trimmed = strings.ReplaceAll(trimmed, "\\", "/")
+	trimmed = strings.TrimPrefix(trimmed, "/")
+	if strings.HasPrefix(strings.ToLower(trimmed), "word/") {
+		trimmed = trimmed[5:]
+	}
+	for strings.HasPrefix(trimmed, "../") {
+		trimmed = strings.TrimPrefix(trimmed, "../")
+	}
+	if trimmed == "" {
+		trimmed = "numbering.xml"
+	}
+	return trimmed
 }

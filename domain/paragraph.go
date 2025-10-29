@@ -95,6 +95,15 @@ type Paragraph interface {
 
 	// SetLineSpacing sets the line spacing.
 	SetLineSpacing(spacing LineSpacing) error
+
+	// Numbering returns the numbering reference applied to this paragraph, if any.
+	Numbering() (NumberingReference, bool)
+
+	// SetNumbering applies a numbering reference (list id + level) to the paragraph.
+	SetNumbering(ref NumberingReference) error
+
+	// ClearNumbering removes any numbering reference from the paragraph.
+	ClearNumbering()
 }
 
 // Alignment represents horizontal alignment options for paragraphs.
@@ -122,6 +131,18 @@ type LineSpacing struct {
 	Rule  LineSpacingRule
 	Value int // Meaning depends on Rule
 }
+
+// NumberingReference identifies a numbering instance and level for a paragraph.
+type NumberingReference struct {
+	ID    int // numId value from numbering.xml
+	Level int // ilvl value (0-8)
+}
+
+// Numbering level bounds supported by Word numbering definitions.
+const (
+	NumberingLevelMin = 0
+	NumberingLevelMax = 8
+)
 
 // LineSpacingRule defines how line spacing is calculated.
 type LineSpacingRule int
