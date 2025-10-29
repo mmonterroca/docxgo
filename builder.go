@@ -23,9 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// Package docx provides a fluent builder API for creating Word documents.
-// The builder pattern allows for intuitive and chainable document construction
-// with built-in error handling and validation.
 package docx
 
 import (

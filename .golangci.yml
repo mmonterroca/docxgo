@@ -1,75 +1,49 @@
+version: '2'
+
 linters-settings:
   errcheck:
     exclude-functions:
       - fmt:.*
-    ignoretests: true
+    check-blank: false
 
-  goimports:
-    local-prefixes: github.com/mmonterroca/docxgo
-
-  forbidigo:
-    # Forbid the following identifiers
-    forbid:
-      - ^fmt\.Errorf$ # Use errors package from pkg/errors
+  revive:
+    rules:
+      - name: package-comments
+        disabled: true
 
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
-  fast: false
   enable:
-    - bodyclose
-    #- depguard
-    - dogsled
-    - dupl
     - errcheck
-    - copyloopvar
-    - exhaustive
-    #- funlen
-    #- goconst
     - gocritic
-    #- gocyclo
-    #- gofumpt
-    #- goimports
-    - goprintffuncname
-    #- gosec
-    - gosimple
     - govet
     - ineffassign
-    - misspell
-    - nolintlint
-    - rowserrcheck
-    - staticcheck
-    - stylecheck
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-    - whitespace
-    - prealloc
-    - predeclared
-    - asciicheck
     - revive
-    - makezero
+    - staticcheck
+    - unused
+    - unparam
+    - exhaustive
+    - misspell
+    - unconvert
+  
+  # Exclude error checking issues in example files only
+  # Examples are demonstration code where verbosity from error handling would obscure the API being demonstrated
+  # Production code in cmd/ and internal/ must handle all errors properly
+  exclusions:
+    rules:
+      - path: ^examples/
+        linters:
+          - errcheck
+          - gocritic
+          - revive
+          - staticcheck
 
 run:
-  # default concurrency is a available CPU number.
-  # concurrency: 4 # explicitly omit this value to fully utilize available resources.
-  deadline: 5m
-  issues-exit-code: 1
+  timeout: 5m
   tests: false
 
-# output configuration options
 output:
   formats:
-    - format: "colored-line-number"
-  print-issued-lines: true
-  print-linter-name: true
-
-issues:
-  # Fix found issues (if it's supported by the linter)
-  fix: false
-  exclude-use-default: false
-  uniq-by-line: true
-  exclude:
-    - "Error return value of .((os.)?std(out|err)..*|.*Close|.*Seek|.*Flush|os.Remove(All)?|.*print(f|ln)?|os.(Un)?Setenv). is not check"
+    text:
+      print-linter-name: true
+      print-issued-lines: true

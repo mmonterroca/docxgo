@@ -1,3 +1,4 @@
+// Command test_write demonstrates basic document creation and writing using go-docx.
 package main
 
 import (
@@ -13,7 +14,10 @@ func main() {
 
 	para, _ := doc.AddParagraph()
 	run, _ := para.AddRun()
-	run.SetText("Hello, World!")
+	if err := run.SetText("Hello, World!"); err != nil {
+		fmt.Printf("Error setting text: %v\n", err)
+		return
+	}
 
 	// Write to buffer
 	var buf bytes.Buffer

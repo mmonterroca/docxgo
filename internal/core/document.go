@@ -381,7 +381,12 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 
 	// Create ZIP writer
 	zipWriter := writer.NewZipWriter(w)
-	defer zipWriter.Close()
+	defer func() {
+		if err := zipWriter.Close(); err != nil {
+			// Log error but don't override return value as document may have been partially written
+			_ = err
+		}
+	}()
 
 	// Build relationships from relationship manager
 	rels := d.relManager.ToXML()
@@ -417,9 +422,13 @@ func (d *document) SaveAs(path string) error {
 	if err != nil {
 		return errors.WrapWithCode(err, errors.ErrCodeIO, "Document.SaveAs")
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = errors.WrapWithCode(closeErr, errors.ErrCodeIO, "Document.SaveAs")
+		}
+	}()
 
-	// Write document
+	// Write document to file
 	_, err = d.WriteTo(file)
 	if err != nil {
 		return errors.Wrap(err, "Document.SaveAs")

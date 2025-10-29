@@ -376,7 +376,7 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 			}
 		}
 
-		switch field.Type() {
+		switch field.Type() { //nolint:exhaustive // Only Hyperlink needs special handling; others use standard field serialization below
 		case domain.FieldTypeHyperlink:
 			if accessor, ok := field.(interface {
 				GetProperty(string) (string, bool)
@@ -425,6 +425,9 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 					continue
 				}
 			}
+		default:
+			// Other field types (TOC, PageNumber, Date, etc.) use standard field serialization
+			// which is handled below
 		}
 
 		beginRun := &xml.Run{FieldChar: xml.NewFieldBegin()}

@@ -61,6 +61,8 @@ type paragraphStyle struct {
 
 // newParagraphStyle creates a new paragraph style.
 // Note: builtIn parameter is used in tests to create custom styles.
+//
+//nolint:unparam // builtIn always true in production, but false in tests
 func newParagraphStyle(id, name string, builtIn bool) *paragraphStyle {
 	return &paragraphStyle{
 		id:            id,

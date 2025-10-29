@@ -51,6 +51,8 @@ type characterStyle struct {
 
 // newCharacterStyle creates a new character style.
 // Note: builtIn parameter is used in tests to create custom styles.
+//
+//nolint:unparam // builtIn always true in production, but false in tests
 func newCharacterStyle(id, name string, builtIn bool) *characterStyle {
 	return &characterStyle{
 		id:        id,

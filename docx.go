@@ -23,20 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// Package docx provides functionality for creating and manipulating
-// Microsoft Word (.docx) documents.
-//
-// This is v2 of the go-docx library, a complete rewrite with improved
-// architecture, better error handling, and comprehensive OOXML support.
-//
-// Example usage:
-//
-//	doc := docx.NewDocument()
-//	para, _ := doc.AddParagraph()
-//	run, _ := para.AddRun()
-//	run.SetText("Hello, World!")
-//	run.SetBold(true)
-//	doc.SaveAs("hello.docx")
 package docx
 
 import (
