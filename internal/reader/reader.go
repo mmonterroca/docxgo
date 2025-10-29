@@ -55,7 +55,9 @@ func LoadPackageFromPath(path string) (*Package, error) {
 	if err != nil {
 		return nil, errors.WrapWithCode(err, errors.ErrCodeIO, opLoadFromPath)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Best effort close
+	}()
 
 	info, err := file.Stat()
 	if err != nil {
@@ -171,7 +173,9 @@ func readZipFile(file *zip.File) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rc.Close()
+	defer func() {
+		_ = rc.Close() // Best effort close
+	}()
 
 	data, err := io.ReadAll(rc)
 	if err != nil {

@@ -137,10 +137,7 @@ func NewImageFromPackage(target string, data []byte, contentType string) (domain
 		normalized = strings.TrimPrefix(normalized, "../")
 	}
 
-	relative := normalized
-	if strings.HasPrefix(relative, "word/") {
-		relative = strings.TrimPrefix(relative, "word/")
-	}
+	relative := strings.TrimPrefix(normalized, "word/")
 
 	base := filepath.Base(relative)
 	if base == "" {

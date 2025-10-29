@@ -53,8 +53,7 @@ func parseXMLTree(data []byte) (*Element, error) {
 		if err != nil {
 			return nil, err
 		}
-		switch start := tok.(type) {
-		case xml.StartElement:
+		if start, ok := tok.(xml.StartElement); ok {
 			return parseElement(dec, start)
 		}
 	}
