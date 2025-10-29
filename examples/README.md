@@ -158,6 +158,21 @@ cd 10_paragraph_spacing && go run main.go
 cd 11_multi_section && go run main.go
 ```
 
+### [12_read_and_modify/](./12_read_and_modify/) - Read and Modify Documents (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Complete read/modify/write workflow
+- Create comprehensive showcase document with all features
+- Read existing .docx files using OpenDocument()
+- Inspect document content (paragraphs, tables, text)
+- Modify existing documents (add paragraphs, tables)
+- Save modified versions with different names
+- Preserve existing formatting and content
+
+**Run:**
+```bash
+cd 12_read_and_modify && go run main.go
+```
+
 ### [basic/](./basic/) - Simple API Example
 **Status**: ✅ Fully functional  
 **Demonstrates**: Direct domain API (non-builder)
@@ -229,7 +244,10 @@ examples/
 ├── 07_advanced/07_advanced_demo.docx (4.6KB)
 ├── 08_images/08_images_output.docx (4.2KB)
 ├── 09_advanced_tables/09_advanced_tables_output.docx (4.8KB)
-└── 11_multi_section/11_multi_section_demo.docx (4.4KB)
+├── 11_multi_section/11_multi_section_demo.docx (4.4KB)
+└── 12_read_and_modify/
+    ├── 12_showcase_original.docx (3.8KB)
+    └── 12_modified_document.docx (4.2KB)
 ```
 
 **All documents are ready to open in**:

@@ -37,6 +37,7 @@ EXAMPLES=(
     "09_advanced_tables"
     "10_paragraph_spacing"
     "11_multi_section"
+    "12_read_and_modify"
 )
 
 FAILED=()
