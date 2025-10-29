@@ -281,7 +281,64 @@ func inspectDocument(doc domain.Document) {
 
 // modifyDocument demonstrates how to modify existing content
 func modifyDocument(doc domain.Document) {
-	// Add a new section at the end
+	// PART 1: Modify existing content
+	fmt.Println("   → Modifying existing paragraphs...")
+	paragraphs := doc.Paragraphs()
+	
+	// Change the title color
+	if len(paragraphs) > 0 {
+		title := paragraphs[0]
+		runs := title.Runs()
+		if len(runs) > 0 {
+			runs[0].SetColor(docx.Blue) // Change title to blue
+		}
+	}
+
+	// Add emphasis to subtitle
+	if len(paragraphs) > 1 {
+		subtitle := paragraphs[1]
+		runs := subtitle.Runs()
+		if len(runs) > 0 {
+			runs[0].SetItalic(true) // Make subtitle italic
+		}
+	}
+
+	// Modify a heading - find "1. Text Formatting Capabilities"
+	for _, para := range paragraphs {
+		if para.Text() == "1. Text Formatting Capabilities" {
+			para.SetStyle(domain.StyleIDHeading2) // Change from H1 to H2
+			runs := para.Runs()
+			if len(runs) > 0 {
+				runs[0].SetText("1. Text Formatting (MODIFIED)") // Update text
+				runs[0].SetColor(docx.Red)                       // Highlight in red
+			}
+			break
+		}
+	}
+
+	// Modify table content
+	fmt.Println("   → Modifying existing table...")
+	tables := doc.Tables()
+	if len(tables) > 0 {
+		table := tables[0]
+		// Update a cell in the table (row 2, column 2 - "Item B" price)
+		if row, err := table.Row(2); err == nil {
+			if cell, err := row.Cell(2); err == nil {
+				paragraphs := cell.Paragraphs()
+				if len(paragraphs) > 0 {
+					runs := paragraphs[0].Runs()
+					if len(runs) > 0 {
+						runs[0].SetText("$35.00 (UPDATED)") // Update price
+						runs[0].SetBold(true)
+						runs[0].SetColor(docx.Green)
+					}
+				}
+			}
+		}
+	}
+
+	// PART 2: Add new content
+	fmt.Println("   → Adding new section...")
 	newPara, err := doc.AddParagraph()
 	if err != nil {
 		log.Printf("Warning: Could not add paragraph: %v", err)
@@ -292,12 +349,12 @@ func modifyDocument(doc domain.Document) {
 	newPara.SetStyle(domain.StyleIDHeading1)
 	run, _ := newPara.AddRun()
 	run.SetText("5. Modifications (Added by Reader)")
-	run.SetColor(docx.Blue)
+	run.SetColor(docx.Purple)
 
 	// Add description paragraph
 	descPara, _ := doc.AddParagraph()
 	descRun, _ := descPara.AddRun()
-	descRun.SetText("This section was added after reading the document. This demonstrates the document modification capabilities:")
+	descRun.SetText("This section was added after reading the document. The modifications demonstrate:")
 
 	// Add bullet points
 	bullet1, _ := doc.AddParagraph()
@@ -313,17 +370,22 @@ func modifyDocument(doc domain.Document) {
 	bullet3, _ := doc.AddParagraph()
 	bullet3.SetStyle(domain.StyleIDListParagraph)
 	b3run, _ := bullet3.AddRun()
-	b3run.SetText("✓ Modify text and formatting")
+	b3run.SetText("✓ Modify existing text and formatting")
 
 	bullet4, _ := doc.AddParagraph()
 	bullet4.SetStyle(domain.StyleIDListParagraph)
 	b4run, _ := bullet4.AddRun()
-	b4run.SetText("✓ Add new content (paragraphs, tables)")
+	b4run.SetText("✓ Update table cell values")
 
 	bullet5, _ := doc.AddParagraph()
 	bullet5.SetStyle(domain.StyleIDListParagraph)
 	b5run, _ := bullet5.AddRun()
-	b5run.SetText("✓ Save modified documents")
+	b5run.SetText("✓ Add new content (paragraphs, tables)")
+
+	bullet6, _ := doc.AddParagraph()
+	bullet6.SetStyle(domain.StyleIDListParagraph)
+	b6run, _ := bullet6.AddRun()
+	b6run.SetText("✓ Save modified documents")
 
 	// Add a new table showing the changes
 	newTable, err := doc.AddTable(3, 2)
@@ -365,13 +427,46 @@ func modifyDocument(doc domain.Document) {
 	cell20, _ := row2.Cell(0)
 	p20, _ := cell20.AddParagraph()
 	r20, _ := p20.AddRun()
-	r20.SetText("Document Modification")
+	r20.SetText("Editing Existing Content")
 
 	cell21, _ := row2.Cell(1)
 	p21, _ := cell21.AddParagraph()
 	r21, _ := p21.AddRun()
 	r21.SetText("✅ Working")
 	r21.SetColor(docx.Green)
+
+	// Add summary of changes
+	doc.AddParagraph() // Empty line
+
+	summaryPara, _ := doc.AddParagraph()
+	summaryPara.SetStyle(domain.StyleIDIntenseQuote)
+	summaryRun, _ := summaryPara.AddRun()
+	summaryRun.SetText("📝 Changes made to original document:")
+
+	change1, _ := doc.AddParagraph()
+	change1.SetStyle(domain.StyleIDListParagraph)
+	c1run, _ := change1.AddRun()
+	c1run.SetText("• Title color changed to blue")
+
+	change2, _ := doc.AddParagraph()
+	change2.SetStyle(domain.StyleIDListParagraph)
+	c2run, _ := change2.AddRun()
+	c2run.SetText("• Subtitle made italic")
+
+	change3, _ := doc.AddParagraph()
+	change3.SetStyle(domain.StyleIDListParagraph)
+	c3run, _ := change3.AddRun()
+	c3run.SetText("• Section 1 heading text updated and colored red")
+
+	change4, _ := doc.AddParagraph()
+	change4.SetStyle(domain.StyleIDListParagraph)
+	c4run, _ := change4.AddRun()
+	c4run.SetText("• Table price updated from $30.00 to $35.00")
+
+	change5, _ := doc.AddParagraph()
+	change5.SetStyle(domain.StyleIDListParagraph)
+	c5run, _ := change5.AddRun()
+	c5run.SetText("• New section 5 added with content")
 
 	// Add final note
 	finalPara, _ := doc.AddParagraph()

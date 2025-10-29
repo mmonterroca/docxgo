@@ -24,11 +24,21 @@ Creates a comprehensive showcase document featuring:
 - Gathers document statistics
 
 ### 4. **Document Modification**
-- Adds new paragraphs to existing documents
-- Creates new runs with custom formatting
-- Adds tables with styled cells
-- Applies paragraph and character styles
-- Preserves existing content and formatting
+Demonstrates **two types of modifications**:
+
+#### A. **Editing Existing Content**
+- Change text color of existing runs (title → blue)
+- Apply formatting to existing text (subtitle → italic)
+- Update paragraph styles (Heading1 → Heading2)
+- Modify text content of existing runs
+- Update table cell values and formatting
+
+#### B. **Adding New Content**
+- Add new paragraphs to existing documents
+- Create new runs with custom formatting
+- Add tables with styled cells
+- Apply paragraph and character styles
+- Preserve existing content and formatting
 
 ### 5. **Save As Different File**
 - Saves modified document with a new filename
@@ -94,7 +104,50 @@ for i, para := range paragraphs {
 }
 ```
 
-### Step 4: Modify Document
+### Step 4A: Edit Existing Content
+
+```go
+// Get existing paragraphs
+paragraphs := doc.Paragraphs()
+
+// Modify title color
+if len(paragraphs) > 0 {
+    title := paragraphs[0]
+    runs := title.Runs()
+    if len(runs) > 0 {
+        runs[0].SetColor(docx.Blue) // Change color
+    }
+}
+
+// Find and update specific paragraph
+for _, para := range paragraphs {
+    if para.Text() == "1. Text Formatting Capabilities" {
+        runs := para.Runs()
+        if len(runs) > 0 {
+            runs[0].SetText("1. Text Formatting (MODIFIED)")
+            runs[0].SetColor(docx.Red)
+        }
+        break
+    }
+}
+
+// Update table cell value
+tables := doc.Tables()
+if len(tables) > 0 {
+    row, _ := tables[0].Row(2)
+    cell, _ := row.Cell(2)
+    paras := cell.Paragraphs()
+    if len(paras) > 0 {
+        runs := paras[0].Runs()
+        if len(runs) > 0 {
+            runs[0].SetText("$35.00 (UPDATED)")
+            runs[0].SetBold(true)
+        }
+    }
+}
+```
+
+### Step 4B: Add New Content
 
 ```go
 // Add new paragraph
@@ -102,7 +155,7 @@ newPara, _ := doc.AddParagraph()
 newPara.SetStyle(domain.StyleIDHeading1)
 run, _ := newPara.AddRun()
 run.SetText("5. Modifications (Added by Reader)")
-run.SetColor(docx.Blue)
+run.SetColor(docx.Purple)
 
 // Add new table
 table, _ := doc.AddTable(3, 2)
@@ -121,30 +174,40 @@ if err != nil {
 
 ## API Features Demonstrated
 
-| Feature | API Method | Example Usage |
+| Category | API Method | Example Usage |
 |---------|-----------|---------------|
+| **Opening** | | |
 | Open document | `docx.OpenDocument()` | `doc, err := docx.OpenDocument("file.docx")` |
+| **Reading** | | |
 | Get paragraphs | `doc.Paragraphs()` | `paras := doc.Paragraphs()` |
 | Get tables | `doc.Tables()` | `tables := doc.Tables()` |
+| Get runs | `para.Runs()` | `runs := para.Runs()` |
+| Get text | `para.Text()` | `text := para.Text()` |
+| Get table row | `table.Row()` | `row, _ := table.Row(0)` |
+| Get cell | `row.Cell()` | `cell, _ := row.Cell(0)` |
+| **Editing** | | |
+| Set text | `run.SetText()` | `run.SetText("New text")` |
+| Set color | `run.SetColor()` | `run.SetColor(docx.Blue)` |
+| Set bold | `run.SetBold()` | `run.SetBold(true)` |
+| Set italic | `run.SetItalic()` | `run.SetItalic(true)` |
+| Set style | `para.SetStyle()` | `para.SetStyle(domain.StyleIDHeading1)` |
+| **Adding** | | |
 | Add paragraph | `doc.AddParagraph()` | `para, _ := doc.AddParagraph()` |
 | Add run | `para.AddRun()` | `run, _ := para.AddRun()` |
-| Set text | `run.SetText()` | `run.SetText("Hello")` |
-| Set style | `para.SetStyle()` | `para.SetStyle(domain.StyleIDHeading1)` |
-| Set color | `run.SetColor()` | `run.SetColor(docx.Blue)` |
 | Add table | `doc.AddTable()` | `table, _ := doc.AddTable(3, 2)` |
-| Get row | `table.Row()` | `row, _ := table.Row(0)` |
-| Get cell | `row.Cell()` | `cell, _ := row.Cell(0)` |
 
 ## Real-World Use Cases
 
 This pattern is useful for:
 
-1. **Template Processing** - Read template documents and fill in placeholders
-2. **Document Merging** - Combine multiple documents into one
-3. **Content Updates** - Update specific sections while preserving formatting
-4. **Automated Reports** - Generate reports by modifying base documents
-5. **Document Analysis** - Extract and analyze content from existing documents
-6. **Format Conversion** - Read, transform, and save in different formats
+1. **Template Processing** - Read template documents and fill in placeholders with dynamic data
+2. **Content Updates** - Update specific sections (prices, dates, names) while preserving formatting
+3. **Document Merging** - Combine multiple documents into one master document
+4. **Automated Reports** - Generate reports by modifying base documents with current data
+5. **Batch Processing** - Apply consistent changes across multiple documents
+6. **Document Analysis** - Extract and analyze content from existing documents
+7. **Format Conversion** - Read, transform, and save in different formats
+8. **Version Updates** - Update document versions by modifying specific sections
 
 ## Technical Notes
 
@@ -201,6 +264,9 @@ When you run this example, you'll see:
       • Columns: 3
 
 ✏️  Step 4: Modifying the document...
+   → Modifying existing paragraphs...
+   → Modifying existing table...
+   → Adding new section...
    ✅ Modifications applied
 
 💾 Step 5: Saving modified document as '12_modified_document.docx'...
@@ -217,11 +283,15 @@ Generated files:
 
 After running this example:
 
-1. Open both generated files in Word/LibreOffice
-2. Compare the original and modified versions
-3. Verify that section 5 was added correctly
-4. Check that all original content was preserved
-5. Examine the new table and formatting
+1. **Open both generated files** in Word/LibreOffice
+2. **Compare the original and modified versions** to see:
+   - Title is now **blue** (was black)
+   - Subtitle is now **italic** (was normal)
+   - Section 1 heading text changed to "1. Text Formatting **(MODIFIED)**" in **red**
+   - Table price updated from $30.00 to **$35.00 (UPDATED)** in green
+   - New section 5 added with content summary
+3. **Verify all original content was preserved** (no data loss)
+4. **Examine the modification summary** in section 5
 
 ## Learn More
 
