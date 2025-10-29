@@ -67,12 +67,13 @@ type BookmarkEnd struct {
 
 // ParagraphProperties represents w:pPr element.
 type ParagraphProperties struct {
-	XMLName           xml.Name           `xml:"w:pPr"`
-	Style             *ParagraphStyleRef `xml:"w:pStyle,omitempty"`
-	Justification     *Justification     `xml:"w:jc,omitempty"`
-	Indentation       *Indentation       `xml:"w:ind,omitempty"`
-	Spacing           *Spacing           `xml:"w:spacing,omitempty"`
-	SectionProperties *SectionProperties `xml:"w:sectPr,omitempty"`
+	XMLName           xml.Name             `xml:"w:pPr"`
+	Style             *ParagraphStyleRef   `xml:"w:pStyle,omitempty"`
+	Justification     *Justification       `xml:"w:jc,omitempty"`
+	Indentation       *Indentation         `xml:"w:ind,omitempty"`
+	Spacing           *Spacing             `xml:"w:spacing,omitempty"`
+	Numbering         *NumberingProperties `xml:"w:numPr,omitempty"`
+	SectionProperties *SectionProperties   `xml:"w:sectPr,omitempty"`
 }
 
 // ParagraphStyleRef represents w:pStyle element (reference to a style).
@@ -99,6 +100,18 @@ type Spacing struct {
 	After    *int    `xml:"w:after,attr,omitempty"`
 	Line     *int    `xml:"w:line,attr,omitempty"`
 	LineRule *string `xml:"w:lineRule,attr,omitempty"`
+}
+
+// NumberingProperties represents w:numPr element (numbering reference).
+type NumberingProperties struct {
+	XMLName xml.Name       `xml:"w:numPr"`
+	Level   *DecimalNumber `xml:"w:ilvl,omitempty"`
+	NumID   *DecimalNumber `xml:"w:numId,omitempty"`
+}
+
+// DecimalNumber represents simple numeric value elements (w:val attr).
+type DecimalNumber struct {
+	Val int `xml:"w:val,attr"`
 }
 
 // Hyperlink represents w:hyperlink element.

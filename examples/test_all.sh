@@ -15,6 +15,7 @@ EXAMPLES=(
     "07_advanced"
     "08_images"
     "09_advanced_tables"
+    "10_paragraph_spacing"
     "11_multi_section"
 )
 

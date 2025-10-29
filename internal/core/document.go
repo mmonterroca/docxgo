@@ -55,18 +55,20 @@ import (
 
 // document implements the domain.Document interface.
 type document struct {
-	paragraphs    []domain.Paragraph
-	tables        []domain.Table
-	sections      []domain.Section
-	blocks        []domain.Block
-	metadata      *domain.Metadata
-	idGen         *manager.IDGenerator
-	relManager    *manager.RelationshipManager
-	mediaManager  *manager.MediaManager
-	styleManager  domain.StyleManager
-	headerCount   int
-	footerCount   int
-	activeSection *docxSection
+	paragraphs      []domain.Paragraph
+	tables          []domain.Table
+	sections        []domain.Section
+	blocks          []domain.Block
+	metadata        *domain.Metadata
+	idGen           *manager.IDGenerator
+	relManager      *manager.RelationshipManager
+	mediaManager    *manager.MediaManager
+	styleManager    domain.StyleManager
+	headerCount     int
+	footerCount     int
+	activeSection   *docxSection
+	numberingPart   []byte
+	numberingTarget string
 }
 
 // NewDocument creates a new Document.
@@ -401,7 +403,15 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	mediaFiles := d.mediaManager.All()
 
 	// Write document structure
-	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers); err != nil {
+	var numberingPart *writer.NumberingPart
+	if len(d.numberingPart) > 0 {
+		numberingPart = &writer.NumberingPart{
+			Data:   d.numberingPart,
+			Target: d.numberingTarget,
+		}
+	}
+
+	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers, numberingPart); err != nil {
 		return 0, errors.WrapWithCode(err, errors.ErrCodeIO, "Document.WriteTo")
 	}
 
@@ -480,4 +490,47 @@ func (d *document) SetMetadata(meta *domain.Metadata) error {
 // StyleManager returns the style manager for this document.
 func (d *document) StyleManager() domain.StyleManager {
 	return d.styleManager
+}
+
+func (d *document) RegisterExistingRelationship(id, relType, target, targetMode string) error {
+	if d == nil || d.relManager == nil {
+		return errors.InvalidState("Document.RegisterExistingRelationship", "relationship manager not initialized")
+	}
+	return d.relManager.RegisterExisting(id, relType, target, targetMode)
+}
+
+func (d *document) SetNumberingPart(data []byte, target string) {
+	if d == nil || len(data) == 0 {
+		return
+	}
+	copied := make([]byte, len(data))
+	copy(copied, data)
+	d.numberingPart = copied
+	d.numberingTarget = normalizeNumberingTarget(target)
+}
+
+func (d *document) NumberingPartInfo() ([]byte, string) {
+	if d == nil || len(d.numberingPart) == 0 {
+		return nil, ""
+	}
+	copied := make([]byte, len(d.numberingPart))
+	copy(copied, d.numberingPart)
+	return copied, d.numberingTarget
+}
+
+func normalizeNumberingTarget(target string) string {
+	trimmed := strings.TrimSpace(target)
+	trimmed = strings.TrimPrefix(trimmed, "./")
+	trimmed = strings.ReplaceAll(trimmed, "\\", "/")
+	trimmed = strings.TrimPrefix(trimmed, "/")
+	if strings.HasPrefix(strings.ToLower(trimmed), "word/") {
+		trimmed = trimmed[5:]
+	}
+	for strings.HasPrefix(trimmed, "../") {
+		trimmed = strings.TrimPrefix(trimmed, "../")
+	}
+	if trimmed == "" {
+		trimmed = "numbering.xml"
+	}
+	return trimmed
 }

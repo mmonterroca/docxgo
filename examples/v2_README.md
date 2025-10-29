@@ -68,6 +68,13 @@ This directory contains comprehensive examples demonstrating the features of go-
 - Working hyperlinks
 - Complete document structure
 
+### [10 - Paragraph Spacing](./10_paragraph_spacing/)
+**Status**: ✅ Complete (Phase 6.5)  
+**Demonstrates**: Fine-grained paragraph spacing controls.
+- Paragraph spacing before/after in twips
+- Line spacing rules (auto, exact, at least)
+- Typographic comparison blocks for documentation
+
 ### [11 - Multi-Section Layouts](./11_multi_section/)
 **Status**: ✅ Complete (Phase 6)  
 **Demonstrates**: Multi-section documents with per-section settings.
@@ -116,6 +123,7 @@ Each example creates a `.docx` file in its directory:
 - `05_styles/05_styles_demo.docx`
 - `06_sections/06_sections_demo.docx`
 - `07_advanced/07_advanced_demo.docx`
+- `10_paragraph_spacing/10_paragraph_spacing_demo.docx`
 - `11_multi_section/11_multi_section_demo.docx`
 
 ## Opening Documents

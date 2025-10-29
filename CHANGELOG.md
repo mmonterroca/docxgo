@@ -7,7 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (Phase 1 - Foundation)
+### Planned for v2.1.0
+- Complete Phase 10: Document Reading to 100%
+- Read headers/footers from existing documents
+- Read images from existing documents
+- Comments and change tracking
+
+---
+
+## [2.0.0] - 2025-10-29
+
+### 🎉 Production Release - v2.0.0 Stable
+
+This is the first stable, production-ready release of go-docx v2!
+
+### Added - Phase 10: Document Reading (NEW! 60% Complete)
+
+#### Document Reading & Modification
+- **OpenDocument()** - Open and read existing .docx files
+- **Document parsing** - Parse document structure (paragraphs, runs, tables)
+- **Content modification** - Edit existing text, formatting, and table cells
+- **Style preservation** - Maintains all paragraph styles (Title, Subtitle, Heading1-9, Quote, Normal, ListParagraph)
+- **Content addition** - Add new paragraphs, runs, and sections to existing documents
+- **Round-trip workflow** - Create → Save → Open → Modify → Save
+- **Example 12** - Complete read/modify example with documentation
+
+#### Bug Fixes Since Beta
+- **Fixed style preservation** - Paragraph styles now correctly preserved when reading documents (Oct 29, 2025)
+  - Added `applyParagraphStyle()` function in `internal/reader/reconstruct.go`
+  - Extracts `w:pStyle` from paragraph properties and applies via `para.SetStyle()`
+  - All paragraph styles (Title, Subtitle, Heading1-3, Quote, Normal, ListParagraph) now working
+- **Enhanced example 12** - Now demonstrates both editing existing content AND adding new content
+
+#### Documentation Improvements Since Beta
+- **Fixed README Quick Start** - Corrected all API examples to show accurate signatures
+  - Separated Simple API vs Builder API clearly
+  - Fixed `WithDefaultFont()` and `WithDefaultFontSize()` signatures
+  - Corrected page size constant (`docx.A4` not `docx.PageSizeA4`)
+  - Fixed alignment constant (`domain.AlignmentCenter` not `docx.AlignmentCenter`)
+  - Added new Option 3: Read and Modify Existing Documents
+- **Updated example count** - All documentation now references 11 working examples (was 9)
+- **Updated Phase 10 status** - Marked as "60% complete - core features working" (was "Not Started")
+- **Fixed error handling examples** - Corrected builder pattern usage in README
+
+### Commits Since Beta (v2.0.0-beta...v2.0.0)
+- `3a0832a` - docs: fix README Quick Start with correct API examples and update status
+- `19c0e73` - Update documentation: Phase 10 now 60% complete with working reader
+- `ca7f1f1` - Fix: Preserve paragraph styles when reading documents
+- `3289b54` - Enhance example 12: Add content editing capabilities
+- `852c3bf` - Add example 12: Read and modify documents
+- `497a94a` - Fix strict OOXML validation and update docs to beta-ready status
+
+### Summary of v2.0.0 Complete Features
+
+#### Core Features from Beta (Carried Forward)
 - **Core Interfaces** (domain package)
   - `Document` interface with metadata support
   - `Paragraph` interface with full formatting options

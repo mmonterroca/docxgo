@@ -285,6 +285,14 @@ func (h *docxHeader) setRelationship(relID, target string) {
 	h.mu.Unlock()
 }
 
+// SetExistingRelationship seeds the header with relationship metadata read from an existing document.
+func (h *docxHeader) SetExistingRelationship(relID, target string) {
+	if h == nil {
+		return
+	}
+	h.setRelationship(relID, target)
+}
+
 // docxFooter implements the Footer interface.
 type docxFooter struct {
 	mu           sync.RWMutex
@@ -339,4 +347,12 @@ func (f *docxFooter) setRelationship(relID, target string) {
 	f.relID = relID
 	f.targetPath = target
 	f.mu.Unlock()
+}
+
+// SetExistingRelationship seeds the footer with relationship metadata read from an existing document.
+func (f *docxFooter) SetExistingRelationship(relID, target string) {
+	if f == nil {
+		return
+	}
+	f.setRelationship(relID, target)
 }

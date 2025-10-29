@@ -26,6 +26,7 @@ SOFTWARE.
 package manager
 
 import (
+	"strconv"
 	"strings"
 	"sync"
 
@@ -171,6 +172,46 @@ func (rm *RelationshipManager) AddHeader(target string) (string, error) {
 // AddFooter adds a footer relationship.
 func (rm *RelationshipManager) AddFooter(target string) (string, error) {
 	return rm.Add(constants.RelTypeFooter, target, "Internal")
+}
+
+// RegisterExisting adds an existing relationship into the manager without generating a new ID.
+func (rm *RelationshipManager) RegisterExisting(id, relType, target, targetMode string) error {
+	if id == "" {
+		return errors.InvalidArgument("RelationshipManager.RegisterExisting", "id", id, "relationship id cannot be empty")
+	}
+	if relType == "" {
+		return errors.InvalidArgument("RelationshipManager.RegisterExisting", "relType", relType, "relationship type cannot be empty")
+	}
+	if target == "" {
+		return errors.InvalidArgument("RelationshipManager.RegisterExisting", "target", target, "relationship target cannot be empty")
+	}
+
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	if _, exists := rm.relationships[id]; exists {
+		return nil
+	}
+
+	mode := strings.TrimSpace(targetMode)
+	if strings.EqualFold(mode, "internal") || mode == "" {
+		mode = ""
+	}
+
+	rm.relationships[id] = &Relationship{
+		ID:         id,
+		Type:       relType,
+		Target:     target,
+		TargetMode: mode,
+	}
+
+	// Update ID generator counter so future relationships avoid collisions.
+	numeric := strings.TrimPrefix(strings.ToLower(id), strings.ToLower(constants.IDPrefixRel))
+	if n, err := strconv.Atoi(numeric); err == nil {
+		rm.idGen.EnsureRelCounterAtLeast(uint64(n))
+	}
+
+	return nil
 }
 
 // ToXML converts relationships to XML structure.

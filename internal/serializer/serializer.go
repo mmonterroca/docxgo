@@ -495,6 +495,13 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 		}
 	}
 
+	if ref, ok := para.Numbering(); ok {
+		props.Numbering = &xml.NumberingProperties{
+			Level: &xml.DecimalNumber{Val: ref.Level},
+			NumID: &xml.DecimalNumber{Val: ref.ID},
+		}
+	}
+
 	// Spacing
 	before := para.SpacingBefore()
 	after := para.SpacingAfter()
@@ -583,16 +590,8 @@ func (s *TableSerializer) serializeTableProperties(table domain.Table) *xml.Tabl
 		W:    width.Value,
 	}
 
-	// Default look hints so Word can map header/footer banding expectations.
-	props.Look = &xml.TableLook{
-		Val:         "04A0",
-		FirstRow:    "1",
-		LastRow:     "0",
-		FirstColumn: "1",
-		LastColumn:  "0",
-		NoHBand:     "0",
-		NoVBand:     "1",
-	}
+	// Default look hints are expressed purely via w:val for strict OOXML compliance.
+	props.Look = &xml.TableLook{Val: "04A0"}
 
 	// Alignment
 	if table.Alignment() != domain.AlignmentLeft {
@@ -1022,26 +1021,6 @@ func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager) *
 	xmlStyles := xml.NewStyles()
 
 	// Set doc defaults
-	xmlStyles.DocDefaults = &xml.DocDefaults{
-		RunDefaults: &xml.RunDefaults{
-			Properties: &xml.RunProperties{
-				Font: &xml.Font{
-					ASCII:    "Calibri",
-					HAnsi:    "Calibri",
-					EastAsia: "Times New Roman",
-					CS:       "Times New Roman",
-				},
-				Size: &xml.HalfPt{Val: 22}, // 11pt
-				Lang: &xml.Language{
-					Val:      "en-MX",
-					EastAsia: "en-US",
-					Bidi:     "ar-SA",
-				},
-			},
-		},
-		ParaDefaults: &xml.ParagraphDefaults{},
-	}
-
 	// Include Word's latent style catalog to avoid auto-added styles during repair
 	xmlStyles.LatentStyles = defaultLatentStyles
 

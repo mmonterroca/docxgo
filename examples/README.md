@@ -131,6 +131,19 @@ cd 08_images && go run main.go
 cd 09_advanced_tables && go run main.go
 ```
 
+### [10_paragraph_spacing/](./10_paragraph_spacing/) - Paragraph Spacing (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Line and paragraph spacing controls
+- Set spacing before and after paragraphs (twips)
+- Configure exact vs. at-least line spacing rules
+- Mix typography blocks for comparison
+- Save finished document ready for inspection
+
+**Run:**
+```bash
+cd 10_paragraph_spacing && go run main.go
+```
+
 ### [11_multi_section/](./11_multi_section/) - Multi-Section Layouts (NEW!)
 **Status**: ✅ Fully functional  
 **Demonstrates**: Independent layouts per section
@@ -143,6 +156,21 @@ cd 09_advanced_tables && go run main.go
 **Run:**
 ```bash
 cd 11_multi_section && go run main.go
+```
+
+### [12_read_and_modify/](./12_read_and_modify/) - Read and Modify Documents (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Complete read/modify/write workflow
+- Create comprehensive showcase document with all features
+- Read existing .docx files using OpenDocument()
+- Inspect document content (paragraphs, tables, text)
+- Modify existing documents (add paragraphs, tables)
+- Save modified versions with different names
+- Preserve existing formatting and content
+
+**Run:**
+```bash
+cd 12_read_and_modify && go run main.go
 ```
 
 ### [basic/](./basic/) - Simple API Example
@@ -167,7 +195,7 @@ Run the included test script to verify all examples compile:
 ./test_all.sh
 ```
 
-This will test all 9 working examples and report results.
+This will test all 11 working examples and report results.
 
 ---
 
@@ -216,7 +244,10 @@ examples/
 ├── 07_advanced/07_advanced_demo.docx (4.6KB)
 ├── 08_images/08_images_output.docx (4.2KB)
 ├── 09_advanced_tables/09_advanced_tables_output.docx (4.8KB)
-└── 11_multi_section/11_multi_section_demo.docx (4.4KB)
+├── 11_multi_section/11_multi_section_demo.docx (4.4KB)
+└── 12_read_and_modify/
+    ├── 12_showcase_original.docx (3.8KB)
+    └── 12_modified_document.docx (4.2KB)
 ```
 
 **All documents are ready to open in**:
