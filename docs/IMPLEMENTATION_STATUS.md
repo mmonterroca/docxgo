@@ -32,7 +32,10 @@ This document tracks the implementation status of all v2 features, helping devel
 11. ✅ Phase 11: Code Quality & Optimization
 
 **⏳ Remaining Phases (2/12)**:
-- ⏳ Phase 10: Document Reading (~55% complete - in progress for v2.1.0)
+- 🟢 Phase 10: Document Reading (~60% complete - **core features working**, remaining features in progress for v2.1.0)
+  - ✅ Read/modify documents available now (`docx.OpenDocument()`)
+  - ✅ Style preservation fixed (Oct 29, 2025)
+  - ✅ Example 12 complete
 - ⏳ Phase 12: Beta Testing & Release (pending - Q4 2025 - Q1 2026)
 
 ---
@@ -220,67 +223,91 @@ This document tracks the implementation status of all v2 features, helping devel
 ---
 
 ### Document Reading
-**Status**: 🟡 Partial (55%)
+**Status**: � Working (60% complete)
 
 **Implemented**:
 - ✅ ZIP extraction infrastructure
 - ✅ XML parsing basics
 - ✅ Relationship loading
 - ✅ Paragraph spacing, alignment, and indentation hydration (document.xml → domain.Paragraph)
+- ✅ **Paragraph style preservation** (w:pStyle extraction and application - NEW Oct 29, 2025)
 - ✅ Run text + formatting hydration (bold, italic, underline, color, size, highlight, fonts)
 - ✅ Run breaks, tabs, and field hydration (line/page breaks, tabs, simple & hyperlink fields)
 - ✅ Basic table hydration (rows, cells, paragraph content)
 - ✅ Embedded image hydration (inline drawings, media relationship + data registration)
 - ✅ Public open helpers (`OpenDocument`, streaming/bytes variants)
+- ✅ **Full document reading and modification** (working examples available)
 
 **Missing**:
-- ⏳ Full document parsing (`OpenDocument()`)
-- ⏳ Modifying existing documents
+- ⏳ Advanced table features (complex merging, nested tables)
+- ⏳ Header/footer reading
+- ⏳ Custom styles reading
+- ⏳ Field reading (partial)
 - ⏳ Preserving unknown elements
 
 **Impact**: MEDIUM  
 **Priority**: HIGH (for v2.1.0)  
-**Effort Estimate**: 15-20 hours
+**Effort Estimate**: 8-10 hours remaining
 
 **Use Cases**:
-- Edit templates
-- Update reports
-- Batch document processing
+- ✅ Edit existing documents (working)
+- ✅ Update reports (working)
+- ✅ Batch document processing (working)
+- ✅ Template processing (working)
 
-**Workaround**: v2 is currently write-only. For reading existing documents, consider using v1 or wait for Phase 10.
+**Available Now**: Use `docx.OpenDocument()` to read and modify documents. See `examples/12_read_and_modify/` for complete examples.
 
-**Implementation Tasks** (for contributors):
-1. Unpack infrastructure (~4 hours): ZIP extraction, XML file identification
-2. XML deserialization (~6 hours): Document.xml, Styles.xml, Relationships parser
-3. Domain object creation (~4 hours): XML → Paragraph/Run/Table conversion
-4. Public API (~2 hours): `OpenDocument(path string)` function
-5. Tests (~3 hours): Open existing document tests, roundtrip tests
-6. Example (~1 hour): `examples/10_modify_document/`
+**Completed Implementation Tasks**:
+1. ✅ Unpack infrastructure: ZIP extraction, XML file identification
+2. ✅ XML deserialization: Document.xml, Relationships parser
+3. ✅ Domain object creation: XML → Paragraph/Run/Table conversion
+4. ✅ Public API: `OpenDocument(path string)` function
+5. ✅ Tests: Open existing document tests, roundtrip tests
+6. ✅ Example: `examples/12_read_and_modify/` (complete read/modify workflow)
+7. ✅ **Paragraph style preservation**: Fixed Oct 29, 2025 (all styles preserved)
 
-**Next Steps Before Beta Adoption**:
-- ✅ Rehydrate embedded images/drawings and media relationships *(Completed Nov 2025 — inline drawing pass + regression test)*
-- ✅ Hydrate numbering/list references (numPr) and preserve numbering.xml
-- ✅ Hydrate section properties plus header/footer linkage
+**Remaining Tasks** (for v2.1.0):
+1. ⏳ Header/footer reading (~3 hours)
+2. ⏳ Advanced table features (~2 hours)
+3. ⏳ Custom styles reading (~2 hours)
+4. ⏳ Complete field reading (~2 hours)
+
+**Beta Status**:
+- ✅ Rehydrate embedded images/drawings and media relationships *(Completed)*
+- ✅ Hydrate numbering/list references (numPr) and preserve numbering.xml *(Completed)*
+- ✅ Hydrate section properties plus header/footer linkage *(Completed)*
+- ✅ **Paragraph style preservation** *(Fixed Oct 29, 2025)*
 
 ---
 
 ## ⏳ Planned Features (Not Yet Implemented)
 
-### Phase 10: Document Reading (Planned for v2.1)
+### Phase 10: Document Reading (In Progress - 60% Complete) 🟢
 **Priority**: HIGH  
-**Estimated Effort**: 15-20 hours  
-**Target Release**: v2.1.0 (Q2 2026)
+**Estimated Effort**: 8-10 hours remaining (of 15-20 total)  
+**Target Release**: v2.1.0 (Q1 2026)  
+**Status**: 🟢 Core functionality working and available
 
-**Features**:
-- ⏳ Open and parse existing .docx files
-- ⏳ Modify existing documents
-- ⏳ Preserve formatting and structure
-- ⏳ Update metadata
-- ⏳ Add/remove content from existing documents
+**✅ Working Features** (as of Oct 29, 2025):
+- ✅ Open and parse existing .docx files (`docx.OpenDocument()`)
+- ✅ Modify existing documents (add/edit/delete content)
+- ✅ Preserve formatting and structure
+- ✅ **Preserve paragraph styles** (Title, Subtitle, Heading1-3, Quote, Normal, ListParagraph, etc.)
+- ✅ Add/remove content from existing documents
+- ✅ Edit table cell values and formatting
+- ✅ Modify text and formatting in runs
+- ✅ Change paragraph styles dynamically
 
-**Use Cases**: Edit templates, update reports, batch document processing.
+**⏳ Remaining Features** (for v2.1.0):
+- ⏳ Read headers/footers (~3h)
+- ⏳ Read custom styles (~2h)
+- ⏳ Advanced table features (~2h)
+- ⏳ Complete field reading (~1h)
 
-**Value**: HIGH - Opens up template editing, batch processing use cases
+**Use Cases**: ✅ Edit templates, ✅ update reports, ✅ batch document processing (all working now)
+
+**Value**: HIGH - Template editing and batch processing now available  
+**Available Now**: Use `docx.OpenDocument()` - See `examples/12_read_and_modify/`
 
 #### Phase 10 Backlog
 - [x] **P0 • Reader infrastructure (4h)**: Create `internal/reader/` package, handle ZIP extraction, relationship resolution, shared util reuse. *(Completed Oct 28 2025 — `internal/reader` package + round-trip test)*

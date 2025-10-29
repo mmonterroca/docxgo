@@ -109,13 +109,14 @@ func main() {
 
 ### More Examples
 
-See the [`examples/`](examples/) directory for comprehensive examples:
+See the [`examples/`](examples/) directory for comprehensive examples (11 working examples):
 
 - **[01_basic](examples/01_basic/)** - Simple document with builder pattern
 - **[02_intermediate](examples/02_intermediate/)** - Professional product catalog
-- **[04_fields](examples/04_fields/)** - TOC, page numbers, hyperlinks (⚠️ needs v2 API update)
+- **[04_fields](examples/04_fields/)** - TOC, page numbers, hyperlinks
 - **[08_images](examples/08_images/)** - Image insertion and positioning
 - **[09_advanced_tables](examples/09_advanced_tables/)** - Cell merging, nested tables, styling
+- **[12_read_and_modify](examples/12_read_and_modify/)** - 🆕 Read and modify existing documents
 
 ---
 
