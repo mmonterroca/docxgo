@@ -1,18 +1,9 @@
 version: '2'
 
-linters-settings:
-  errcheck:
-    exclude-functions:
-      - fmt:.*
-    check-blank: false
-
-  revive:
-    rules:
-      - name: package-comments
-        disabled: true
-
 linters:
-  disable-all: true
+  # Disable all linters by default, then enable specific ones
+  default: none
+  
   enable:
     - errcheck
     - gocritic
@@ -25,6 +16,18 @@ linters:
     - exhaustive
     - misspell
     - unconvert
+  
+  # Linter-specific settings
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt:.*
+      check-blank: false
+    
+    revive:
+      rules:
+        - name: package-comments
+          disabled: true
   
   # Exclude error checking issues in example files only
   # Examples are demonstration code where verbosity from error handling would obscure the API being demonstrated
