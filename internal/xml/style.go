@@ -29,10 +29,11 @@ import "encoding/xml"
 
 // Styles represents the styles.xml document.
 type Styles struct {
-	XMLName     xml.Name     `xml:"w:styles"`
-	Xmlns       string       `xml:"xmlns:w,attr"`
-	DocDefaults *DocDefaults `xml:"w:docDefaults,omitempty"`
-	Styles      []*Style     `xml:"w:style"`
+	XMLName      xml.Name      `xml:"w:styles"`
+	Xmlns        string        `xml:"xmlns:w,attr"`
+	LatentStyles *LatentStyles `xml:"w:latentStyles,omitempty"`
+	DocDefaults  *DocDefaults  `xml:"w:docDefaults,omitempty"`
+	Styles       []*Style      `xml:"w:style"`
 }
 
 // DocDefaults represents w:docDefaults element.
@@ -134,6 +135,29 @@ type StyleIndentation struct {
 type OutlineLevel struct {
 	XMLName xml.Name `xml:"w:outlineLvl"`
 	Val     int      `xml:"w:val,attr"`
+}
+
+// LatentStyles represents w:latentStyles element (latent style metadata).
+type LatentStyles struct {
+	XMLName           xml.Name                `xml:"w:latentStyles"`
+	DefLockedState    string                  `xml:"w:defLockedState,attr,omitempty"`
+	DefUIPriority     string                  `xml:"w:defUIPriority,attr,omitempty"`
+	DefSemiHidden     string                  `xml:"w:defSemiHidden,attr,omitempty"`
+	DefUnhideWhenUsed string                  `xml:"w:defUnhideWhenUsed,attr,omitempty"`
+	DefQFormat        string                  `xml:"w:defQFormat,attr,omitempty"`
+	Count             string                  `xml:"w:count,attr,omitempty"`
+	Exceptions        []*LatentStyleException `xml:"w:lsdException,omitempty"`
+}
+
+// LatentStyleException represents w:lsdException element (latent style exception definition).
+type LatentStyleException struct {
+	XMLName        xml.Name `xml:"w:lsdException"`
+	Name           string   `xml:"w:name,attr"`
+	UIPriority     string   `xml:"w:uiPriority,attr,omitempty"`
+	QFormat        string   `xml:"w:qFormat,attr,omitempty"`
+	SemiHidden     string   `xml:"w:semiHidden,attr,omitempty"`
+	UnhideWhenUsed string   `xml:"w:unhideWhenUsed,attr,omitempty"`
+	Locked         string   `xml:"w:locked,attr,omitempty"`
 }
 
 // NewStyles creates a new styles document.

@@ -91,13 +91,63 @@ func (sm *styleManager) initializeBuiltInStyles() {
 		sm.builtInStyleIDs[id] = true
 	}
 
+	// Mark built-in table style IDs
+	builtInTableStyles := []string{
+		domain.StyleIDTableNormal,
+		domain.StyleIDTableGrid,
+		domain.StyleIDTablePlain,
+		domain.StyleIDTableMediumShading,
+		domain.StyleIDTableLightShading,
+		domain.StyleIDTableColorful,
+		domain.StyleIDTableAccent1,
+		domain.StyleIDTableAccent2,
+	}
+
+	for _, id := range builtInTableStyles {
+		sm.builtInStyleIDs[id] = true
+	}
+
 	// Create and add built-in styles
 	sm.createBuiltInParagraphStyles()
 	sm.createBuiltInCharacterStyles()
+	sm.createBuiltInTableStyles()
 
 	// Set default styles
 	sm.defaultStyles[domain.StyleTypeParagraph] = domain.StyleIDNormal
 	sm.defaultStyles[domain.StyleTypeCharacter] = domain.StyleIDDefaultParagraphFont
+	sm.defaultStyles[domain.StyleTypeTable] = domain.StyleIDTableNormal
+}
+
+// createBuiltInTableStyles creates all built-in table styles.
+// Note: Error returns are intentionally ignored for built-in styles as they
+// use only valid, hardcoded values that cannot fail under normal circumstances.
+//
+//nolint:errcheck // Built-in styles use hardcoded valid values
+func (sm *styleManager) createBuiltInTableStyles() {
+	styles := []struct {
+		id   string
+		name string
+	}{
+		{domain.StyleIDTableNormal, "Table Normal"},
+		{domain.StyleIDTableGrid, "Table Grid"},
+		{domain.StyleIDTablePlain, "Plain Table 1"},
+		{domain.StyleIDTableMediumShading, "Medium Shading 1"},
+		{domain.StyleIDTableLightShading, "Light Shading"},
+		{domain.StyleIDTableColorful, "Colorful List"},
+		{domain.StyleIDTableAccent1, "Medium Shading 1 Accent 1"},
+		{domain.StyleIDTableAccent2, "Medium Shading 1 Accent 2"},
+	}
+
+	for idx, def := range styles {
+		style := newTableStyle(def.id, def.name, true)
+		if def.id != domain.StyleIDTableNormal {
+			style.SetBasedOn(domain.StyleIDTableNormal)
+		}
+		if idx == 0 { // Table Normal is the default
+			style.SetDefault(true)
+		}
+		sm.styles[def.id] = style
+	}
 }
 
 // createBuiltInParagraphStyles creates all built-in paragraph styles.

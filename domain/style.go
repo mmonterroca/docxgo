@@ -23,45 +23,43 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package domain
 
 // Built-in paragraph style IDs (OOXML standard).
 // These style IDs are recognized by Microsoft Word and compatible applications.
 const (
-	StyleIDNormal           = "Normal"           // Default normal paragraph style
-	StyleIDHeading1         = "Heading1"         // Heading level 1
-	StyleIDHeading2         = "Heading2"         // Heading level 2
-	StyleIDHeading3         = "Heading3"         // Heading level 3
-	StyleIDHeading4         = "Heading4"         // Heading level 4
-	StyleIDHeading5         = "Heading5"         // Heading level 5
-	StyleIDHeading6         = "Heading6"         // Heading level 6
-	StyleIDHeading7         = "Heading7"         // Heading level 7
-	StyleIDHeading8         = "Heading8"         // Heading level 8
-	StyleIDHeading9         = "Heading9"         // Heading level 9
-	StyleIDTitle            = "Title"            // Document title style
-	StyleIDSubtitle         = "Subtitle"         // Document subtitle style
-	StyleIDQuote            = "Quote"            // Block quote style
-	StyleIDIntenseQuote     = "IntenseQuote"     // Emphasized block quote style
-	StyleIDListParagraph    = "ListParagraph"    // List paragraph style
-	StyleIDCaption          = "Caption"          // Caption style (for figures/tables)
-	StyleIDTOC1             = "TOC1"             // Table of contents level 1
-	StyleIDTOC2             = "TOC2"             // Table of contents level 2
-	StyleIDTOC3             = "TOC3"             // Table of contents level 3
-	StyleIDTOC4             = "TOC4"             // Table of contents level 4
-	StyleIDTOC5             = "TOC5"             // Table of contents level 5
-	StyleIDTOC6             = "TOC6"             // Table of contents level 6
-	StyleIDTOC7             = "TOC7"             // Table of contents level 7
-	StyleIDTOC8             = "TOC8"             // Table of contents level 8
-	StyleIDTOC9             = "TOC9"             // Table of contents level 9
-	StyleIDHeader           = "Header"           // Header text style
-	StyleIDFooter           = "Footer"           // Footer text style
-	StyleIDFootnoteText     = "FootnoteText"     // Footnote text style
-	StyleIDEndnoteText      = "EndnoteText"      // Endnote text style
-	StyleIDBodyText         = "BodyText"         // Body text style
-	StyleIDBodyTextIndent   = "BodyTextIndent"   // Body text with first-line indent
-	StyleIDNoSpacing        = "NoSpacing"        // No spacing paragraph style
+	StyleIDNormal         = "Normal"         // Default normal paragraph style
+	StyleIDHeading1       = "Heading1"       // Heading level 1
+	StyleIDHeading2       = "Heading2"       // Heading level 2
+	StyleIDHeading3       = "Heading3"       // Heading level 3
+	StyleIDHeading4       = "Heading4"       // Heading level 4
+	StyleIDHeading5       = "Heading5"       // Heading level 5
+	StyleIDHeading6       = "Heading6"       // Heading level 6
+	StyleIDHeading7       = "Heading7"       // Heading level 7
+	StyleIDHeading8       = "Heading8"       // Heading level 8
+	StyleIDHeading9       = "Heading9"       // Heading level 9
+	StyleIDTitle          = "Title"          // Document title style
+	StyleIDSubtitle       = "Subtitle"       // Document subtitle style
+	StyleIDQuote          = "Quote"          // Block quote style
+	StyleIDIntenseQuote   = "IntenseQuote"   // Emphasized block quote style
+	StyleIDListParagraph  = "ListParagraph"  // List paragraph style
+	StyleIDCaption        = "Caption"        // Caption style (for figures/tables)
+	StyleIDTOC1           = "TOC1"           // Table of contents level 1
+	StyleIDTOC2           = "TOC2"           // Table of contents level 2
+	StyleIDTOC3           = "TOC3"           // Table of contents level 3
+	StyleIDTOC4           = "TOC4"           // Table of contents level 4
+	StyleIDTOC5           = "TOC5"           // Table of contents level 5
+	StyleIDTOC6           = "TOC6"           // Table of contents level 6
+	StyleIDTOC7           = "TOC7"           // Table of contents level 7
+	StyleIDTOC8           = "TOC8"           // Table of contents level 8
+	StyleIDTOC9           = "TOC9"           // Table of contents level 9
+	StyleIDHeader         = "Header"         // Header text style
+	StyleIDFooter         = "Footer"         // Footer text style
+	StyleIDFootnoteText   = "FootnoteText"   // Footnote text style
+	StyleIDEndnoteText    = "EndnoteText"    // Endnote text style
+	StyleIDBodyText       = "BodyText"       // Body text style
+	StyleIDBodyTextIndent = "BodyTextIndent" // Body text with first-line indent
+	StyleIDNoSpacing      = "NoSpacing"      // No spacing paragraph style
 )
 
 // Built-in character style IDs (OOXML standard).
@@ -76,6 +74,18 @@ const (
 	StyleIDBookTitle            = "BookTitle"            // Book title style
 	StyleIDHyperlink            = "Hyperlink"            // Hyperlink text style
 	StyleIDFollowedHyperlink    = "FollowedHyperlink"    // Visited hyperlink style
+)
+
+// Built-in table style IDs (OOXML standard).
+const (
+	StyleIDTableNormal        = "TableNormal"           // Default table style
+	StyleIDTableGrid          = "TableGrid"             // Grid table style
+	StyleIDTablePlain         = "PlainTable1"           // Plain table style
+	StyleIDTableMediumShading = "MediumShading1"        // Medium shading table style
+	StyleIDTableLightShading  = "LightShading"          // Light shading table style
+	StyleIDTableColorful      = "ColorfulList"          // Colorful table style
+	StyleIDTableAccent1       = "MediumShading1Accent1" // Accent 1 shading style
+	StyleIDTableAccent2       = "MediumShading1Accent2" // Accent 2 shading style
 )
 
 // StyleManager manages document styles.

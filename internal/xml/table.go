@@ -40,6 +40,7 @@ type TableProperties struct {
 	XMLName xml.Name       `xml:"w:tblPr"`
 	Style   *TableStyle    `xml:"w:tblStyle,omitempty"`
 	Width   *TableWidth    `xml:"w:tblW,omitempty"`
+	Look    *TableLook     `xml:"w:tblLook,omitempty"`
 	Jc      *Justification `xml:"w:jc,omitempty"`
 }
 
@@ -52,6 +53,18 @@ type TableStyle struct {
 type TableWidth struct {
 	Type string `xml:"w:type,attr"`
 	W    int    `xml:"w:w,attr"`
+}
+
+// TableLook represents w:tblLook element that carries default visual hints for table features.
+type TableLook struct {
+	XMLName     xml.Name `xml:"w:tblLook"`
+	Val         string   `xml:"w:val,attr,omitempty"`
+	FirstRow    string   `xml:"w:firstRow,attr,omitempty"`
+	LastRow     string   `xml:"w:lastRow,attr,omitempty"`
+	FirstColumn string   `xml:"w:firstColumn,attr,omitempty"`
+	LastColumn  string   `xml:"w:lastColumn,attr,omitempty"`
+	NoHBand     string   `xml:"w:noHBand,attr,omitempty"`
+	NoVBand     string   `xml:"w:noVBand,attr,omitempty"`
 }
 
 // TableGrid represents w:tblGrid element.
@@ -88,8 +101,7 @@ type TableRowHeight struct {
 type TableCell struct {
 	XMLName    xml.Name             `xml:"w:tc"`
 	Properties *TableCellProperties `xml:"w:tcPr,omitempty"`
-	Paragraphs []*Paragraph         `xml:"w:p"`
-	Tables     []*Table             `xml:"w:tbl,omitempty"` // Nested tables
+	Content    []interface{}        `xml:",any"`
 }
 
 // TableCellProperties represents w:tcPr element.

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,6 +95,16 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 		return fmt.Errorf("write theme: %w", err)
 	}
 
+	// Write word/settings.xml (minimal default)
+	if err := zw.writeDefaultSettings(); err != nil {
+		return fmt.Errorf("write settings: %w", err)
+	}
+
+	// Write word/webSettings.xml (minimal default)
+	if err := zw.writeDefaultWebSettings(); err != nil {
+		return fmt.Errorf("write web settings: %w", err)
+	}
+
 	// Write media files to word/media
 	if err := zw.writeMediaFiles(media); err != nil {
 		return fmt.Errorf("write media: %w", err)
@@ -134,6 +145,8 @@ func (zw *ZipWriter) writeContentTypes(headers map[string]*xmlstructs.Header, fo
 			{PartName: "/word/styles.xml", ContentType: constants.ContentTypeStyles},
 			{PartName: "/word/fontTable.xml", ContentType: constants.ContentTypeFontTable},
 			{PartName: "/word/theme/theme1.xml", ContentType: constants.ContentTypeTheme},
+			{PartName: "/word/settings.xml", ContentType: constants.ContentTypeSettings},
+			{PartName: "/word/webSettings.xml", ContentType: constants.ContentTypeWebSettings},
 			{PartName: "/docProps/core.xml", ContentType: constants.ContentTypeCoreProperties},
 			{PartName: "/docProps/app.xml", ContentType: constants.ContentTypeExtendedProperties},
 		},
@@ -225,6 +238,48 @@ func (zw *ZipWriter) writeDocumentRels(rels *xmlstructs.Relationships) error {
 			Relationships: []*xmlstructs.Relationship{},
 		}
 	}
+
+	if rels.Xmlns == "" {
+		rels.Xmlns = constants.NamespacePackageRels
+	}
+
+	nextRelID := func() string {
+		maxID := 0
+		for _, rel := range rels.Relationships {
+			if rel == nil {
+				continue
+			}
+			if strings.HasPrefix(rel.ID, "rId") {
+				if n, err := strconv.Atoi(strings.TrimPrefix(rel.ID, "rId")); err == nil && n > maxID {
+					maxID = n
+				}
+			}
+		}
+		return fmt.Sprintf("rId%d", maxID+1)
+	}
+
+	ensureRel := func(relType, target string) {
+		if target == "" {
+			return
+		}
+		for _, rel := range rels.Relationships {
+			if rel != nil && rel.Target == target {
+				return
+			}
+		}
+		rels.Relationships = append(rels.Relationships, &xmlstructs.Relationship{
+			ID:     nextRelID(),
+			Type:   relType,
+			Target: target,
+		})
+	}
+
+	ensureRel(constants.RelTypeStyles, "styles.xml")
+	ensureRel(constants.RelTypeFontTable, "fontTable.xml")
+	ensureRel(constants.RelTypeTheme, "theme/theme1.xml")
+	ensureRel(constants.RelTypeSettings, "settings.xml")
+	ensureRel(constants.RelTypeWebSettings, "webSettings.xml")
+
 	return zw.writeXML("word/_rels/document.xml.rels", rels)
 }
 
@@ -402,6 +457,29 @@ func (zw *ZipWriter) writeDefaultTheme() error {
 	<a:extraClrSchemeLst/>
 </a:theme>`
 	return zw.writeRaw("word/theme/theme1.xml", []byte(theme))
+}
+
+// writeDefaultSettings writes a baseline word/settings.xml part.
+func (zw *ZipWriter) writeDefaultSettings() error {
+	settings := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+	<w:zoom w:percent="100"/>
+	<w:defaultTabStop w:val="720"/>
+	<w:characterSpacingControl w:val="doNotCompress"/>
+	<w:compat>
+		<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>
+	</w:compat>
+</w:settings>`
+	return zw.writeRaw("word/settings.xml", []byte(settings))
+}
+
+// writeDefaultWebSettings writes a baseline word/webSettings.xml part.
+func (zw *ZipWriter) writeDefaultWebSettings() error {
+	webSettings := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+	<w:allowPNG/>
+</w:webSettings>`
+	return zw.writeRaw("word/webSettings.xml", []byte(webSettings))
 }
 
 // writeXML marshals and writes an XML structure to the ZIP.

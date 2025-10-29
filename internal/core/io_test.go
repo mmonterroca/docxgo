@@ -72,6 +72,11 @@ func TestDocument_WriteTo(t *testing.T) {
 		"word/_rels/document.xml.rels",
 		"docProps/core.xml",
 		"docProps/app.xml",
+		"word/styles.xml",
+		"word/fontTable.xml",
+		"word/theme/theme1.xml",
+		"word/settings.xml",
+		"word/webSettings.xml",
 	}
 
 	fileMap := make(map[string]bool)
@@ -97,7 +102,13 @@ func TestDocument_WriteTo(t *testing.T) {
 	}
 
 	relsXML := string(relsContent)
-	for _, target := range []string{"Target=\"styles.xml\"", "Target=\"fontTable.xml\"", "Target=\"theme/theme1.xml\""} {
+	for _, target := range []string{
+		"Target=\"styles.xml\"",
+		"Target=\"fontTable.xml\"",
+		"Target=\"theme/theme1.xml\"",
+		"Target=\"settings.xml\"",
+		"Target=\"webSettings.xml\"",
+	} {
 		if !strings.Contains(relsXML, target) {
 			t.Errorf("Relationship missing for %s", target)
 		}

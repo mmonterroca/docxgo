@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package domain
 
 // Table represents a table in a document.
@@ -137,6 +135,10 @@ type TableCell interface {
 
 	// Tables returns all nested tables in this cell.
 	Tables() []Table
+
+	// IsHorizontallyMergedContinuation reports whether this cell is consumed by a
+	// horizontal merge and should not be serialized as a standalone cell.
+	IsHorizontallyMergedContinuation() bool
 }
 
 // TableWidth represents table width settings.
@@ -202,14 +204,14 @@ type TableStyle struct {
 
 // Predefined table styles (compatible with Word built-in styles)
 var (
-	TableStyleNormal        = TableStyle{Name: "TableNormal"}
-	TableStyleGrid          = TableStyle{Name: "TableGrid"}
-	TableStylePlain         = TableStyle{Name: "PlainTable1"}
-	TableStyleMediumShading = TableStyle{Name: "MediumShading1"}
-	TableStyleLightShading  = TableStyle{Name: "LightShading"}
-	TableStyleColorful      = TableStyle{Name: "ColorfulList"}
-	TableStyleAccent1       = TableStyle{Name: "MediumShading1Accent1"}
-	TableStyleAccent2       = TableStyle{Name: "MediumShading1Accent2"}
+	TableStyleNormal        = TableStyle{Name: StyleIDTableNormal}
+	TableStyleGrid          = TableStyle{Name: StyleIDTableGrid}
+	TableStylePlain         = TableStyle{Name: StyleIDTablePlain}
+	TableStyleMediumShading = TableStyle{Name: StyleIDTableMediumShading}
+	TableStyleLightShading  = TableStyle{Name: StyleIDTableLightShading}
+	TableStyleColorful      = TableStyle{Name: StyleIDTableColorful}
+	TableStyleAccent1       = TableStyle{Name: StyleIDTableAccent1}
+	TableStyleAccent2       = TableStyle{Name: StyleIDTableAccent2}
 )
 
 // VerticalMergeType represents the vertical merge state of a table cell.
@@ -218,8 +220,8 @@ type VerticalMergeType int
 // Vertical merge type constants for table cells.
 const (
 	VMergeNone     VerticalMergeType = iota // No vertical merge
-	VMergeRestart                            // Start of vertical merge
-	VMergeContinue                           // Continuation of vertical merge
+	VMergeRestart                           // Start of vertical merge
+	VMergeContinue                          // Continuation of vertical merge
 )
 
 // CellMergeInfo represents cell merge information.

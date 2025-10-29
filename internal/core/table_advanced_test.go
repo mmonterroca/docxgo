@@ -66,6 +66,22 @@ func TestTableCellMerge_Horizontal(t *testing.T) {
 	if cell.VMerge() != domain.VMergeNone {
 		t.Errorf("VMerge() = %v, want VMergeNone", cell.VMerge())
 	}
+
+	second, err := row.Cell(1)
+	if err != nil {
+		t.Fatalf("Cell(1) error = %v", err)
+	}
+	if !second.IsHorizontallyMergedContinuation() {
+		t.Error("Cell(1) should be marked as a horizontal merge continuation")
+	}
+
+	third, err := row.Cell(2)
+	if err != nil {
+		t.Fatalf("Cell(2) error = %v", err)
+	}
+	if !third.IsHorizontallyMergedContinuation() {
+		t.Error("Cell(2) should be marked as a horizontal merge continuation")
+	}
 }
 
 func TestTableCellMerge_Vertical(t *testing.T) {
@@ -96,6 +112,21 @@ func TestTableCellMerge_Vertical(t *testing.T) {
 	if cell.GridSpan() != 1 {
 		t.Errorf("GridSpan() = %v, want 1", cell.GridSpan())
 	}
+
+	row2, err := table.Row(1)
+	if err != nil {
+		t.Fatalf("Row(1) error = %v", err)
+	}
+	cell2, err := row2.Cell(0)
+	if err != nil {
+		t.Fatalf("Row(1).Cell(0) error = %v", err)
+	}
+	if cell2.VMerge() != domain.VMergeContinue {
+		t.Errorf("Row(1).Cell(0) VMerge() = %v, want VMergeContinue", cell2.VMerge())
+	}
+	if cell2.IsHorizontallyMergedContinuation() {
+		t.Error("Row(1).Cell(0) should not be a horizontal continuation")
+	}
 }
 
 func TestTableCellMerge_Both(t *testing.T) {
@@ -124,6 +155,37 @@ func TestTableCellMerge_Both(t *testing.T) {
 
 	if cell.VMerge() != domain.VMergeRestart {
 		t.Errorf("VMerge() = %v, want VMergeRestart", cell.VMerge())
+	}
+
+	row1, err := table.Row(1)
+	if err != nil {
+		t.Fatalf("Row(1) error = %v", err)
+	}
+	below, err := row1.Cell(0)
+	if err != nil {
+		t.Fatalf("Row(1).Cell(0) error = %v", err)
+	}
+	if below.VMerge() != domain.VMergeContinue {
+		t.Errorf("Row(1).Cell(0) VMerge() = %v, want VMergeContinue", below.VMerge())
+	}
+	if below.GridSpan() != 2 {
+		t.Errorf("Row(1).Cell(0) GridSpan() = %v, want 2", below.GridSpan())
+	}
+
+	neighbor, err := row.Cell(1)
+	if err != nil {
+		t.Fatalf("Row(0).Cell(1) error = %v", err)
+	}
+	if !neighbor.IsHorizontallyMergedContinuation() {
+		t.Error("Row(0).Cell(1) should be a horizontal continuation")
+	}
+
+	neighborBelow, err := row1.Cell(1)
+	if err != nil {
+		t.Fatalf("Row(1).Cell(1) error = %v", err)
+	}
+	if !neighborBelow.IsHorizontallyMergedContinuation() {
+		t.Error("Row(1).Cell(1) should be a horizontal continuation")
 	}
 }
 
@@ -249,8 +311,8 @@ func TestTableStyle(t *testing.T) {
 	}
 
 	style = table.Style()
-	if style.Name != "TableGrid" {
-		t.Errorf("Style name = %v, want TableGrid", style.Name)
+	if style.Name != domain.StyleIDTableGrid {
+		t.Errorf("Style name = %v, want %s", style.Name, domain.StyleIDTableGrid)
 	}
 
 	// Set custom style

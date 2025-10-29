@@ -21,6 +21,7 @@ package serializer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mmonterroca/docxgo/domain"
 	"github.com/mmonterroca/docxgo/internal/xml"
@@ -148,7 +149,10 @@ func (s *RunSerializer) serializeProperties(run domain.Run) *xml.RunProperties {
 }
 
 func (s *RunSerializer) serializeText(run domain.Run) *xml.Text {
-	text := run.Text()
+	return s.serializeTextContent(run.Text())
+}
+
+func (s *RunSerializer) serializeTextContent(text string) *xml.Text {
 	if text == "" {
 		return nil
 	}
@@ -157,7 +161,6 @@ func (s *RunSerializer) serializeText(run domain.Run) *xml.Text {
 		Content: text,
 	}
 
-	// Preserve spaces if text starts/ends with space
 	if len(text) > 0 && (text[0] == ' ' || text[len(text)-1] == ' ') {
 		xmlText.Space = "preserve"
 	}
@@ -284,6 +287,11 @@ func (s *ParagraphSerializer) Serialize(para domain.Paragraph) *xml.Paragraph {
 			}
 		}
 
+		if text := run.Text(); strings.Contains(text, "\n") {
+			xmlPara.Elements = append(xmlPara.Elements, s.expandRunWithNewlines(run, text)...)
+			continue
+		}
+
 		// Regular run without fields
 		xmlPara.Elements = append(xmlPara.Elements, s.runSerializer.Serialize(run))
 	}
@@ -296,6 +304,57 @@ func (s *ParagraphSerializer) Serialize(para domain.Paragraph) *xml.Paragraph {
 	}
 
 	return xmlPara
+}
+
+func (s *ParagraphSerializer) expandRunWithNewlines(run domain.Run, text string) []interface{} {
+	parts := strings.Split(text, "\n")
+	if len(parts) == 0 {
+		return []interface{}{s.runSerializer.Serialize(run)}
+	}
+
+	result := make([]interface{}, 0, len(parts)*2-1)
+
+	var (
+		setter   func(string) error
+		restore  func()
+		canSet   bool
+		original string
+	)
+
+	if s, ok := run.(interface{ SetText(string) error }); ok {
+		canSet = true
+		original = run.Text()
+		setter = s.SetText
+		restore = func() {
+			_ = setter(original)
+		}
+	}
+
+	for idx, part := range parts {
+		var xmlRun *xml.Run
+
+		if canSet {
+			_ = setter(part)
+			xmlRun = s.runSerializer.Serialize(run)
+		} else {
+			xmlRun = &xml.Run{
+				Properties: s.runSerializer.serializeProperties(run),
+				Text:       s.runSerializer.serializeTextContent(part),
+			}
+		}
+
+		if idx < len(parts)-1 {
+			xmlRun.Break = &xml.Break{}
+		}
+
+		result = append(result, xmlRun)
+	}
+
+	if canSet && restore != nil {
+		restore()
+	}
+
+	return result
 }
 
 // expandRunWithFields expands a run containing fields into XML elements while preserving formatting.
@@ -521,6 +580,17 @@ func (s *TableSerializer) serializeTableProperties(table domain.Table) *xml.Tabl
 		W:    width.Value,
 	}
 
+	// Default look hints so Word can map header/footer banding expectations.
+	props.Look = &xml.TableLook{
+		Val:         "04A0",
+		FirstRow:    "1",
+		LastRow:     "0",
+		FirstColumn: "1",
+		LastColumn:  "0",
+		NoHBand:     "0",
+		NoVBand:     "1",
+	}
+
 	// Alignment
 	if table.Alignment() != domain.AlignmentLeft {
 		props.Jc = &xml.Justification{
@@ -544,7 +614,7 @@ func (s *TableSerializer) serializeGrid(table domain.Table) *xml.TableGrid {
 	}
 
 	for i := 0; i < table.ColumnCount(); i++ {
-		grid.Cols[i] = &xml.GridCol{}
+		grid.Cols[i] = &xml.GridCol{W: intPtr(0)}
 	}
 
 	return grid
@@ -565,8 +635,11 @@ func (s *TableSerializer) serializeRow(row domain.TableRow) *xml.TableRow {
 		}
 	}
 
-	// Serialize cells
+	// Serialize cells, skipping horizontal merge continuations
 	for _, cell := range row.Cells() {
+		if cell.IsHorizontallyMergedContinuation() {
+			continue
+		}
 		xmlRow.Cells = append(xmlRow.Cells, s.serializeCell(cell))
 	}
 
@@ -574,39 +647,52 @@ func (s *TableSerializer) serializeRow(row domain.TableRow) *xml.TableRow {
 }
 
 func (s *TableSerializer) serializeCell(cell domain.TableCell) *xml.TableCell {
-	xmlCell := &xml.TableCell{
+	paragraphs := cell.Paragraphs()
+	tables := cell.Tables()
+
+	content := make([]interface{}, 0, len(paragraphs)+len(tables)+1)
+
+	for _, para := range paragraphs {
+		content = append(content, s.paraSerializer.Serialize(para))
+	}
+
+	if len(tables) > 0 {
+		// If the cell contains only nested tables, add a leading placeholder paragraph to anchor the table content.
+		if len(paragraphs) == 0 {
+			content = append(content, emptyParagraph())
+		}
+
+		for _, table := range tables {
+			content = append(content, s.Serialize(table))
+		}
+
+		// Word expects a trailing empty paragraph after nested tables to keep the end-of-cell marker intact.
+		content = append(content, emptyParagraph())
+	}
+
+	if len(content) == 0 {
+		content = append(content, emptyParagraph())
+	}
+
+	return &xml.TableCell{
 		Properties: s.serializeCellProperties(cell),
-		Paragraphs: make([]*xml.Paragraph, 0, len(cell.Paragraphs())),
-		Tables:     make([]*xml.Table, 0, len(cell.Tables())),
+		Content:    content,
 	}
-
-	// Serialize paragraphs
-	for _, para := range cell.Paragraphs() {
-		xmlCell.Paragraphs = append(xmlCell.Paragraphs, s.paraSerializer.Serialize(para))
-	}
-
-	// Serialize nested tables
-	for _, table := range cell.Tables() {
-		xmlCell.Tables = append(xmlCell.Tables, s.Serialize(table))
-	}
-
-	// Add empty paragraph if cell has no content
-	if len(xmlCell.Paragraphs) == 0 && len(xmlCell.Tables) == 0 {
-		xmlCell.Paragraphs = append(xmlCell.Paragraphs, &xml.Paragraph{})
-	}
-
-	return xmlCell
 }
 
 func (s *TableSerializer) serializeCellProperties(cell domain.TableCell) *xml.TableCellProperties {
 	props := &xml.TableCellProperties{}
 
-	// Width
+	// Width (Word expects tcW even for auto width)
+	widthType := constants.WidthTypeAuto
+	widthValue := 0
 	if cell.Width() > 0 {
-		props.Width = &xml.TableWidth{
-			Type: constants.WidthTypeDXA,
-			W:    cell.Width(),
-		}
+		widthType = constants.WidthTypeDXA
+		widthValue = cell.Width()
+	}
+	props.Width = &xml.TableWidth{
+		Type: widthType,
+		W:    widthValue,
 	}
 
 	// GridSpan (horizontal merge)
@@ -674,6 +760,12 @@ func (s *TableSerializer) alignmentToString(align domain.Alignment) string {
 	}
 }
 
+func emptyParagraph() *xml.Paragraph {
+	return &xml.Paragraph{
+		Properties: &xml.ParagraphProperties{},
+	}
+}
+
 func (s *TableSerializer) verticalAlignToString(align domain.VerticalAlignment) string {
 	switch align {
 	case domain.VerticalAlignTop:
@@ -691,6 +783,10 @@ func (s *TableSerializer) verticalAlignToString(align domain.VerticalAlignment) 
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func intPtr(i int) *int {
+	return &i
 }
 
 func intPtrIfNotZero(i int) *int {
@@ -927,14 +1023,24 @@ func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager) *
 		RunDefaults: &xml.RunDefaults{
 			Properties: &xml.RunProperties{
 				Font: &xml.Font{
-					ASCII: "Calibri",
-					HAnsi: "Calibri",
+					ASCII:    "Calibri",
+					HAnsi:    "Calibri",
+					EastAsia: "Times New Roman",
+					CS:       "Times New Roman",
 				},
 				Size: &xml.HalfPt{Val: 22}, // 11pt
+				Lang: &xml.Language{
+					Val:      "en-MX",
+					EastAsia: "en-US",
+					Bidi:     "ar-SA",
+				},
 			},
 		},
 		ParaDefaults: &xml.ParagraphDefaults{},
 	}
+
+	// Include Word's latent style catalog to avoid auto-added styles during repair
+	xmlStyles.LatentStyles = defaultLatentStyles
 
 	// Serialize all styles from the style manager
 	for _, style := range styleManager.ListStyles() {

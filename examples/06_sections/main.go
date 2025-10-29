@@ -200,12 +200,12 @@ func main() {
 	ori1, _ := doc.AddParagraph()
 	ori1.SetStyle(domain.StyleIDListParagraph)
 	ori1Run, _ := ori1.AddRun()
-	ori1Run.AddText("• Portrait (default, used here)")
+	ori1Run.AddText("• Portrait (default option)")
 
 	ori2, _ := doc.AddParagraph()
 	ori2.SetStyle(domain.StyleIDListParagraph)
 	ori2Run, _ := ori2.AddRun()
-	ori2Run.AddText("• Landscape (for wide content)")
+	ori2Run.AddText("• Landscape (used in this demo)")
 
 	doc.AddParagraph()
 

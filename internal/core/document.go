@@ -341,6 +341,8 @@ func (d *document) ensureDefaultRelationships() {
 		{constants.RelTypeStyles, "styles.xml"},
 		{constants.RelTypeFontTable, "fontTable.xml"},
 		{constants.RelTypeTheme, "theme/theme1.xml"},
+		{constants.RelTypeSettings, "settings.xml"},
+		{constants.RelTypeWebSettings, "webSettings.xml"},
 	}
 
 	for _, rel := range baseRels {

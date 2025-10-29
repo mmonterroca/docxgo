@@ -23,8 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-
 package manager
 
 import (
@@ -182,6 +180,7 @@ func TestStyleManager_ListStylesByType(t *testing.T) {
 
 	paragraphStyles := sm.ListStylesByType(domain.StyleTypeParagraph)
 	characterStyles := sm.ListStylesByType(domain.StyleTypeCharacter)
+	tableStyles := sm.ListStylesByType(domain.StyleTypeTable)
 
 	if len(paragraphStyles) == 0 {
 		t.Error("ListStylesByType(Paragraph) should return styles")
@@ -189,6 +188,10 @@ func TestStyleManager_ListStylesByType(t *testing.T) {
 
 	if len(characterStyles) == 0 {
 		t.Error("ListStylesByType(Character) should return styles")
+	}
+
+	if len(tableStyles) == 0 {
+		t.Error("ListStylesByType(Table) should return styles")
 	}
 
 	// Verify types are correct
@@ -201,6 +204,12 @@ func TestStyleManager_ListStylesByType(t *testing.T) {
 	for _, style := range characterStyles {
 		if style.Type() != domain.StyleTypeCharacter {
 			t.Errorf("Expected character style, got %v", style.Type())
+		}
+	}
+
+	for _, style := range tableStyles {
+		if style.Type() != domain.StyleTypeTable {
+			t.Errorf("Expected table style, got %v", style.Type())
 		}
 	}
 }
@@ -224,6 +233,15 @@ func TestStyleManager_DefaultStyle(t *testing.T) {
 	}
 	if characterDefault.ID() != domain.StyleIDDefaultParagraphFont {
 		t.Errorf("Default character style = %v, want %v", characterDefault.ID(), domain.StyleIDDefaultParagraphFont)
+	}
+
+	// Test table default
+	tableDefault, err := sm.DefaultStyle(domain.StyleTypeTable)
+	if err != nil {
+		t.Errorf("DefaultStyle(Table) error = %v", err)
+	}
+	if tableDefault.ID() != domain.StyleIDTableNormal {
+		t.Errorf("Default table style = %v, want %v", tableDefault.ID(), domain.StyleIDTableNormal)
 	}
 }
 
@@ -440,6 +458,9 @@ func TestBuiltInStyles_Coverage(t *testing.T) {
 		domain.StyleIDEmphasis,
 		domain.StyleIDStrong,
 		domain.StyleIDHyperlink,
+		domain.StyleIDTableNormal,
+		domain.StyleIDTableGrid,
+		domain.StyleIDTableMediumShading,
 	}
 
 	for _, styleID := range importantStyles {

@@ -62,7 +62,7 @@ func NewTable(id string, rows, cols int, idGen *manager.IDGenerator, relManager 
 	// Create initial rows
 	for i := 0; i < rows; i++ {
 		rowID := idGen.NextRowID()
-		row := NewTableRow(rowID, cols, idGen, relManager, mediaManager)
+		row := NewTableRow(t, rowID, cols, idGen, relManager, mediaManager)
 		t.rows = append(t.rows, row)
 	}
 
@@ -88,7 +88,7 @@ func (t *table) Rows() []domain.TableRow {
 // AddRow adds a new row to the end of the table.
 func (t *table) AddRow() (domain.TableRow, error) {
 	rowID := t.idGen.NextRowID()
-	row := NewTableRow(rowID, t.cols, t.idGen, t.relManager, t.mediaManager)
+	row := NewTableRow(t, rowID, t.cols, t.idGen, t.relManager, t.mediaManager)
 	t.rows = append(t.rows, row)
 	return row, nil
 }
@@ -101,7 +101,7 @@ func (t *table) InsertRow(index int) (domain.TableRow, error) {
 	}
 
 	rowID := t.idGen.NextRowID()
-	row := NewTableRow(rowID, t.cols, t.idGen, t.relManager, t.mediaManager)
+	row := NewTableRow(t, rowID, t.cols, t.idGen, t.relManager, t.mediaManager)
 
 	// Insert at index
 	t.rows = append(t.rows[:index], append([]domain.TableRow{row}, t.rows[index:]...)...)
@@ -176,17 +176,19 @@ type tableRow struct {
 	id           string
 	cells        []domain.TableCell
 	height       int
+	table        *table
 	idGen        *manager.IDGenerator
 	relManager   *manager.RelationshipManager
 	mediaManager *manager.MediaManager
 }
 
 // NewTableRow creates a new TableRow.
-func NewTableRow(id string, cols int, idGen *manager.IDGenerator, relManager *manager.RelationshipManager, mediaManager *manager.MediaManager) domain.TableRow {
+func NewTableRow(tbl *table, id string, cols int, idGen *manager.IDGenerator, relManager *manager.RelationshipManager, mediaManager *manager.MediaManager) domain.TableRow {
 	row := &tableRow{
 		id:           id,
 		cells:        make([]domain.TableCell, 0, cols),
 		height:       0, // Auto height
+		table:        tbl,
 		idGen:        idGen,
 		relManager:   relManager,
 		mediaManager: mediaManager,
@@ -195,7 +197,7 @@ func NewTableRow(id string, cols int, idGen *manager.IDGenerator, relManager *ma
 	// Create cells
 	for i := 0; i < cols; i++ {
 		cellID := idGen.NextCellID()
-		cell := NewTableCell(cellID, idGen, relManager, mediaManager)
+		cell := NewTableCell(row, cellID, idGen, relManager, mediaManager)
 		row.cells = append(row.cells, cell)
 	}
 
@@ -244,13 +246,15 @@ type tableCell struct {
 	shading           domain.Color
 	gridSpan          int
 	vMerge            domain.VerticalMergeType
+	row               *tableRow
+	hMergeParent      *tableCell
 	idGen             *manager.IDGenerator
 	relManager        *manager.RelationshipManager
 	mediaManager      *manager.MediaManager
 }
 
 // NewTableCell creates a new TableCell.
-func NewTableCell(id string, idGen *manager.IDGenerator, relManager *manager.RelationshipManager, mediaManager *manager.MediaManager) domain.TableCell {
+func NewTableCell(row *tableRow, id string, idGen *manager.IDGenerator, relManager *manager.RelationshipManager, mediaManager *manager.MediaManager) domain.TableCell {
 	return &tableCell{
 		id:                id,
 		paragraphs:        make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
@@ -261,6 +265,7 @@ func NewTableCell(id string, idGen *manager.IDGenerator, relManager *manager.Rel
 		shading:           domain.ColorWhite,
 		gridSpan:          1, // Default: no horizontal merge
 		vMerge:            domain.VMergeNone,
+		row:               row,
 		idGen:             idGen,
 		relManager:        relManager,
 		mediaManager:      mediaManager,
@@ -336,21 +341,124 @@ func (c *tableCell) SetShading(color domain.Color) error {
 
 // Merge merges this cell with adjacent cells.
 func (c *tableCell) Merge(cols, rows int) error {
+	const op = "TableCell.Merge"
+
 	if cols < 1 {
-		return errors.InvalidArgument("TableCell.Merge", "cols", cols,
+		return errors.InvalidArgument(op, "cols", cols,
 			"cols must be at least 1")
 	}
 	if rows < 1 {
-		return errors.InvalidArgument("TableCell.Merge", "rows", rows,
+		return errors.InvalidArgument(op, "rows", rows,
 			"rows must be at least 1")
 	}
 
-	// Set horizontal merge (gridSpan)
-	c.gridSpan = cols
+	if c.row == nil || c.row.table == nil {
+		return errors.InvalidState(op, "cell is not attached to a table")
+	}
 
-	// Set vertical merge
+	if c.hMergeParent != nil {
+		return errors.InvalidState(op, "cannot merge from a horizontally merged cell")
+	}
+	if c.vMerge == domain.VMergeContinue {
+		return errors.InvalidState(op, "cannot merge from a vertically continued cell")
+	}
+
+	row := c.row
+	colIndex := -1
+	for idx, candidate := range row.cells {
+		if tc, ok := candidate.(*tableCell); ok && tc == c {
+			colIndex = idx
+			break
+		}
+	}
+	if colIndex == -1 {
+		return errors.InvalidState(op, "cell not found in parent row")
+	}
+
+	if colIndex+cols > len(row.cells) {
+		return errors.InvalidArgument(op, "cols", cols,
+			"merge exceeds row column count")
+	}
+
+	tbl := row.table
+	rowIndex := -1
+	for idx, candidate := range tbl.rows {
+		if tr, ok := candidate.(*tableRow); ok && tr == row {
+			rowIndex = idx
+			break
+		}
+	}
+	if rowIndex == -1 {
+		return errors.InvalidState(op, "parent row not found in table")
+	}
+
+	if rowIndex+rows > len(tbl.rows) {
+		return errors.InvalidArgument(op, "rows", rows,
+			"merge exceeds available rows")
+	}
+
+	// Validate that the merge region is free of existing merges
+	for rOffset := 0; rOffset < rows; rOffset++ {
+		targetRow, ok := tbl.rows[rowIndex+rOffset].(*tableRow)
+		if !ok {
+			return errors.InvalidState(op, "unexpected row implementation type")
+		}
+
+		for cOffset := 0; cOffset < cols; cOffset++ {
+			targetCell, ok := targetRow.cells[colIndex+cOffset].(*tableCell)
+			if !ok {
+				return errors.InvalidState(op, "unexpected cell implementation type")
+			}
+
+			if targetCell == c {
+				continue
+			}
+
+			if targetCell.hMergeParent != nil {
+				return errors.InvalidState(op, "merge region overlaps an existing horizontal merge")
+			}
+			if targetCell.vMerge != domain.VMergeNone {
+				return errors.InvalidState(op, "merge region overlaps an existing vertical merge")
+			}
+			if targetCell.gridSpan > 1 {
+				return errors.InvalidState(op, "merge region overlaps an existing grid span")
+			}
+		}
+	}
+
+	// Configure the primary cell
+	c.hMergeParent = nil
+	c.gridSpan = cols
 	if rows > 1 {
 		c.vMerge = domain.VMergeRestart
+	} else {
+		c.vMerge = domain.VMergeNone
+	}
+
+	// Apply horizontal merge within the current row
+	for offset := 1; offset < cols; offset++ {
+		sibling := row.cells[colIndex+offset].(*tableCell)
+		sibling.hMergeParent = c
+		sibling.gridSpan = 1
+		sibling.vMerge = domain.VMergeNone
+	}
+
+	// Apply vertical merges across subsequent rows
+	if rows > 1 {
+		for rOffset := 1; rOffset < rows; rOffset++ {
+			targetRow := tbl.rows[rowIndex+rOffset].(*tableRow)
+			leading := targetRow.cells[colIndex].(*tableCell)
+			leading.hMergeParent = nil
+			leading.gridSpan = cols
+			leading.vMerge = domain.VMergeContinue
+
+			for cOffset := 1; cOffset < cols; cOffset++ {
+				neighbor := targetRow.cells[colIndex+cOffset].(*tableCell)
+				neighbor.hMergeParent = leading
+				neighbor.gridSpan = 1
+				neighbor.vMerge = domain.VMergeContinue
+			}
+		}
 	}
 
 	return nil
@@ -408,4 +516,10 @@ func (c *tableCell) Tables() []domain.Table {
 	result := make([]domain.Table, len(c.tables))
 	copy(result, c.tables)
 	return result
+}
+
+// IsHorizontallyMergedContinuation reports whether this cell is hidden by a
+// horizontal merge originating from another cell in the same row.
+func (c *tableCell) IsHorizontallyMergedContinuation() bool {
+	return c.hMergeParent != nil
 }

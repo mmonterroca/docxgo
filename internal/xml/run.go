@@ -49,6 +49,7 @@ type RunProperties struct {
 	SizeCS    *HalfPt    `xml:"w:szCs,omitempty"` // Complex script size
 	Underline *Underline `xml:"w:u,omitempty"`
 	Highlight *Highlight `xml:"w:highlight,omitempty"`
+	Lang      *Language  `xml:"w:lang,omitempty"`
 }
 
 // Text represents w:t element (text content).
@@ -84,6 +85,13 @@ type Font struct {
 	HAnsi    string `xml:"w:hAnsi,attr,omitempty"`
 	EastAsia string `xml:"w:eastAsia,attr,omitempty"`
 	CS       string `xml:"w:cs,attr,omitempty"`
+}
+
+// Language represents w:lang element.
+type Language struct {
+	Val      string `xml:"w:val,attr,omitempty"`
+	EastAsia string `xml:"w:eastAsia,attr,omitempty"`
+	Bidi     string `xml:"w:bidi,attr,omitempty"`
 }
 
 // Highlight represents w:highlight element.

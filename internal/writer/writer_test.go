@@ -78,6 +78,8 @@ func TestZipWriter_WriteDocument(t *testing.T) {
 		"word/styles.xml",
 		"word/fontTable.xml",
 		"word/theme/theme1.xml",
+		"word/settings.xml",
+		"word/webSettings.xml",
 	}
 
 	fileMap := make(map[string]bool)
@@ -137,8 +139,8 @@ func TestZipWriter_ContentTypes(t *testing.T) {
 				t.Errorf("Wrong number of defaults: got %d, want 2", len(ct.Defaults))
 			}
 
-			if len(ct.Overrides) != 6 {
-				t.Errorf("Wrong number of overrides: got %d, want 6", len(ct.Overrides))
+			if len(ct.Overrides) != 8 {
+				t.Errorf("Wrong number of overrides: got %d, want 8", len(ct.Overrides))
 			}
 
 			return

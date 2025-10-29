@@ -209,10 +209,13 @@ func TestTableSerializer(t *testing.T) {
 	}
 
 	firstCell := xmlTable.Rows[0].Cells[0]
-	if len(firstCell.Paragraphs) == 0 {
-		t.Fatal("expected at least one paragraph in first cell")
+	if len(firstCell.Content) == 0 {
+		t.Fatal("expected at least one element in first cell content")
 	}
-	firstPara := firstCell.Paragraphs[0]
+	firstPara, ok := firstCell.Content[0].(*xmlstructs.Paragraph)
+	if !ok {
+		t.Fatalf("expected first content element to be paragraph, got %T", firstCell.Content[0])
+	}
 	cellRuns := collectRuns(firstPara)
 	if len(cellRuns) == 0 {
 		t.Fatal("expected at least one run in first paragraph")
