@@ -1,5 +1,3 @@
-module github.com/fumiama/go-docx
+module github.com/mmonterroca/docxgo
 
-go 1.20
-
-require github.com/fumiama/imgsz v0.0.2
+go 1.23

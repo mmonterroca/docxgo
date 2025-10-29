@@ -1,0 +1,157 @@
+#!/bin/bash
+# Script to run all examples and generate .docx files for validation
+
+set -e  # Exit on error
+
+echo "🚀 Running all examples to generate .docx files..."
+echo ""
+
+# Resolve directories
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Change to examples directory
+cd "$SCRIPT_DIR"
+
+VALIDATOR_PROJECT="$ROOT_DIR/DocxValidator"
+VALIDATE_DOCX=true
+
+if ! command -v dotnet >/dev/null 2>&1; then
+    echo "⚠️  dotnet CLI not found; skipping Open XML validation"
+    VALIDATE_DOCX=false
+elif [ ! -f "$VALIDATOR_PROJECT/DocxValidator.csproj" ]; then
+    echo "⚠️  DocxValidator project not found at $VALIDATOR_PROJECT; skipping Open XML validation"
+    VALIDATE_DOCX=false
+else
+    echo "🔍 Open XML validation enabled via DocxValidator"
+fi
+
+EXAMPLES=(
+    "01_basic"
+    "02_intermediate"
+    "04_fields"
+    "05_styles"
+    "06_sections"
+    "07_advanced"
+    "08_images"
+    "09_advanced_tables"
+    "11_multi_section"
+)
+
+FAILED=()
+PASSED=()
+GENERATED_FILES=()
+VALIDATED_FILES=()
+VALIDATION_FAILED=()
+
+for example in "${EXAMPLES[@]}"; do
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📝 Running $example..."
+    
+    if cd "$example"; then
+        # Build
+        if go build -o ./example_binary 2>&1; then
+            # Run the example
+            if ./example_binary 2>&1; then
+                echo "✅ $example executed successfully"
+                PASSED+=("$example")
+                
+                # Find generated .docx files
+                docx_files=$(find . -name "*.docx" -type f 2>/dev/null || true)
+                if [ -n "$docx_files" ]; then
+                    while IFS= read -r file; do
+                        relative_file="${example}/${file#./}"
+                        absolute_file="$PWD/${file#./}"
+
+                        GENERATED_FILES+=("$relative_file")
+                        echo "   📄 Generated: ${file#./}"
+
+                        if [ "$VALIDATE_DOCX" = true ]; then
+                            echo "   🔍 Validating with DocxValidator..."
+                            if output=$(dotnet run --project "$VALIDATOR_PROJECT" -- "$absolute_file" 2>&1); then
+                                echo "   ✅ Open XML validation passed"
+                                VALIDATED_FILES+=("$relative_file")
+                            else
+                                echo "   ❌ Open XML validation failed"
+                                VALIDATION_FAILED+=("$relative_file")
+                                echo ""
+                                echo "$output" | sed 's/^/      /'
+                                echo ""
+                            fi
+                        fi
+                    done <<< "$docx_files"
+                fi
+                
+                # Clean up binary
+                rm -f ./example_binary
+            else
+                echo "❌ $example execution failed"
+                FAILED+=("$example")
+            fi
+        else
+            echo "❌ $example build failed"
+            FAILED+=("$example")
+        fi
+        cd ..
+    else
+        echo "❌ Could not enter directory $example"
+        FAILED+=("$example")
+    fi
+    echo ""
+done
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 SUMMARY"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ Passed: ${#PASSED[@]}/${#EXAMPLES[@]}"
+echo "❌ Failed: ${#FAILED[@]}/${#EXAMPLES[@]}"
+echo "📄 Files generated: ${#GENERATED_FILES[@]}"
+if [ "$VALIDATE_DOCX" = true ]; then
+    echo "🔍 Validations passed: ${#VALIDATED_FILES[@]}"
+    echo "🚫 Validations failed: ${#VALIDATION_FAILED[@]}"
+else
+    echo "🔍 Open XML validation skipped"
+fi
+
+if [ ${#FAILED[@]} -gt 0 ]; then
+    echo ""
+    echo "Failed examples:"
+    for example in "${FAILED[@]}"; do
+        echo "  ❌ $example"
+    done
+fi
+
+if [ ${#GENERATED_FILES[@]} -gt 0 ]; then
+    echo ""
+    echo "Generated .docx files:"
+    for file in "${GENERATED_FILES[@]}"; do
+        echo "  📄 $file"
+    done
+fi
+
+if [ "$VALIDATE_DOCX" = true ] && [ ${#VALIDATION_FAILED[@]} -gt 0 ]; then
+    echo ""
+    echo "Validation failures:"
+    for file in "${VALIDATION_FAILED[@]}"; do
+        echo "  ❌ $file"
+    done
+fi
+
+echo ""
+if [ ${#FAILED[@]} -gt 0 ] || { [ "$VALIDATE_DOCX" = true ] && [ ${#VALIDATION_FAILED[@]} -gt 0 ]; }; then
+    if [ ${#FAILED[@]} -gt 0 ]; then
+        echo "❌ Some examples failed"
+    fi
+    if [ "$VALIDATE_DOCX" = true ] && [ ${#VALIDATION_FAILED[@]} -gt 0 ]; then
+        echo "❌ Some .docx files failed Open XML validation"
+    fi
+    exit 1
+else
+    echo "✅ All examples executed successfully!"
+    if [ "$VALIDATE_DOCX" = true ]; then
+        echo "🎉 All generated .docx files passed Open XML validation"
+    else
+        echo "🎉 You can now open the generated .docx files to validate them"
+    fi
+    exit 0
+fi

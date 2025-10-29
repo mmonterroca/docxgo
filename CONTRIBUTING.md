@@ -1,6 +1,18 @@
-# Contributing to go-docx (SlideLang Fork)
+# Contributing to go-docx
 
-Thank you for your interest in contributing to the SlideLang fork of go-docx! This document provides guidelines and workflow information for contributors.
+Thank you for your interest in contributing to go-docx! This document provides guidelines and workflow information for contributors.
+
+> **Note**: This project was completely rewritten in 2024-2025 with a clean architecture design. All code follows modern Go practices and comprehensive testing standards.
+
+## Quick Start for Contributors
+
+1. **Read the docs**: [README.md](README.md), [V2_DESIGN.md](docs/V2_DESIGN.md)
+2. **Check issues**: Look for `good-first-issue` or `help-wanted` labels
+3. **Follow Git Flow**: Branch from `dev`, PR back to `dev`
+4. **Write tests**: Aim for 95%+ coverage
+5. **Update docs**: Keep README and examples in sync
+
+---
 
 ## Git Flow Workflow
 
@@ -30,7 +42,7 @@ cd go-docx
 Add the original repository as upstream (if not already added):
 
 ```bash
-git remote add upstream https://github.com/SlideLang/go-docx.git
+git remote add upstream https://github.com/mmonterroca/docxgo.git
 git remote -v  # Verify remotes
 ```
 
@@ -102,7 +114,7 @@ git push origin feature/your-feature-name
 
 #### 7. Open Pull Request
 
-1. Go to the [original repository](https://github.com/SlideLang/go-docx)
+1. Go to the [original repository](https://github.com/mmonterroca/docxgo)
 2. Click "New Pull Request"
 3. **Important**: Set base branch to `dev` (NOT `master`)
 4. Set compare branch to your feature branch
@@ -128,33 +140,57 @@ Periodically, maintainers will:
 
 ## What We're Looking For
 
-We welcome contributions in these areas:
+Current priorities for v2 development:
 
 ### High Priority
-- ✅ **Bug fixes**: Resolve issues or Word compatibility problems
-- ✅ **Additional field codes**: STYLEREF, HYPERLINK, IF, DATE, etc.
-- ✅ **Extended style support**: More heading levels, custom styles
-- ✅ **Test coverage**: Improve code reliability
+- ✅ **Complete file I/O**: Finish XML serialization and .docx writing
+- ✅ **Headers/Footers**: Proper section support
+- ✅ **Styles**: Complete styles management
+- ✅ **Fields**: TOC, page numbers, cross-references
+- ✅ **Bug fixes**: Any issues in current implementation
+- ✅ **Test coverage**: Maintain 95%+ coverage
 
 ### Medium Priority
-- ✅ **Performance improvements**: Optimize parsing or generation
-- ✅ **Documentation**: Better examples, API docs, tutorials
-- ✅ **Headers/Footers API**: Enhanced section properties
+- ✅ **Images & Drawings**: Media file handling
+- ✅ **Builder Pattern**: Fluent API (planned for v2.1)
+- ✅ **Performance**: Optimization opportunities
+- ✅ **Documentation**: Better examples, tutorials
+- ✅ **Migration Tools**: Help users migrate from v1
 
-### Future Enhancements
+### Future / Nice to Have
 - ✅ **Advanced formatting**: SmartArt, equations, charts
-- ✅ **Section management**: Multiple sections, page layout
-- ✅ **Cross-references**: Figure numbers, table references
+- ✅ **Comments & Tracking**: Change tracking support
+- ✅ **Custom XML**: Custom XML parts
+- ✅ **Template Support**: Document templates
 
 ## Development Guidelines
 
 ### Code Quality
 
-- **Go Idioms**: Follow Go best practices and idioms
-- **Error Handling**: Always handle errors properly
+- **Clean Architecture**: Follow the established pattern (domain → internal → pkg)
+- **Interfaces First**: Define interfaces in `domain/`, implementations in `internal/`
+- **Error Handling**: All public methods return errors
 - **Naming**: Use clear, descriptive names
-- **Comments**: Document exported functions and complex logic
-- **Tests**: Aim for >60% coverage
+- **Comments**: Document all exported functions
+- **Tests**: Aim for 95%+ coverage (current standard)
+
+### Architecture Guidelines
+
+When contributing code:
+
+1. **Domain Layer** (`domain/`) - Interfaces only, no implementations
+2. **Internal Layer** (`internal/`) - Core implementations, managers, services
+3. **Package Layer** (`pkg/`) - Public utilities, helpers, constants
+4. **No `interface{}`** - Use concrete types or generic constraints
+5. **Dependency Injection** - Pass dependencies via constructors
+6. **Thread-Safe** - Use mutexes/atomics where needed
+
+### Submitting Changes
+1. Consider if it exists in v2 too
+2. Fix in both if applicable
+3. Mark PR with `legacy-v1` label
+
+---
 
 ### Testing
 
@@ -167,6 +203,14 @@ go test -cover ./...             # With coverage
 go test -race ./...              # Race detection
 ```
 
+After regenerating any `.docx` fixtures (especially under `examples/`), validate them with the local Open XML validator to be sure Microsoft Word will open them without warnings:
+
+```bash
+dotnet run --project DocxValidator -- examples/07_advanced/07_advanced_demo.docx
+```
+
+The validator project targets .NET 8 and reports schema errors inline. Fix any reported issues before opening a pull request.
+
 ### Documentation
 
 Update documentation when adding features:
@@ -177,8 +221,8 @@ Update documentation when adding features:
 
 ## Community
 
-- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/SlideLang/go-docx/issues)
-- **Discussions**: Ask questions or share ideas in [GitHub Discussions](https://github.com/SlideLang/go-docx/discussions)
+- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
+- **Discussions**: Ask questions or share ideas in [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
 - **Code of Conduct**: Be respectful and constructive
 
 ## Questions?
