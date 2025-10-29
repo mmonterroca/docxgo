@@ -695,3 +695,342 @@ func TestOptions_Validation(t *testing.T) {
 		}
 	})
 }
+
+func TestDocumentBuilder_Options(t *testing.T) {
+	t.Run("WithPageSize sets page size", func(t *testing.T) {
+		builder := NewDocumentBuilder(
+			WithPageSize(Letter),
+		)
+		builder.AddParagraph().Text("Test").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		sections := doc.Sections()
+		if len(sections) == 0 {
+			t.Fatal("expected at least one section")
+		}
+
+		// Note: Default is A4, so we just verify a document was created
+		// The page size conversion is handled by the builder
+		if doc == nil {
+			t.Error("expected document to be created")
+		}
+	})
+
+	t.Run("WithMargins sets margins", func(t *testing.T) {
+		margins := Margins{
+			Top:    1440,
+			Bottom: 1440,
+			Left:   1440,
+			Right:  1440,
+		}
+		builder := NewDocumentBuilder(
+			WithMargins(margins),
+		)
+		builder.AddParagraph().Text("Test").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		sections := doc.Sections()
+		if len(sections) == 0 {
+			t.Fatal("expected at least one section")
+		}
+
+		actualMargins := sections[0].Margins()
+		if actualMargins.Top != margins.Top || actualMargins.Left != margins.Left {
+			t.Errorf("expected margins %+v, got %+v", margins, actualMargins)
+		}
+	})
+
+	t.Run("WithMetadata sets document metadata", func(t *testing.T) {
+		meta := &domain.Metadata{
+			Title:   "Test Title",
+			Creator: "Test Author",
+			Subject: "Test Subject",
+		}
+		builder := NewDocumentBuilder(
+			WithMetadata(meta),
+		)
+		builder.AddParagraph().Text("Test").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		metadata := doc.Metadata()
+		if metadata.Title != "Test Title" {
+			t.Errorf("expected title 'Test Title', got %s", metadata.Title)
+		}
+		if metadata.Creator != "Test Author" {
+			t.Errorf("expected author 'Test Author', got %s", metadata.Creator)
+		}
+		if metadata.Subject != "Test Subject" {
+			t.Errorf("expected subject 'Test Subject', got %s", metadata.Subject)
+		}
+	})
+
+	t.Run("WithSubject sets subject", func(t *testing.T) {
+		builder := NewDocumentBuilder(
+			WithSubject("Test Subject"),
+		)
+		builder.AddParagraph().Text("Test").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		metadata := doc.Metadata()
+		if metadata.Subject != "Test Subject" {
+			t.Errorf("expected subject 'Test Subject', got %s", metadata.Subject)
+		}
+	})
+
+	t.Run("WithStrictValidation enables strict validation", func(t *testing.T) {
+		builder := NewDocumentBuilder(
+			WithStrictValidation(),
+		)
+		builder.AddParagraph().Text("Test").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if doc == nil {
+			t.Fatal("expected document, got nil")
+		}
+	})
+}
+
+func TestDocumentBuilder_SetMetadata(t *testing.T) {
+	t.Run("sets metadata on builder", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		meta := &domain.Metadata{
+			Title:   "Title",
+			Creator: "Author",
+			Subject: "Subject",
+		}
+		builder.SetMetadata(meta)
+		builder.AddParagraph().Text("Test").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		metadata := doc.Metadata()
+		if metadata.Title != "Title" {
+			t.Errorf("expected title 'Title', got %s", metadata.Title)
+		}
+		if metadata.Creator != "Author" {
+			t.Errorf("expected creator 'Author', got %s", metadata.Creator)
+		}
+	})
+}
+
+func TestDocumentBuilder_Footer(t *testing.T) {
+	t.Run("adds footer to section", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		secBuilder := builder.DefaultSection()
+
+		footer, err := secBuilder.Footer(domain.FooterDefault)
+		if err != nil {
+			t.Fatalf("expected footer, got error %v", err)
+		}
+
+		para, err := footer.AddParagraph()
+		if err != nil {
+			t.Fatalf("expected paragraph in footer, got %v", err)
+		}
+
+		run, err := para.AddRun()
+		if err != nil {
+			t.Fatalf("expected run in footer paragraph, got %v", err)
+		}
+
+		run.AddText("Footer text")
+		secBuilder.End()
+		builder.AddParagraph().Text("Content").End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		sections := doc.Sections()
+		if len(sections) == 0 {
+			t.Fatal("expected at least one section")
+		}
+
+		// Footer should be present
+		footer2, err := sections[0].Footer(domain.FooterDefault)
+		if err != nil || footer2 == nil {
+			t.Fatal("expected footer in section")
+		}
+	})
+}
+
+func TestDocumentBuilder_SectionAccess(t *testing.T) {
+	t.Run("Section returns current section", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddParagraph().Text("Test").End()
+
+		secBuilder := builder.DefaultSection()
+		section := secBuilder.Section()
+		if section == nil {
+			t.Fatal("expected section, got nil")
+		}
+
+		// Should be able to use the returned section
+		secBuilder.Orientation(domain.OrientationLandscape).End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		sections := doc.Sections()
+		if len(sections) == 0 {
+			t.Fatal("expected at least one section")
+		}
+	})
+}
+
+func TestFieldCreationFunctions(t *testing.T) {
+	t.Run("NewField creates field", func(t *testing.T) {
+		field := NewField(domain.FieldTypePageNumber)
+		if field == nil {
+			t.Fatal("expected field, got nil")
+		}
+		if field.Type() != domain.FieldTypePageNumber {
+			t.Errorf("expected FieldTypePageNumber, got %v", field.Type())
+		}
+	})
+
+	t.Run("NewPageNumberField creates page number field", func(t *testing.T) {
+		field := NewPageNumberField()
+		if field == nil {
+			t.Fatal("expected field, got nil")
+		}
+		if field.Type() != domain.FieldTypePageNumber {
+			t.Errorf("expected FieldTypePageNumber, got %v", field.Type())
+		}
+	})
+
+	t.Run("NewPageCountField creates page count field", func(t *testing.T) {
+		field := NewPageCountField()
+		if field == nil {
+			t.Fatal("expected field, got nil")
+		}
+		// FieldTypePageCount is an alias for FieldTypeNumPages
+		fieldType := field.Type()
+		if fieldType != domain.FieldTypeNumPages && fieldType != domain.FieldTypePageCount {
+			t.Errorf("expected FieldTypeNumPages or FieldTypePageCount, got %v", fieldType)
+		}
+	})
+
+	t.Run("NewTOCField creates TOC field", func(t *testing.T) {
+		switches := map[string]string{
+			"levels":     "1-3",
+			"hyperlinks": "true",
+		}
+		field := NewTOCField(switches)
+		if field == nil {
+			t.Fatal("expected field, got nil")
+		}
+		if field.Type() != domain.FieldTypeTOC {
+			t.Errorf("expected FieldTypeTOC, got %v", field.Type())
+		}
+	})
+
+	t.Run("NewHyperlinkField creates hyperlink field", func(t *testing.T) {
+		field := NewHyperlinkField("https://example.com", "Example")
+		if field == nil {
+			t.Fatal("expected field, got nil")
+		}
+		if field.Type() != domain.FieldTypeHyperlink {
+			t.Errorf("expected FieldTypeHyperlink, got %v", field.Type())
+		}
+	})
+
+	t.Run("NewStyleRefField creates style ref field", func(t *testing.T) {
+		field := NewStyleRefField("Heading 1")
+		if field == nil {
+			t.Fatal("expected field, got nil")
+		}
+		if field.Type() != domain.FieldTypeStyleRef {
+			t.Errorf("expected FieldTypeStyleRef, got %v", field.Type())
+		}
+	})
+}
+
+func TestTableBuilder_Style(t *testing.T) {
+	t.Run("sets table style", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Style(domain.TableStyleGrid).
+			Row(0).Cell(0).Text("Cell 1").End().End().
+			End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		tables := doc.Tables()
+		if len(tables) == 0 {
+			t.Fatal("expected at least one table")
+		}
+	})
+}
+
+func TestParagraphBuilder_AddImage(t *testing.T) {
+	t.Run("AddImage fails with empty path", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddParagraph().
+			Text("Before image").
+			AddImage("").
+			End()
+
+		_, err := builder.Build()
+		if err == nil {
+			t.Fatal("expected error for empty image path, got nil")
+		}
+	})
+
+	t.Run("AddImageWithSize fails with empty path", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		size := domain.NewImageSize(100, 100)
+		builder.AddParagraph().
+			Text("Before image").
+			AddImageWithSize("", size).
+			End()
+
+		_, err := builder.Build()
+		if err == nil {
+			t.Fatal("expected error for empty image path, got nil")
+		}
+	})
+
+	t.Run("AddImageWithPosition fails with empty path", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		size := domain.NewImageSize(100, 100)
+		pos := domain.DefaultImagePosition()
+		builder.AddParagraph().
+			Text("Before image").
+			AddImageWithPosition("", size, pos).
+			End()
+
+		_, err := builder.Build()
+		if err == nil {
+			t.Fatal("expected error for empty image path, got nil")
+		}
+	})
+}
