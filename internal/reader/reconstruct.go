@@ -206,6 +206,10 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 }
 
 func applyParagraphProperties(para domain.Paragraph, props *Element) error {
+	// Apply paragraph style first (must be before other formatting)
+	if err := applyParagraphStyle(para, props); err != nil {
+		return err
+	}
 	if err := applyParagraphSpacing(para, props); err != nil {
 		return err
 	}
@@ -218,6 +222,21 @@ func applyParagraphProperties(para domain.Paragraph, props *Element) error {
 	if err := applyParagraphNumbering(para, props); err != nil {
 		return err
 	}
+	return nil
+}
+
+func applyParagraphStyle(para domain.Paragraph, props *Element) error {
+	pStyleElem := findChild(props, "pStyle")
+	if pStyleElem == nil {
+		return nil
+	}
+
+	if styleID, ok := getAttr(pStyleElem, "val"); ok && styleID != "" {
+		if err := para.SetStyle(styleID); err != nil {
+			return errors.WrapWithContext(err, "applyParagraphStyle", map[string]interface{}{"styleID": styleID})
+		}
+	}
+
 	return nil
 }
 
