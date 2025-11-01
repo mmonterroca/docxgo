@@ -38,6 +38,7 @@ type Config struct {
 	Margins          Margins
 	StrictValidation bool
 	Metadata         *domain.Metadata
+	Theme            interface{} // Theme to apply (using interface{} to avoid import cycle)
 }
 
 // PageSize represents paper dimensions.
@@ -225,5 +226,21 @@ func WithSubject(subject string) Option {
 			c.Metadata = &domain.Metadata{}
 		}
 		c.Metadata.Subject = subject
+	}
+}
+
+// WithTheme applies a theme to the document, configuring colors, fonts, and spacing.
+// The theme parameter should be a themes.Theme interface.
+//
+// Example:
+//
+//	import "github.com/mmonterroca/docxgo/themes"
+//
+//	builder := docx.NewDocumentBuilder(
+//	    docx.WithTheme(themes.Corporate),
+//	)
+func WithTheme(theme interface{}) Option {
+	return func(c *Config) {
+		c.Theme = theme
 	}
 }

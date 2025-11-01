@@ -81,6 +81,7 @@ func (sm *styleManager) initializeBuiltInStyles() {
 	// Mark built-in character style IDs
 	builtInCharacterStyles := []string{
 		domain.StyleIDDefaultParagraphFont,
+		domain.StyleIDHeaderChar,
 		domain.StyleIDEmphasis, domain.StyleIDStrong, domain.StyleIDSubtle,
 		domain.StyleIDIntenseEmphasis, domain.StyleIDIntenseReference,
 		domain.StyleIDBookTitle,
@@ -290,6 +291,7 @@ func (sm *styleManager) createBuiltInParagraphStyles() {
 	// Header and Footer
 	header := newParagraphStyle(domain.StyleIDHeader, "Header", true)
 	header.SetBasedOn(domain.StyleIDNormal)
+	header.SetLink(domain.StyleIDHeaderChar)
 	header.SetSize(20) // 10pt
 	sm.styles[domain.StyleIDHeader] = header
 
@@ -320,6 +322,11 @@ func (sm *styleManager) createBuiltInCharacterStyles() {
 	defaultFont := newCharacterStyle(domain.StyleIDDefaultParagraphFont, "Default Paragraph Font", true)
 	defaultFont.SetDefault(true)
 	sm.styles[domain.StyleIDDefaultParagraphFont] = defaultFont
+
+	// Header Char
+	headerChar := newCharacterStyle(domain.StyleIDHeaderChar, "Header Char", true)
+	headerChar.SetBasedOn(domain.StyleIDDefaultParagraphFont)
+	sm.styles[domain.StyleIDHeaderChar] = headerChar
 
 	// Emphasis (italic)
 	emphasis := newCharacterStyle(domain.StyleIDEmphasis, "Emphasis", true)

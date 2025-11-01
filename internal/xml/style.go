@@ -65,6 +65,7 @@ type Style struct {
 	Name        *StyleName                `xml:"w:name,omitempty"`
 	BasedOn     *BasedOn                  `xml:"w:basedOn,omitempty"`
 	Next        *Next                     `xml:"w:next,omitempty"`
+	Link        *Link                     `xml:"w:link,omitempty"`
 	UIPriority  *UIPriority               `xml:"w:uiPriority,omitempty"`
 	QFormat     *struct{}                 `xml:"w:qFormat,omitempty"`
 	ParaProps   *StyleParagraphProperties `xml:"w:pPr,omitempty"` // Must come before rPr per OOXML spec
@@ -86,6 +87,12 @@ type BasedOn struct {
 // Next represents w:next element (next paragraph style).
 type Next struct {
 	XMLName xml.Name `xml:"w:next"`
+	Val     string   `xml:"w:val,attr"`
+}
+
+// Link represents w:link element (linked character style).
+type Link struct {
+	XMLName xml.Name `xml:"w:link"`
 	Val     string   `xml:"w:val,attr"`
 }
 

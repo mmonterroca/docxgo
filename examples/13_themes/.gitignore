@@ -1,0 +1,5 @@
+# Generated DOCX files
+*.docx
+
+# Compiled binaries
+13_themes
