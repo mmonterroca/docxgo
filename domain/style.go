@@ -66,6 +66,7 @@ const (
 // These apply formatting to individual runs of text within paragraphs.
 const (
 	StyleIDDefaultParagraphFont = "DefaultParagraphFont" // Default character formatting
+	StyleIDHeaderChar           = "HeaderChar"           // Header character style (linked to Header)
 	StyleIDEmphasis             = "Emphasis"             // Emphasis (typically italic)
 	StyleIDStrong               = "Strong"               // Strong emphasis (typically bold)
 	StyleIDSubtle               = "Subtle"               // Subtle text
@@ -175,6 +176,38 @@ type ParagraphStyle interface {
 
 	// SetOutlineLevel sets the outline level.
 	SetOutlineLevel(level int) error
+
+	// Default run formatting (character properties applied to runs in this style)
+
+	// Bold returns whether the default run is bold.
+	Bold() bool
+
+	// SetBold sets bold on the default run formatting.
+	SetBold(bold bool) error
+
+	// Italic returns whether the default run is italic.
+	Italic() bool
+
+	// SetItalic sets italic on the default run formatting.
+	SetItalic(italic bool) error
+
+	// Underline returns the underline style for the default run.
+	Underline() UnderlineStyle
+
+	// SetUnderline sets underline style for the default run.
+	SetUnderline(style UnderlineStyle) error
+
+	// Color returns the default run color.
+	Color() Color
+
+	// SetColor sets the default run color.
+	SetColor(color Color) error
+
+	// Size returns the default run font size in half-points.
+	Size() int
+
+	// SetSize sets the default run font size in half-points.
+	SetSize(halfPoints int) error
 }
 
 // CharacterStyle extends Style with character-specific properties.

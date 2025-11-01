@@ -69,6 +69,7 @@ type document struct {
 	activeSection   *docxSection
 	numberingPart   []byte
 	numberingTarget string
+	backgroundColor *domain.Color
 }
 
 // NewDocument creates a new Document.
@@ -485,6 +486,24 @@ func (d *document) SetMetadata(meta *domain.Metadata) error {
 	}
 	d.metadata = meta
 	return nil
+}
+
+// SetBackgroundColor sets the document page background color.
+func (d *document) SetBackgroundColor(color domain.Color) error {
+	if d == nil {
+		return errors.InvalidState("Document.SetBackgroundColor", "document is nil")
+	}
+	copyColor := color
+	d.backgroundColor = &copyColor
+	return nil
+}
+
+// BackgroundColor returns the configured page background color.
+func (d *document) BackgroundColor() (domain.Color, bool) {
+	if d == nil || d.backgroundColor == nil {
+		return domain.Color{}, false
+	}
+	return *d.backgroundColor, true
 }
 
 // StyleManager returns the style manager for this document.

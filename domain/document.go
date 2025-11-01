@@ -149,6 +149,16 @@ type Document interface {
 
 	// SetMetadata updates the document's metadata.
 	SetMetadata(meta *Metadata) error
+
+	// SetBackgroundColor sets the page background color for the entire document.
+	// Pass an RGB color to render a solid page background. Use the zero-value
+	// color together with BackgroundColor() to determine whether a custom color
+	// is applied.
+	SetBackgroundColor(color Color) error
+
+	// BackgroundColor returns the configured page background color.
+	// The boolean result indicates whether a background color is explicitly set.
+	BackgroundColor() (Color, bool)
 }
 
 // Metadata contains document properties like title, author, etc.

@@ -197,6 +197,11 @@ func NewDocumentBuilder(opts ...Option) *DocumentBuilder {
 	// Create document with configuration
 	doc := NewDocument()
 
+	builder := &DocumentBuilder{
+		doc:    doc,
+		errors: make([]error, 0),
+	}
+
 	// Apply configuration to document
 	if config.Metadata != nil {
 		if err := doc.SetMetadata(config.Metadata); err != nil {
@@ -206,10 +211,20 @@ func NewDocumentBuilder(opts ...Option) *DocumentBuilder {
 		}
 	}
 
-	return &DocumentBuilder{
-		doc:    doc,
-		errors: make([]error, 0),
+	// Apply theme if provided
+	if config.Theme != nil {
+		// Use type assertion to get Theme interface
+		// This avoids import cycle between docx and themes packages
+		if theme, ok := config.Theme.(interface {
+			ApplyTo(domain.Document) error
+		}); ok {
+			if err := theme.ApplyTo(doc); err != nil {
+				builder.errors = append(builder.errors, err)
+			}
+		}
 	}
+
+	return builder
 }
 
 // AddParagraph adds a new paragraph to the document and returns a ParagraphBuilder.

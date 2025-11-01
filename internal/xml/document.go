@@ -32,11 +32,12 @@ import "encoding/xml"
 
 // Document represents w:document element (main document).
 type Document struct {
-	XMLName xml.Name `xml:"w:document"`
-	XMLnsW  string   `xml:"xmlns:w,attr"`
-	XMLnsR  string   `xml:"xmlns:r,attr"`
-	XMLnsWP string   `xml:"xmlns:wp,attr,omitempty"`
-	Body    *Body    `xml:"w:body"`
+	XMLName    xml.Name    `xml:"w:document"`
+	XMLnsW     string      `xml:"xmlns:w,attr"`
+	XMLnsR     string      `xml:"xmlns:r,attr"`
+	XMLnsWP    string      `xml:"xmlns:wp,attr,omitempty"`
+	Background *Background `xml:"w:background,omitempty"`
+	Body       *Body       `xml:"w:body"`
 }
 
 // Body represents w:body element.
@@ -44,6 +45,12 @@ type Body struct {
 	XMLName xml.Name           `xml:"w:body"`
 	Content []interface{}      `xml:",any"`
 	SectPr  *SectionProperties `xml:"w:sectPr,omitempty"`
+}
+
+// Background represents w:background element.
+type Background struct {
+	XMLName xml.Name `xml:"w:background"`
+	Color   string   `xml:"w:color,attr,omitempty"`
 }
 
 // Relationships represents the .rels file.

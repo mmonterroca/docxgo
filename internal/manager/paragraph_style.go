@@ -40,6 +40,7 @@ type paragraphStyle struct {
 	name            string
 	basedOn         string
 	next            string
+	link            string
 	font            domain.Font
 	isDefault       bool
 	isBuiltIn       bool
@@ -78,6 +79,12 @@ func newParagraphStyle(id, name string, builtIn bool) *paragraphStyle {
 		runColor:      domain.ColorBlack,
 		runSize:       constants.DefaultFontSize,
 	}
+}
+
+// NewParagraphStyle creates a custom paragraph style instance.
+// The returned style can be configured and added to a document style manager.
+func NewParagraphStyle(id, name string) domain.ParagraphStyle {
+	return newParagraphStyle(id, name, false)
 }
 
 // ID returns the unique style identifier.
@@ -126,6 +133,21 @@ func (ps *paragraphStyle) SetNext(styleID string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	ps.next = styleID
+	return nil
+}
+
+// Link returns the linked character style ID.
+func (ps *paragraphStyle) Link() string {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	return ps.link
+}
+
+// SetLink sets the linked character style.
+func (ps *paragraphStyle) SetLink(styleID string) error {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.link = styleID
 	return nil
 }
 
