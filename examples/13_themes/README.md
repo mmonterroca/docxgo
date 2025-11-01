@@ -115,20 +115,49 @@ themes.Modern.ApplyTo(doc)
 doc.SaveAs("restyled.docx")
 ```
 
-## Running the Example
+## Running the Examples
 
+The examples are organized in subdirectories:
+
+### 1. Main Themes Example (`01_main/`)
+Demonstrates all 5 preset themes with full document content:
 ```bash
-cd examples/13_themes
+cd examples/13_themes/01_main
 go run main.go
 ```
+Generates: `corporate_theme.docx`, `startup_theme.docx`, `modern_theme.docx`, `fintech_theme.docx`, `academic_theme.docx`, `theme_comparison.docx`
 
-This will generate:
-- `corporate_theme.docx` - Corporate theme example
-- `startup_theme.docx` - Startup theme example
-- `modern_theme.docx` - Modern theme example
-- `fintech_theme.docx` - Fintech theme example
-- `academic_theme.docx` - Academic theme example
-- `theme_comparison.docx` - Comparison of all themes
+### 2. Custom Theme Example (`02_custom_theme/`)
+Shows how to clone and customize themes or build from scratch:
+```bash
+cd examples/13_themes/02_custom_theme
+go run main.go
+```
+Generates: `custom_cloned_theme.docx`, `custom_brand_theme.docx`, `custom_builder_theme.docx`
+
+### 3. External Themes Example (`03_external_themes/`)
+Demonstrates using themes from an external package:
+```bash
+cd examples/13_themes/03_external_themes
+go run main.go
+```
+Generates: `gaming_theme_example.docx`, `medical_theme_example.docx`, `legal_theme_example.docx`
+
+### 4. Technical Architecture Example (`04_tech_architecture/`) 🌟
+**Our showcase example!** Modern technical documentation with PlantUML diagrams:
+```bash
+cd examples/13_themes/04_tech_architecture
+go run main.go
+```
+Generates: `tech_architecture_light.docx`, `tech_architecture_dark.docx`
+
+**Features:**
+- Tech Presentation theme (Light & Dark Mode)
+- PlantUML diagrams (Class, Component, Sequence)
+- Code blocks with syntax highlighting
+- Professional tables
+- Architecture Decision Records (ADRs)
+- Complete microservices architecture example
 
 ## Theme Components
 
@@ -224,8 +253,93 @@ Themes use only standard OOXML properties and are compatible with:
 - Google Docs (with some limitations)
 - Other OOXML-compatible applications
 
+## Creating Custom Themes for External Distribution
+
+External developers can create their own theme packages and distribute them. There are three approaches:
+
+### 1. Clone and Customize (Easiest)
+
+See `custom_theme_example.go` for a complete example of cloning and customizing existing themes.
+
+### 2. Create a Theme Package
+
+Create a separate Go package with your themes:
+
+```go
+// mythemes/mythemes.go
+package mythemes
+
+import "github.com/mmonterroca/docxgo/themes"
+
+var Gaming = themes.NewTheme("gaming", "Gaming", "Vibrant gaming theme")
+var Medical = themes.NewTheme("medical", "Medical", "Clean medical theme")
+// ... configure themes
+```
+
+Use in your code:
+
+```go
+import "your-module/mythemes"
+
+doc := docx.NewDocument()
+mythemes.Gaming.ApplyTo(doc)
+```
+
+See `external_themes/` directory for a complete example package with Gaming, Medical, and Legal themes.
+
+### 3. Publish Your Themes
+
+You can publish your themes as a Go module for others to use:
+
+```bash
+# Create module
+go mod init github.com/yourname/my-docx-themes
+
+# Publish to GitHub
+git tag v1.0.0
+git push --tags
+
+# Others can use it
+go get github.com/yourname/my-docx-themes
+```
+
+## Running All Examples
+
+```bash
+# Main theme demonstration
+cd 01_main && go run main.go && cd ..
+
+# Custom theme cloning example
+cd 02_custom_theme && go run main.go && cd ..
+
+# External themes package example
+cd 03_external_themes && go run main.go && cd ..
+
+# Technical architecture showcase
+cd 04_tech_architecture && go run main.go && cd ..
+```
+
+Or run all at once with the provided script:
+```bash
+cd examples/13_themes
+./run_all.sh
+```
+
+This will execute all examples in sequence and generate **14 documents total**.
+
+## Documentation
+
+For complete documentation on creating custom themes, see:
+- [CUSTOM_THEMES_GUIDE.md](./CUSTOM_THEMES_GUIDE.md) - Comprehensive guide for external developers
+- `external_themes/` - Example theme package with Gaming, Medical, and Legal themes
+- `custom_theme_example.go` - Example of cloning and customizing themes
+- `external_example.go` - Example of using external theme packages
+
 ## See Also
 
 - [Main README](../../README.md) - Library documentation
 - [Styles Example](../05_styles/main.go) - Working with styles
 - [V2 API Guide](../../docs/V2_API_GUIDE.md) - Complete API reference
+- [Theme System Design](../../themes/README.md) - Theme architecture documentation
+
+````

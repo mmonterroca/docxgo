@@ -56,6 +56,7 @@ type paragraph struct {
 	spacingAfter  int
 	lineSpacing   domain.LineSpacing
 	numbering     *domain.NumberingReference
+	borders       domain.ParagraphBorders
 	idGen         IDGenerator
 	relManager    *manager.RelationshipManager
 	bookmarkID    string // ID for bookmark (if this paragraph needs one for TOC)
@@ -469,4 +470,54 @@ func (p *paragraph) ClearNumbering() {
 		return
 	}
 	p.numbering = nil
+}
+
+// Borders returns the paragraph borders.
+func (p *paragraph) Borders() domain.ParagraphBorders {
+	return p.borders
+}
+
+// SetBorders sets all paragraph borders at once.
+func (p *paragraph) SetBorders(borders domain.ParagraphBorders) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetBorders", "paragraph is nil")
+	}
+	p.borders = borders
+	return nil
+}
+
+// SetBorderTop sets the top border.
+func (p *paragraph) SetBorderTop(border domain.BorderStyle) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetBorderTop", "paragraph is nil")
+	}
+	p.borders.Top = border
+	return nil
+}
+
+// SetBorderBottom sets the bottom border.
+func (p *paragraph) SetBorderBottom(border domain.BorderStyle) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetBorderBottom", "paragraph is nil")
+	}
+	p.borders.Bottom = border
+	return nil
+}
+
+// SetBorderLeft sets the left border.
+func (p *paragraph) SetBorderLeft(border domain.BorderStyle) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetBorderLeft", "paragraph is nil")
+	}
+	p.borders.Left = border
+	return nil
+}
+
+// SetBorderRight sets the right border.
+func (p *paragraph) SetBorderRight(border domain.BorderStyle) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetBorderRight", "paragraph is nil")
+	}
+	p.borders.Right = border
+	return nil
 }

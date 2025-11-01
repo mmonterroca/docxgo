@@ -66,6 +66,7 @@ const (
 // These apply formatting to individual runs of text within paragraphs.
 const (
 	StyleIDDefaultParagraphFont = "DefaultParagraphFont" // Default character formatting
+	StyleIDHeaderChar           = "HeaderChar"           // Header character style (linked to Header)
 	StyleIDEmphasis             = "Emphasis"             // Emphasis (typically italic)
 	StyleIDStrong               = "Strong"               // Strong emphasis (typically bold)
 	StyleIDSubtle               = "Subtle"               // Subtle text

@@ -73,7 +73,17 @@ type ParagraphProperties struct {
 	Indentation       *Indentation         `xml:"w:ind,omitempty"`
 	Spacing           *Spacing             `xml:"w:spacing,omitempty"`
 	Numbering         *NumberingProperties `xml:"w:numPr,omitempty"`
+	Borders           *ParagraphBorders    `xml:"w:pBdr,omitempty"`
 	SectionProperties *SectionProperties   `xml:"w:sectPr,omitempty"`
+}
+
+// ParagraphBorders represents w:pBdr element (paragraph borders).
+type ParagraphBorders struct {
+	XMLName xml.Name `xml:"w:pBdr"`
+	Top     *Border  `xml:"w:top,omitempty"`
+	Bottom  *Border  `xml:"w:bottom,omitempty"`
+	Left    *Border  `xml:"w:left,omitempty"`
+	Right   *Border  `xml:"w:right,omitempty"`
 }
 
 // ParagraphStyleRef represents w:pStyle element (reference to a style).

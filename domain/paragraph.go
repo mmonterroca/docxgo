@@ -104,6 +104,32 @@ type Paragraph interface {
 
 	// ClearNumbering removes any numbering reference from the paragraph.
 	ClearNumbering()
+
+	// Borders returns the paragraph borders.
+	Borders() ParagraphBorders
+
+	// SetBorders sets all paragraph borders at once.
+	SetBorders(borders ParagraphBorders) error
+
+	// SetBorderTop sets the top border.
+	SetBorderTop(border BorderStyle) error
+
+	// SetBorderBottom sets the bottom border.
+	SetBorderBottom(border BorderStyle) error
+
+	// SetBorderLeft sets the left border.
+	SetBorderLeft(border BorderStyle) error
+
+	// SetBorderRight sets the right border.
+	SetBorderRight(border BorderStyle) error
+}
+
+// ParagraphBorders represents borders for a paragraph.
+type ParagraphBorders struct {
+	Top    BorderStyle
+	Bottom BorderStyle
+	Left   BorderStyle
+	Right  BorderStyle
 }
 
 // Alignment represents horizontal alignment options for paragraphs.

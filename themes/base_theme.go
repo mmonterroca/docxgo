@@ -25,8 +25,6 @@ SOFTWARE.
 package themes
 
 import (
-	"strings"
-
 	"github.com/mmonterroca/docxgo/domain"
 	"github.com/mmonterroca/docxgo/pkg/errors"
 )
@@ -127,6 +125,10 @@ func (t *baseTheme) ApplyTo(doc domain.Document) error {
 		return errors.InvalidState(op, "style manager is nil")
 	}
 
+	if err := doc.SetBackgroundColor(t.colors.Background); err != nil {
+		return errors.Wrap(err, op)
+	}
+
 	// Apply styles in order: Normal, Headings, Title, Quote, etc.
 	if err := t.applyNormalStyle(styleMgr); err != nil {
 		return errors.Wrap(err, op)
@@ -136,17 +138,9 @@ func (t *baseTheme) ApplyTo(doc domain.Document) error {
 		return errors.Wrap(err, op)
 	}
 
-	if err := t.applyTitleStyles(styleMgr); err != nil {
-		return errors.Wrap(err, op)
-	}
-
-	if err := t.applyQuoteStyles(styleMgr); err != nil {
-		return errors.Wrap(err, op)
-	}
-
-	if err := t.applyListStyle(styleMgr); err != nil {
-		return errors.Wrap(err, op)
-	}
+	t.applyTitleStyles(styleMgr)
+	t.applyQuoteStyles(styleMgr)
+	t.applyListStyle(styleMgr)
 
 	return nil
 }
@@ -165,6 +159,15 @@ func (t *baseTheme) applyNormalStyle(styleMgr domain.StyleManager) error {
 
 	// Set font
 	if err := paraStyle.SetFont(domain.Font{Name: t.fonts.Body}); err != nil {
+		return err
+	}
+
+	// Set default body size and color so runs inherit theme values.
+	if err := paraStyle.SetSize(t.fonts.BodySize); err != nil {
+		return err
+	}
+
+	if err := paraStyle.SetColor(t.colors.Text); err != nil {
 		return err
 	}
 
@@ -240,86 +243,76 @@ func (t *baseTheme) applyHeadingStyles(styleMgr domain.StyleManager) error {
 		if err := paraStyle.SetSpacingAfter(t.spacing.HeadingAfter); err != nil {
 			return err
 		}
+
+		// Set alignment to left
+		if err := paraStyle.SetAlignment(domain.AlignmentLeft); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 // applyTitleStyles configures Title and Subtitle styles.
-func (t *baseTheme) applyTitleStyles(styleMgr domain.StyleManager) error {
+func (t *baseTheme) applyTitleStyles(styleMgr domain.StyleManager) {
 	// Title style
 	if titleStyle, err := styleMgr.GetStyle(domain.StyleIDTitle); err == nil {
 		if paraStyle, ok := titleStyle.(domain.ParagraphStyle); ok {
-			paraStyle.SetFont(domain.Font{Name: t.fonts.Heading})
-			paraStyle.SetSize(t.headings.H1Size + 8) // Slightly larger than H1
-			paraStyle.SetBold(true)
+			_ = paraStyle.SetFont(domain.Font{Name: t.fonts.Heading})
+			_ = paraStyle.SetSize(t.headings.H1Size + 8) // Slightly larger than H1
+			_ = paraStyle.SetBold(true)
 			if t.headings.UseColor {
-				paraStyle.SetColor(t.colors.Primary)
+				_ = paraStyle.SetColor(t.colors.Primary)
 			}
-			paraStyle.SetAlignment(domain.AlignmentCenter)
-			paraStyle.SetSpacingAfter(t.spacing.HeadingAfter * 2)
+			_ = paraStyle.SetAlignment(domain.AlignmentCenter)
+			_ = paraStyle.SetSpacingAfter(t.spacing.HeadingAfter * 2)
 		}
 	}
 
 	// Subtitle style
 	if subtitleStyle, err := styleMgr.GetStyle(domain.StyleIDSubtitle); err == nil {
 		if paraStyle, ok := subtitleStyle.(domain.ParagraphStyle); ok {
-			paraStyle.SetFont(domain.Font{Name: t.fonts.Body})
-			paraStyle.SetSize(t.fonts.BodySize + 4) // Slightly larger than body
-			paraStyle.SetColor(t.colors.TextLight)
-			paraStyle.SetAlignment(domain.AlignmentCenter)
-			paraStyle.SetSpacingAfter(t.spacing.SectionSpacing)
+			_ = paraStyle.SetFont(domain.Font{Name: t.fonts.Body})
+			_ = paraStyle.SetSize(t.fonts.BodySize + 4) // Slightly larger than body
+			_ = paraStyle.SetColor(t.colors.TextLight)
+			_ = paraStyle.SetAlignment(domain.AlignmentCenter)
+			_ = paraStyle.SetSpacingAfter(t.spacing.SectionSpacing)
 		}
 	}
-
-	return nil
 }
 
 // applyQuoteStyles configures quote styles.
-func (t *baseTheme) applyQuoteStyles(styleMgr domain.StyleManager) error {
+func (t *baseTheme) applyQuoteStyles(styleMgr domain.StyleManager) {
 	// Quote style
 	if quoteStyle, err := styleMgr.GetStyle(domain.StyleIDQuote); err == nil {
 		if paraStyle, ok := quoteStyle.(domain.ParagraphStyle); ok {
-			paraStyle.SetFont(domain.Font{Name: t.fonts.Body})
-			paraStyle.SetColor(t.colors.TextLight)
-			paraStyle.SetItalic(true)
-			paraStyle.SetIndentation(domain.Indentation{Left: 720, Right: 720}) // 0.5 inch
+			_ = paraStyle.SetFont(domain.Font{Name: t.fonts.Body})
+			_ = paraStyle.SetColor(t.colors.TextLight)
+			_ = paraStyle.SetItalic(true)
+			_ = paraStyle.SetIndentation(domain.Indentation{Left: 720, Right: 720}) // 0.5 inch
 		}
 	}
 
 	// Intense Quote style
 	if intenseQuoteStyle, err := styleMgr.GetStyle(domain.StyleIDIntenseQuote); err == nil {
 		if paraStyle, ok := intenseQuoteStyle.(domain.ParagraphStyle); ok {
-			paraStyle.SetFont(domain.Font{Name: t.fonts.Body})
-			paraStyle.SetSize(t.fonts.BodySize + 2)
-			paraStyle.SetColor(t.colors.Secondary)
-			paraStyle.SetBold(true)
-			paraStyle.SetAlignment(domain.AlignmentCenter)
+			_ = paraStyle.SetFont(domain.Font{Name: t.fonts.Body})
+			_ = paraStyle.SetSize(t.fonts.BodySize + 2)
+			_ = paraStyle.SetColor(t.colors.Secondary)
+			_ = paraStyle.SetBold(true)
+			_ = paraStyle.SetAlignment(domain.AlignmentCenter)
 		}
 	}
-
-	return nil
 }
 
 // applyListStyle configures list paragraph style.
-func (t *baseTheme) applyListStyle(styleMgr domain.StyleManager) error {
+func (t *baseTheme) applyListStyle(styleMgr domain.StyleManager) {
 	if listStyle, err := styleMgr.GetStyle(domain.StyleIDListParagraph); err == nil {
 		if paraStyle, ok := listStyle.(domain.ParagraphStyle); ok {
-			paraStyle.SetFont(domain.Font{Name: t.fonts.Body})
-			paraStyle.SetSize(t.fonts.BodySize)
-			paraStyle.SetColor(t.colors.Text)
-			paraStyle.SetSpacingAfter(t.spacing.ParagraphAfter / 2) // Tighter spacing for lists
+			_ = paraStyle.SetFont(domain.Font{Name: t.fonts.Body})
+			_ = paraStyle.SetSize(t.fonts.BodySize)
+			_ = paraStyle.SetColor(t.colors.Text)
+			_ = paraStyle.SetSpacingAfter(t.spacing.ParagraphAfter / 2) // Tighter spacing for lists
 		}
 	}
-
-	return nil
-}
-
-// Helper function to create uppercase text transform
-// Note: DOCX doesn't have direct uppercase property, this is for future enhancement
-func (t *baseTheme) transformText(text string) string {
-	if t.headings.H1Uppercase {
-		return strings.ToUpper(text)
-	}
-	return text
 }

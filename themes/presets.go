@@ -58,7 +58,7 @@ var (
 // newCorporateTheme creates the Corporate theme.
 // Color palette inspired by the AliatUniversidades document:
 // - Navy blue (#2F5496) for primary headings
-// - Light blue (#4F81BD) for secondary elements  
+// - Light blue (#4F81BD) for secondary elements
 // - Red accent (#C00000) for highlights and emphasis
 // - Clean, professional look suitable for business documents
 func newCorporateTheme() Theme {
@@ -194,9 +194,9 @@ func newModernTheme() Theme {
 			SectionSpacing:  640, // 32pt - distinct sections
 		},
 		headings: ThemeHeadings{
-			H1Size:      34, // 17pt
-			H2Size:      28, // 14pt
-			H3Size:      24, // 12pt
+			H1Size:      34,    // 17pt
+			H2Size:      28,    // 14pt
+			H3Size:      24,    // 12pt
 			H1Bold:      false, // Light weight for modern look
 			H2Bold:      false,
 			H3Bold:      true, // Only H3 is bold for contrast

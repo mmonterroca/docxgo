@@ -516,7 +516,58 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 		}
 	}
 
+	// Borders
+	borders := para.Borders()
+	if s.hasBorders(borders) {
+		props.Borders = &xml.ParagraphBorders{
+			Top:    s.serializeBorder(borders.Top),
+			Bottom: s.serializeBorder(borders.Bottom),
+			Left:   s.serializeBorder(borders.Left),
+			Right:  s.serializeBorder(borders.Right),
+		}
+	}
+
 	return props
+}
+
+func (s *ParagraphSerializer) hasBorders(borders domain.ParagraphBorders) bool {
+	return borders.Top.Style != domain.BorderNone ||
+		borders.Bottom.Style != domain.BorderNone ||
+		borders.Left.Style != domain.BorderNone ||
+		borders.Right.Style != domain.BorderNone
+}
+
+func (s *ParagraphSerializer) serializeBorder(border domain.BorderStyle) *xml.Border {
+	if border.Style == domain.BorderNone {
+		return nil
+	}
+
+	return &xml.Border{
+		Val:   s.borderStyleToString(border.Style),
+		Color: color.ToHex(border.Color),
+		Sz:    border.Width,
+	}
+}
+
+func (s *ParagraphSerializer) borderStyleToString(style domain.BorderLineStyle) string {
+	switch style {
+	case domain.BorderNone:
+		return "none"
+	case domain.BorderSingle:
+		return "single"
+	case domain.BorderDashed:
+		return "dashed"
+	case domain.BorderDotted:
+		return "dotted"
+	case domain.BorderDouble:
+		return "double"
+	case domain.BorderThick:
+		return "thick"
+	case domain.BorderTriple:
+		return "triple"
+	default:
+		return "none"
+	}
 }
 
 func (s *ParagraphSerializer) alignmentToString(align domain.Alignment) string {
@@ -871,11 +922,17 @@ func (s *DocumentSerializer) SerializeBody(doc domain.Document) *xml.Body {
 
 // SerializeDocument creates the complete document XML structure.
 func (s *DocumentSerializer) SerializeDocument(doc domain.Document) *xml.Document {
+	var background *xml.Background
+	if colorValue, ok := doc.BackgroundColor(); ok {
+		background = &xml.Background{Color: color.ToHex(colorValue)}
+	}
+
 	return &xml.Document{
-		XMLnsW:  constants.NamespaceMain,
-		XMLnsR:  constants.NamespaceRelationships,
-		XMLnsWP: constants.NamespaceWordprocessingDrawing,
-		Body:    s.SerializeBody(doc),
+		XMLnsW:     constants.NamespaceMain,
+		XMLnsR:     constants.NamespaceRelationships,
+		XMLnsWP:    constants.NamespaceWordprocessingDrawing,
+		Background: background,
+		Body:       s.SerializeBody(doc),
 	}
 }
 
@@ -1057,6 +1114,13 @@ func (s *DocumentSerializer) serializeStyle(style domain.Style) *xml.Style {
 		xmlStyle.BasedOn = &xml.BasedOn{Val: style.BasedOn()}
 	}
 
+	// Set link if applicable (for paragraph styles linked to character styles)
+	if ps, ok := style.(interface{ Link() string }); ok {
+		if link := ps.Link(); link != "" {
+			xmlStyle.Link = &xml.Link{Val: link}
+		}
+	}
+
 	// For Heading styles and Normal, add qFormat
 	styleID := style.ID()
 	if styleID == "Normal" {
@@ -1150,6 +1214,13 @@ func (s *DocumentSerializer) serializeParagraphStyleProperties(style domain.Styl
 				FirstLine: intPtrIfNotZero(indent.FirstLine),
 				Hanging:   intPtrIfNotZero(indent.Hanging),
 			}
+			hasProps = true
+		}
+	}
+
+	if ps, ok := style.(interface{ Alignment() domain.Alignment }); ok {
+		if align := ps.Alignment(); align != domain.AlignmentLeft {
+			props.Alignment = &xml.Alignment{Val: s.paraSerializer.alignmentToString(align)}
 			hasProps = true
 		}
 	}
