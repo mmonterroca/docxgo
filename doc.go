@@ -44,7 +44,7 @@ Create a simple document:
 
 	import (
 	    "log"
-	    "github.com/mmonterroca/docxgo"
+	    "github.com/mmonterroca/docxgo/v2"
 	)
 
 	func main() {
@@ -323,7 +323,7 @@ See the examples/ directory for complete working examples:
 # Links
 
   - GitHub: https://github.com/mmonterroca/docxgo
-  - Documentation: https://pkg.go.dev/github.com/mmonterroca/docxgo
+  - Documentation: https://pkg.go.dev/github.com/mmonterroca/docxgo/v2
   - Examples: https://github.com/mmonterroca/docxgo/tree/main/examples
 
 # License

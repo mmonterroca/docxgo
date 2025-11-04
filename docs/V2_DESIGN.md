@@ -406,7 +406,7 @@ doc.WriteTo(file)
 
 ```go
 // v2 (new - current)
-import docx "github.com/mmonterroca/docxgo"  // NEW namespace (no /v2 suffix in root)
+import docx "github.com/mmonterroca/docxgo/v2"  // NEW namespace (no /v2 suffix in root)
 
 // Builder pattern with error handling
 doc := docx.NewDocument(

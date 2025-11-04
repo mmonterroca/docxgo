@@ -27,8 +27,8 @@ package core
 import (
 	"testing"
 
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/internal/manager"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/internal/manager"
 )
 
 func newTestTable(id string, rows, cols int) domain.Table {

@@ -26,8 +26,8 @@ SOFTWARE.
 package docx
 
 import (
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
 // Config contains configuration options for document creation.
@@ -234,7 +234,7 @@ func WithSubject(subject string) Option {
 //
 // Example:
 //
-//	import "github.com/mmonterroca/docxgo/themes"
+//	import "github.com/mmonterroca/docxgo/v2/themes"
 //
 //	builder := docx.NewDocumentBuilder(
 //	    docx.WithTheme(themes.Corporate),

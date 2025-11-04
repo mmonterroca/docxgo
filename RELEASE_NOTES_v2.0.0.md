@@ -26,7 +26,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {
@@ -122,7 +122,7 @@ go get github.com/mmonterroca/docxgo@v2.0.0
 
 ```go
 import (
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/domain"
 )
 ```
@@ -138,7 +138,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {
@@ -166,7 +166,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/domain"
 )
 
@@ -215,7 +215,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {

@@ -25,8 +25,8 @@ SOFTWARE.
 package themes
 
 import (
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/pkg/errors"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
 // baseTheme provides a concrete implementation of the Theme interface.

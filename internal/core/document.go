@@ -45,12 +45,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/internal/manager"
-	"github.com/mmonterroca/docxgo/internal/serializer"
-	"github.com/mmonterroca/docxgo/internal/writer"
-	"github.com/mmonterroca/docxgo/pkg/constants"
-	"github.com/mmonterroca/docxgo/pkg/errors"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/internal/manager"
+	"github.com/mmonterroca/docxgo/v2/internal/serializer"
+	"github.com/mmonterroca/docxgo/v2/internal/writer"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
 // document implements the domain.Document interface.

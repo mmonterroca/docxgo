@@ -2,7 +2,7 @@
 
 Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/mmonterroca/docxgo.svg)](https://pkg.go.dev/github.com/mmonterroca/docxgo)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mmonterroca/docxgo/v2.svg)](https://pkg.go.dev/github.com/mmonterroca/docxgo/v2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mmonterroca/docxgo)](https://goreportcard.com/report/github.com/mmonterroca/docxgo)
 
@@ -38,7 +38,7 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 ## Installation
 
 ```bash
-go get github.com/mmonterroca/docxgo
+go get github.com/mmonterroca/docxgo/v2
 ```
 
 ### Requirements
@@ -58,7 +58,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {
@@ -86,7 +86,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/domain"
 )
 
@@ -135,7 +135,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {
@@ -422,7 +422,7 @@ See [docs/COVERAGE_ANALYSIS.md](docs/COVERAGE_ANALYSIS.md) for detailed coverage
 - **[Coverage Analysis](docs/COVERAGE_ANALYSIS.md)** - Test coverage report
 
 **Quick Links:**
-- [API Reference (pkg.go.dev)](https://pkg.go.dev/github.com/mmonterroca/docxgo)
+- [API Reference (pkg.go.dev)](https://pkg.go.dev/github.com/mmonterroca/docxgo/v2)
 - [Documentation Index](docs/README.md) - Complete documentation guide
 - [Credits](CREDITS.md) - Project history and contributors
 
@@ -597,7 +597,7 @@ See [docs/V2_DESIGN.md](docs/V2_DESIGN.md) for detailed phase breakdown.
 - **Issues**: [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
 - **Email**: misael@monterroca.com
-- **Documentation**: [pkg.go.dev](https://pkg.go.dev/github.com/mmonterroca/docxgo)
+- **Documentation**: [pkg.go.dev](https://pkg.go.dev/github.com/mmonterroca/docxgo/v2)
 
 ### Reporting Bugs
 

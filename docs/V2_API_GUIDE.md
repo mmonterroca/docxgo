@@ -52,7 +52,7 @@
 ## 📦 Installation
 
 ```bash
-go get github.com/mmonterroca/docxgo@latest
+go get github.com/mmonterroca/docxgo/v2@latest
 ```
 
 **Minimum Go version**: 1.20
@@ -68,7 +68,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {
@@ -107,7 +107,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {
@@ -807,7 +807,7 @@ doc.WriteTo(file)
 ### v2 API (Current - Builder Pattern)
 
 ```go
-import docx "github.com/mmonterroca/docxgo"
+import docx "github.com/mmonterroca/docxgo/v2"
 
 builder := docx.NewDocumentBuilder()
 builder.AddParagraph().
@@ -824,7 +824,7 @@ doc.SaveAs("output.docx")
 ### v2 API (Current - Direct API)
 
 ```go
-import docx "github.com/mmonterroca/docxgo"
+import docx "github.com/mmonterroca/docxgo/v2"
 
 doc := docx.NewDocument()
 para, _ := doc.AddParagraph()

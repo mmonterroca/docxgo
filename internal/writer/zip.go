@@ -28,10 +28,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mmonterroca/docxgo/internal/manager"
-	"github.com/mmonterroca/docxgo/internal/serializer"
-	xmlstructs "github.com/mmonterroca/docxgo/internal/xml"
-	"github.com/mmonterroca/docxgo/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/internal/manager"
+	"github.com/mmonterroca/docxgo/v2/internal/serializer"
+	xmlstructs "github.com/mmonterroca/docxgo/v2/internal/xml"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
 // ZipWriter writes a .docx file to an io.Writer.

@@ -21,10 +21,10 @@ import (
 	stdxml "encoding/xml"
 	"testing"
 
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/internal/core"
-	"github.com/mmonterroca/docxgo/internal/serializer"
-	xmlstructs "github.com/mmonterroca/docxgo/internal/xml"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/internal/core"
+	"github.com/mmonterroca/docxgo/v2/internal/serializer"
+	xmlstructs "github.com/mmonterroca/docxgo/v2/internal/xml"
 )
 
 func collectRuns(p *xmlstructs.Paragraph) []*xmlstructs.Run {

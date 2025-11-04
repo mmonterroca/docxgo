@@ -14,7 +14,7 @@ Themes define a complete visual style for documents, including:
 
 ```go
 import (
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/themes"
 )
 

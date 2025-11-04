@@ -34,7 +34,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func createTestImage(t *testing.T, width, height int) string {

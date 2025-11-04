@@ -30,7 +30,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func TestFieldChar_Marshal(t *testing.T) {

@@ -65,7 +65,7 @@ go get github.com/mmonterroca/docxgo@v2.0.0-beta
 package main
 
 import (
-    "github.com/mmonterroca/docxgo"
+    "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/domain"
 )
 

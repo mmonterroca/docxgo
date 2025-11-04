@@ -28,9 +28,9 @@ package core_test
 import (
 	"testing"
 
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/internal/core"
-	"github.com/mmonterroca/docxgo/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/internal/core"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
 func TestNewDocument(t *testing.T) {

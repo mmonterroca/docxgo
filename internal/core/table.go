@@ -26,10 +26,10 @@ SOFTWARE.
 package core
 
 import (
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/internal/manager"
-	"github.com/mmonterroca/docxgo/pkg/constants"
-	"github.com/mmonterroca/docxgo/pkg/errors"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/internal/manager"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
 // table implements the domain.Table interface.

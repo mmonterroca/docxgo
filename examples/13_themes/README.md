@@ -62,7 +62,7 @@ Traditional scholarly theme for academic and research documents. Perfect for res
 
 ```go
 import (
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/themes"
 )
 

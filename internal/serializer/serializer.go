@@ -23,10 +23,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/internal/xml"
-	"github.com/mmonterroca/docxgo/pkg/color"
-	"github.com/mmonterroca/docxgo/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/internal/xml"
+	"github.com/mmonterroca/docxgo/v2/pkg/color"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
 type drawingIDProvider interface {

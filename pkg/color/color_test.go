@@ -28,7 +28,7 @@ package color
 import (
 	"testing"
 
-	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func TestToHex(t *testing.T) {

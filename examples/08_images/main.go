@@ -23,8 +23,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mmonterroca/docxgo"
-	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/v2"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func createSampleImage(path string, width, height int, fillColor color.RGBA) error {

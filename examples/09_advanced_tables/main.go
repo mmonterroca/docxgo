@@ -22,8 +22,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/mmonterroca/docxgo"
-	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/v2"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func main() {

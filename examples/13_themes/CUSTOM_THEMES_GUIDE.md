@@ -12,7 +12,7 @@ Clone an existing theme and customize specific properties:
 package main
 
 import (
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/domain"
     "github.com/mmonterroca/docxgo/themes"
 )
@@ -178,7 +178,7 @@ package main
 
 import (
     "your-module/mythemes"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {

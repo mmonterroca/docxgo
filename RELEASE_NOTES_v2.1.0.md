@@ -39,7 +39,7 @@ package main
 
 import (
     "log"
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/domain"
     "github.com/mmonterroca/docxgo/themes"
 )
@@ -130,10 +130,10 @@ See [`examples/13_themes/04_tech_architecture/`](examples/13_themes/04_tech_arch
 
 ---
 
-## 📦 Installation
+## Installation
 
 ```bash
-go get github.com/mmonterroca/docxgo@v2.1.0
+go get github.com/mmonterroca/docxgo/v2@v2.1.0
 ```
 
 ---

@@ -28,9 +28,9 @@ package manager
 import (
 	"sync"
 
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/pkg/constants"
-	"github.com/mmonterroca/docxgo/pkg/errors"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
 // characterStyle implements domain.CharacterStyle.

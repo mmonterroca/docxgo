@@ -161,7 +161,7 @@ Documents with fields (TOC, page numbers) may require updating:
 ```go
 package main
 
-import docx "github.com/mmonterroca/docxgo"
+import docx "github.com/mmonterroca/docxgo/v2"
 
 func main() {
     // Create document with options
@@ -191,7 +191,7 @@ func main() {
 package main
 
 import (
-    docx "github.com/mmonterroca/docxgo"
+    docx "github.com/mmonterroca/docxgo/v2"
     "github.com/mmonterroca/docxgo/domain"
 )
 

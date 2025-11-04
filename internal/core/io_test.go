@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mmonterroca/docxgo/domain"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func TestDocument_WriteTo(t *testing.T) {

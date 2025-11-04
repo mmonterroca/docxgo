@@ -19,7 +19,7 @@ package serializer
    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import "github.com/mmonterroca/docxgo/internal/xml"
+import "github.com/mmonterroca/docxgo/v2/internal/xml"
 
 // defaultLatentStyles mirrors Microsoft Word's shipped latent style table so that
 // generated documents include the same built-in quick styles metadata.

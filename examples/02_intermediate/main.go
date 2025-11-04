@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	docx "github.com/mmonterroca/docxgo"
+	docx "github.com/mmonterroca/docxgo/v2"
 )
 
 func main() {

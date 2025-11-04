@@ -32,8 +32,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mmonterroca/docxgo/pkg/constants"
-	"github.com/mmonterroca/docxgo/pkg/errors"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
 // MediaFile represents a media file in the document.

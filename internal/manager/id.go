@@ -30,7 +30,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/mmonterroca/docxgo/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
 // IDGenerator generates unique IDs for document elements.

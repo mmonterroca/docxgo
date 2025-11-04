@@ -151,7 +151,7 @@ para.SetAlignment(constants.AlignmentCenter)   // Constant
 go get github.com/fumiama/go-docx@none
 
 # Add v2
-go get github.com/mmonterroca/docxgo@latest
+go get github.com/mmonterroca/docxgo/v2@latest
 ```
 
 ### Step 2: Update Imports
@@ -680,7 +680,7 @@ tocRun.AddField(tocField)
 
 // Hyperlinks
 linkField := docx.NewHyperlinkField(
-    "https://github.com/mmonterroca/docxgo",
+    "https://github.com/mmonterroca/docxgo/v2",
     "go-docx Repository",
 )
 linkRun.SetColor(docx.ColorBlue)

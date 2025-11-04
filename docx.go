@@ -28,11 +28,11 @@ package docx
 import (
 	"io"
 
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/internal/core"
-	"github.com/mmonterroca/docxgo/internal/reader"
-	"github.com/mmonterroca/docxgo/pkg/color"
-	"github.com/mmonterroca/docxgo/pkg/errors"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/internal/core"
+	"github.com/mmonterroca/docxgo/v2/internal/reader"
+	"github.com/mmonterroca/docxgo/v2/pkg/color"
+	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
 // NewDocument creates a new empty Word document.
@@ -214,7 +214,7 @@ func NewTOCField(switches map[string]string) domain.Field {
 //
 //	run, _ := para.AddRun()
 //	linkField := docx.NewHyperlinkField(
-//	    "https://github.com/mmonterroca/docxgo",
+//	    "https://github.com/mmonterroca/docxgo/v2",
 //	    "go-docx Repository",
 //	)
 //	run.SetColor(0x0000FF) // Blue

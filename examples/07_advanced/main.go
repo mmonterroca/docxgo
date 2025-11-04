@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	docx "github.com/mmonterroca/docxgo"
-	"github.com/mmonterroca/docxgo/domain"
+	docx "github.com/mmonterroca/docxgo/v2"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func main() {
@@ -338,7 +338,7 @@ func addExamples(doc domain.Document) {
 	// Hyperlink
 	r2, _ := linkDesc.AddRun()
 	linkField := docx.NewHyperlinkField(
-		"https://github.com/mmonterroca/docxgo",
+		"https://github.com/mmonterroca/docxgo/v2",
 		"go-docx GitHub repository",
 	)
 	r2.SetColor(domain.Color{R: 0x00, G: 0x00, B: 0xFF}) // Blue

@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/mmonterroca/docxgo/internal/core"
+	"github.com/mmonterroca/docxgo/v2/internal/core"
 )
 
 func main() {

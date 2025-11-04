@@ -125,7 +125,7 @@ run.AddField(tocField)
 
 ```go
 linkField := docx.NewHyperlinkField(
-    "https://github.com/mmonterroca/docxgo",
+    "https://github.com/mmonterroca/docxgo/v2",
     "go-docx GitHub repository",
 )
 run.SetColor(0x0000FF)

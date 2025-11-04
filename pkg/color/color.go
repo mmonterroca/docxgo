@@ -30,8 +30,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/mmonterroca/docxgo/domain"
-	"github.com/mmonterroca/docxgo/pkg/errors"
+	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
 // Common color constants for convenience.
