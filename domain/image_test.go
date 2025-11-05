@@ -28,25 +28,25 @@ import "testing"
 
 func TestNewImageSize(t *testing.T) {
 	tests := []struct {
-		name      string
-		widthPx   int
-		heightPx  int
-		wantEMUW  int
-		wantEMUH  int
+		name     string
+		widthPx  int
+		heightPx int
+		wantEMUW int
+		wantEMUH int
 	}{
 		{
 			name:     "100x100 pixels",
 			widthPx:  100,
 			heightPx: 100,
-			wantEMUW: 952500,  // 100 * 9525
+			wantEMUW: 952500, // 100 * 9525
 			wantEMUH: 952500,
 		},
 		{
 			name:     "640x480 pixels",
 			widthPx:  640,
 			heightPx: 480,
-			wantEMUW: 6096000,  // 640 * 9525
-			wantEMUH: 4572000,  // 480 * 9525
+			wantEMUW: 6096000, // 640 * 9525
+			wantEMUH: 4572000, // 480 * 9525
 		},
 		{
 			name:     "zero dimensions",
@@ -60,7 +60,7 @@ func TestNewImageSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			size := NewImageSize(tt.widthPx, tt.heightPx)
-			
+
 			if size.WidthPx != tt.widthPx {
 				t.Errorf("WidthPx = %d; want %d", size.WidthPx, tt.widthPx)
 			}
@@ -79,39 +79,39 @@ func TestNewImageSize(t *testing.T) {
 
 func TestNewImageSizeInches(t *testing.T) {
 	tests := []struct {
-		name         string
-		widthInches  float64
-		heightInches float64
-		wantWidthPx  int
-		wantHeightPx int
-		wantWidthEMU int
+		name          string
+		widthInches   float64
+		heightInches  float64
+		wantWidthPx   int
+		wantHeightPx  int
+		wantWidthEMU  int
 		wantHeightEMU int
 	}{
 		{
-			name:         "1x1 inches",
-			widthInches:  1.0,
-			heightInches: 1.0,
-			wantWidthPx:  96,      // 1 * 96 DPI
-			wantHeightPx: 96,
-			wantWidthEMU: 914400,  // 1 * 914400 EMU/inch
+			name:          "1x1 inches",
+			widthInches:   1.0,
+			heightInches:  1.0,
+			wantWidthPx:   96, // 1 * 96 DPI
+			wantHeightPx:  96,
+			wantWidthEMU:  914400, // 1 * 914400 EMU/inch
 			wantHeightEMU: 914400,
 		},
 		{
-			name:         "2.5x3.5 inches",
-			widthInches:  2.5,
-			heightInches: 3.5,
-			wantWidthPx:  240,      // 2.5 * 96
-			wantHeightPx: 336,      // 3.5 * 96
-			wantWidthEMU: 2286000,  // 2.5 * 914400
+			name:          "2.5x3.5 inches",
+			widthInches:   2.5,
+			heightInches:  3.5,
+			wantWidthPx:   240,     // 2.5 * 96
+			wantHeightPx:  336,     // 3.5 * 96
+			wantWidthEMU:  2286000, // 2.5 * 914400
 			wantHeightEMU: 3200400, // 3.5 * 914400
 		},
 		{
-			name:         "zero dimensions",
-			widthInches:  0.0,
-			heightInches: 0.0,
-			wantWidthPx:  0,
-			wantHeightPx: 0,
-			wantWidthEMU: 0,
+			name:          "zero dimensions",
+			widthInches:   0.0,
+			heightInches:  0.0,
+			wantWidthPx:   0,
+			wantHeightPx:  0,
+			wantWidthEMU:  0,
 			wantHeightEMU: 0,
 		},
 	}
@@ -119,7 +119,7 @@ func TestNewImageSizeInches(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			size := NewImageSizeInches(tt.widthInches, tt.heightInches)
-			
+
 			if size.WidthPx != tt.wantWidthPx {
 				t.Errorf("WidthPx = %d; want %d", size.WidthPx, tt.wantWidthPx)
 			}
@@ -138,7 +138,7 @@ func TestNewImageSizeInches(t *testing.T) {
 
 func TestDefaultImagePosition(t *testing.T) {
 	pos := DefaultImagePosition()
-	
+
 	if pos.Type != ImagePositionInline {
 		t.Errorf("Type = %v; want %v", pos.Type, ImagePositionInline)
 	}
@@ -181,8 +181,8 @@ func TestImageFormatConstants(t *testing.T) {
 
 func TestImagePositionTypeConstants(t *testing.T) {
 	tests := []struct {
-		name string
-		pos  ImagePositionType
+		name  string
+		pos   ImagePositionType
 		value string
 	}{
 		{"Inline", ImagePositionInline, "inline"},
@@ -244,8 +244,8 @@ func TestVerticalAlignConstants(t *testing.T) {
 
 func TestTextWrapTypeConstants(t *testing.T) {
 	tests := []struct {
-		name string
-		wrap TextWrapType
+		name  string
+		wrap  TextWrapType
 		value string
 	}{
 		{"None", WrapNone, "none"},

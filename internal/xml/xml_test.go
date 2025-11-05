@@ -367,26 +367,26 @@ func TestComplexField_Sequence(t *testing.T) {
 
 // Mock Image for testing
 type mockImage struct {
-	id              string
-	format          domain.ImageFormat
-	size            domain.ImageSize
-	data            []byte
-	relationshipID  string
-	target          string
-	description     string
-	position        domain.ImagePosition
+	id             string
+	format         domain.ImageFormat
+	size           domain.ImageSize
+	data           []byte
+	relationshipID string
+	target         string
+	description    string
+	position       domain.ImagePosition
 }
 
-func (m *mockImage) ID() string                                  { return m.id }
-func (m *mockImage) Format() domain.ImageFormat                  { return m.format }
-func (m *mockImage) Size() domain.ImageSize                      { return m.size }
-func (m *mockImage) SetSize(size domain.ImageSize) error         { m.size = size; return nil }
-func (m *mockImage) Data() []byte                                { return m.data }
-func (m *mockImage) RelationshipID() string                      { return m.relationshipID }
-func (m *mockImage) Target() string                              { return m.target }
-func (m *mockImage) Description() string                         { return m.description }
-func (m *mockImage) SetDescription(desc string) error            { m.description = desc; return nil }
-func (m *mockImage) Position() domain.ImagePosition              { return m.position }
+func (m *mockImage) ID() string                          { return m.id }
+func (m *mockImage) Format() domain.ImageFormat          { return m.format }
+func (m *mockImage) Size() domain.ImageSize              { return m.size }
+func (m *mockImage) SetSize(size domain.ImageSize) error { m.size = size; return nil }
+func (m *mockImage) Data() []byte                        { return m.data }
+func (m *mockImage) RelationshipID() string              { return m.relationshipID }
+func (m *mockImage) Target() string                      { return m.target }
+func (m *mockImage) Description() string                 { return m.description }
+func (m *mockImage) SetDescription(desc string) error    { m.description = desc; return nil }
+func (m *mockImage) Position() domain.ImagePosition      { return m.position }
 
 func TestNewInlineDrawing(t *testing.T) {
 	img := &mockImage{
@@ -566,4 +566,3 @@ func TestNewGraphic(t *testing.T) {
 		t.Errorf("Ext.Cx = %d; want %d", graphic.GraphicData.Pic.SpPr.Xfrm.Ext.Cx, img.size.WidthEMU)
 	}
 }
-

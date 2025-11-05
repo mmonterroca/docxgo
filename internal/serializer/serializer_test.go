@@ -577,10 +577,10 @@ func TestTableSerializer_CellWidth(t *testing.T) {
 	doc := core.NewDocument()
 	table, _ := doc.AddTable(1, 2)
 	row, _ := table.Row(0)
-	
+
 	cell1, _ := row.Cell(0)
 	cell1.SetWidth(2000) // width in twips
-	
+
 	cell2, _ := row.Cell(1)
 	cell2.SetWidth(3000)
 
