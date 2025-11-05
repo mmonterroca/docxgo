@@ -24,14 +24,14 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 
 ## Status
 
-**Current Version**: v2.0.0-beta (95% complete)  
-**Stability**: Beta - Production Ready  
-**Target Stable Release**: Q1 2026  
+**Current Version**: v2.1.1 (Stable)  
+**Stability**: Production Ready  
+**Released**: November 2025  
 **Test Coverage**: 50.7% (improvement plan ready → 95%)
 
-**Completed Phases**: 1-9, 11 (10 phases complete, 2 remaining)
+**Latest Features**: Theme System (v2.1.0+)
 
-> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Phase 11 (Code Quality & Optimization) completed October 2025.
+> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0.
 
 ---
 
@@ -310,11 +310,11 @@ github.com/mmonterroca/docxgo/
 - ✅ Style preservation (Title, Subtitle, Headings, Quote, Normal)
 - 🚧 Advanced features (headers/footers, complex tables, images in existing docs)
 
-**Phase 12: Beta Testing & Release** (In Progress)
-- Community feedback integration
-- Performance tuning
-- Final documentation review
-- v2.0.0 stable release preparation
+**Phase 12: Release & Themes** (✅ Complete)
+- ✅ v2.0.0 stable release (October 2025)
+- ✅ v2.1.0 theme system (November 2025)
+- ✅ Community feedback integration
+- ✅ v2.1.1 Go module path fix
 
 ### 📋 Planned Features
 
@@ -558,35 +558,32 @@ For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
 **Progress**: ~95% complete (10 phases done, 2 remaining)
 
-### 🚧 Remaining Phases (2/12)
+### 🚧 Remaining Phases (1/12)
 
-**Phase 10: Document Reading** (Not Started - ~15-20 hours)
-- Open existing .docx files
-- Parse document structure  
-- Modify existing documents
-- Roundtrip testing
+**Phase 10: Document Reading** (60% Complete - Core Features Working ✅)
+- ✅ Open existing .docx files (example 12)
+- ✅ Parse document structure  
+- ✅ Modify existing documents
+- 🚧 Advanced features (headers/footers in existing docs)
 
-**Phase 12: Beta Testing & Release** (In Progress)
-- Community feedback
-- Final documentation review
-- v2.0.0 stable release
+### Release History
 
-### Release Timeline
+- **v2.1.1** (November 2025 - Current)
+  - Go module path fix (/v2 suffix)
+  - All features from v2.1.0
 
-- **v2.0.0-beta** (Q4 2025 - Current)
-  - Phase 10 (Document Reading) - estimated Dec 2025
-  - Final API polish
-  - Performance optimizations
+- **v2.1.0** (November 2025)
+  - Complete theme system
+  - 6 pre-built themes
+  - Custom theme support
 
-- **v2.0.0-rc** (Q1 2026)
-  - Beta testing feedback
-  - Bug fixes
-  - Migration tooling
+- **v2.0.1** (November 2025)
+  - Go module path fix (/v2 suffix)
 
-- **v2.0.0 stable** (Q1 2026 - Target: March 2026)
-  - Production ready
-  - Long-term support
-  - Backward compatibility guarantee
+- **v2.0.0** (October 2025)
+  - Production ready stable release
+  - Clean architecture implementation
+  - Comprehensive documentation
 
 See [docs/V2_DESIGN.md](docs/V2_DESIGN.md) for detailed phase breakdown.
 
