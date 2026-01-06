@@ -780,7 +780,68 @@ func (s *TableSerializer) serializeCellProperties(cell domain.TableCell) *xml.Ta
 		}
 	}
 
+	// Borders
+	borders := cell.Borders()
+	if s.hasCellBorders(borders) {
+		props.Borders = s.serializeCellBorders(borders)
+	}
+
 	return props
+}
+
+func (s *TableSerializer) hasCellBorders(borders domain.TableBorders) bool {
+	return borders.Top.Style != domain.BorderNone ||
+		borders.Bottom.Style != domain.BorderNone ||
+		borders.Left.Style != domain.BorderNone ||
+		borders.Right.Style != domain.BorderNone
+}
+
+func (s *TableSerializer) serializeCellBorders(borders domain.TableBorders) *xml.TableBorders {
+	xmlBorders := &xml.TableBorders{}
+
+	if borders.Top.Style != domain.BorderNone {
+		xmlBorders.Top = s.serializeCellBorder(borders.Top)
+	}
+	if borders.Bottom.Style != domain.BorderNone {
+		xmlBorders.Bottom = s.serializeCellBorder(borders.Bottom)
+	}
+	if borders.Left.Style != domain.BorderNone {
+		xmlBorders.Left = s.serializeCellBorder(borders.Left)
+	}
+	if borders.Right.Style != domain.BorderNone {
+		xmlBorders.Right = s.serializeCellBorder(borders.Right)
+	}
+
+	return xmlBorders
+}
+
+func (s *TableSerializer) serializeCellBorder(border domain.BorderStyle) *xml.Border {
+	return &xml.Border{
+		Val:   s.borderLineStyleToString(border.Style),
+		Sz:    border.Width,
+		Color: color.ToHex(border.Color),
+	}
+}
+
+func (s *TableSerializer) borderLineStyleToString(style domain.BorderLineStyle) string {
+	switch style {
+	case domain.BorderNone:
+		return "none"
+	case domain.BorderSingle:
+		return "single"
+	case domain.BorderDashed:
+		return "dashed"
+	case domain.BorderDotted:
+		return "dotted"
+	case domain.BorderDouble:
+		return "double"
+	case domain.BorderThick:
+		return "thick"
+	case domain.BorderTriple:
+		return "triple"
+	default:
+		return "none"
+	}
 }
 
 func (s *TableSerializer) widthTypeToString(wType domain.WidthType) string {
