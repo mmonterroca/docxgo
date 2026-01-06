@@ -607,3 +607,97 @@ func TestRunSerializer_WithTextBreaks(t *testing.T) {
 		t.Errorf("expected at least 3 elements (text+break+text), got %d", len(runs))
 	}
 }
+
+func TestTableSerializer_CellBorders(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 1)
+
+	// Get first cell and set borders
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+
+	// Set borders with specific properties
+	borders := domain.TableBorders{
+		Top: domain.BorderStyle{
+			Style: domain.BorderSingle,
+			Width: 4,
+			Color: domain.ColorRed,
+		},
+		Bottom: domain.BorderStyle{
+			Style: domain.BorderSingle,
+			Width: 4,
+			Color: domain.ColorRed,
+		},
+		Left: domain.BorderStyle{
+			Style: domain.BorderSingle,
+			Width: 4,
+			Color: domain.ColorRed,
+		},
+		Right: domain.BorderStyle{
+			Style: domain.BorderSingle,
+			Width: 4,
+			Color: domain.ColorRed,
+		},
+	}
+	cell.SetBorders(borders)
+
+	// Serialize the table
+	ser := serializer.NewTableSerializer()
+	xmlTable := ser.Serialize(table)
+
+	// Get first cell from serialized table
+	if len(xmlTable.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(xmlTable.Rows))
+	}
+	if len(xmlTable.Rows[0].Cells) != 1 {
+		t.Fatalf("expected 1 cell, got %d", len(xmlTable.Rows[0].Cells))
+	}
+
+	firstCell := xmlTable.Rows[0].Cells[0]
+
+	// Check that borders are set
+	if firstCell.Properties == nil {
+		t.Fatal("expected cell properties to be set")
+	}
+	if firstCell.Properties.Borders == nil {
+		t.Fatal("expected borders to be set")
+	}
+
+	// Check top border properties
+	if firstCell.Properties.Borders.Top == nil {
+		t.Fatal("expected border top to be set")
+	}
+	if firstCell.Properties.Borders.Top.Val != "single" {
+		t.Errorf("expected border top style to be 'single', got %q", firstCell.Properties.Borders.Top.Val)
+	}
+	if firstCell.Properties.Borders.Top.Sz != 4 {
+		t.Errorf("expected border top width (Sz) to be 4, got %d", firstCell.Properties.Borders.Top.Sz)
+	}
+	if firstCell.Properties.Borders.Top.Color != "FF0000" {
+		t.Errorf("expected border top color to be 'FF0000' (red), got %q", firstCell.Properties.Borders.Top.Color)
+	}
+
+	// Check all borders have the same properties
+	borders_to_check := []*xmlstructs.Border{
+		firstCell.Properties.Borders.Bottom,
+		firstCell.Properties.Borders.Left,
+		firstCell.Properties.Borders.Right,
+	}
+	borderNames := []string{"bottom", "left", "right"}
+
+	for i, border := range borders_to_check {
+		if border == nil {
+			t.Errorf("expected border %s to be set", borderNames[i])
+			continue
+		}
+		if border.Val != "single" {
+			t.Errorf("expected border %s style to be 'single', got %q", borderNames[i], border.Val)
+		}
+		if border.Sz != 4 {
+			t.Errorf("expected border %s width (Sz) to be 4, got %d", borderNames[i], border.Sz)
+		}
+		if border.Color != "FF0000" {
+			t.Errorf("expected border %s color to be 'FF0000' (red), got %q", borderNames[i], border.Color)
+		}
+	}
+}
