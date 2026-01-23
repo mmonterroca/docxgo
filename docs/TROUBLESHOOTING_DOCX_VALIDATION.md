@@ -91,25 +91,33 @@ This caused:
 
 ### Solution
 
-**File:** `internal/core/run.go` (lines 238-257)
+**File:** `internal/core/run.go` - `AddField()` method
 
 Before generating a new relationship, check if a preserved one already exists:
 
 ```go
 // Check if this hyperlink already has a relationship ID (preserved from read)
+// If so, skip creating a new one to preserve original document references
 existingRelID, hasExistingRelID := accessor.GetProperty("relationshipID")
 if hasExistingRelID && existingRelID != "" {
     // Already has a relationship ID, skip creating new one
-    // The preserved ID will be used during serialization
 } else {
     // No existing relationship ID, create a new one
-    if relMgr := accessor.RelationshipManager(); relMgr != nil {
-        relID, err := relMgr.AddHyperlink(link)
-        if err != nil {
-            return fmt.Errorf("failed to add hyperlink relationship: %w", err)
-        }
-        accessor.SetProperty("relationshipID", relID)
+    if r.relManager == nil {
+        return errors.InvalidState("Run.AddField", "hyperlink relationship manager not initialized")
     }
+
+    url, ok := accessor.GetProperty("url")
+    if !ok || url == "" {
+        return errors.InvalidArgument("Run.AddField", "url", url, "hyperlink URL cannot be empty")
+    }
+
+    relID, err := r.relManager.AddHyperlink(url)
+    if err != nil {
+        return errors.Wrap(err, "Run.AddField")
+    }
+
+    accessor.SetProperty("relationshipID", relID)
 }
 ```
 
