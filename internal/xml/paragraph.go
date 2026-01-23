@@ -66,15 +66,16 @@ type BookmarkEnd struct {
 }
 
 // ParagraphProperties represents w:pPr element.
+// Element order follows ISO/IEC 29500 (OOXML) schema sequence requirements.
 type ParagraphProperties struct {
 	XMLName           xml.Name             `xml:"w:pPr"`
-	Style             *ParagraphStyleRef   `xml:"w:pStyle,omitempty"`
-	Justification     *Justification       `xml:"w:jc,omitempty"`
-	Indentation       *Indentation         `xml:"w:ind,omitempty"`
-	Spacing           *Spacing             `xml:"w:spacing,omitempty"`
-	Numbering         *NumberingProperties `xml:"w:numPr,omitempty"`
-	Borders           *ParagraphBorders    `xml:"w:pBdr,omitempty"`
-	SectionProperties *SectionProperties   `xml:"w:sectPr,omitempty"`
+	Style             *ParagraphStyleRef   `xml:"w:pStyle,omitempty"`      // 1. pStyle
+	Numbering         *NumberingProperties `xml:"w:numPr,omitempty"`       // 2. numPr (after pStyle, before pBdr)
+	Borders           *ParagraphBorders    `xml:"w:pBdr,omitempty"`        // 3. pBdr
+	Spacing           *Spacing             `xml:"w:spacing,omitempty"`     // 4. spacing
+	Indentation       *Indentation         `xml:"w:ind,omitempty"`         // 5. ind
+	Justification     *Justification       `xml:"w:jc,omitempty"`          // 6. jc (near the end)
+	SectionProperties *SectionProperties   `xml:"w:sectPr,omitempty"`      // 7. sectPr (always last)
 }
 
 // ParagraphBorders represents w:pBdr element (paragraph borders).
@@ -125,8 +126,11 @@ type DecimalNumber struct {
 }
 
 // Hyperlink represents w:hyperlink element.
+// Can use either r:id (external link via relationship) or w:anchor (internal bookmark link).
 type Hyperlink struct {
 	XMLName xml.Name `xml:"w:hyperlink"`
-	ID      string   `xml:"r:id,attr"`
+	ID      string   `xml:"r:id,attr,omitempty"` // External hyperlink via relationship
+	Anchor  string   `xml:"w:anchor,attr,omitempty"` // Internal bookmark anchor (e.g., _Toc123456)
+	History string   `xml:"w:history,attr,omitempty"` // "1" to add to history
 	Runs    []*Run   `xml:"w:r"`
 }

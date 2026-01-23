@@ -356,6 +356,61 @@ func TestHyperlinkFieldProperties(t *testing.T) {
 	}
 }
 
+// TestHyperlinkRelationshipIDPreservation tests that when a hyperlink field
+// has a preserved relationshipID from reading an existing document, it is
+// not overwritten when calling AddField.
+// See: docs/TROUBLESHOOTING_DOCX_VALIDATION.md - Issue 1
+func TestHyperlinkRelationshipIDPreservation(t *testing.T) {
+	url := "https://example.com"
+	displayText := "Example"
+	preservedRelID := "rId25"
+
+	field := NewHyperlinkField(url, displayText)
+	df := field.(*docxField)
+
+	// Simulate what happens during document read - the relationshipID is preserved
+	df.SetProperty("relationshipID", preservedRelID)
+
+	// Verify the preserved ID is stored
+	gotRelID, ok := df.GetProperty("relationshipID")
+	if !ok {
+		t.Error("GetProperty(relationshipID) returned false; want true")
+	}
+	if gotRelID != preservedRelID {
+		t.Errorf("GetProperty(relationshipID) = %q, want %q", gotRelID, preservedRelID)
+	}
+}
+
+// TestHyperlinkAnchorField tests internal hyperlinks that use anchors
+// instead of external URLs.
+func TestHyperlinkAnchorField(t *testing.T) {
+	anchor := "_Toc123456789"
+	displayText := "Section 1"
+
+	// Create a hyperlink field for an internal anchor
+	field := NewField(domain.FieldTypeHyperlink)
+	df := field.(*docxField)
+	df.SetProperty("anchor", anchor)
+	df.SetProperty("display", displayText)
+
+	// Verify properties
+	gotAnchor, ok := df.GetProperty("anchor")
+	if !ok || gotAnchor != anchor {
+		t.Errorf("GetProperty(anchor) = %q, want %q", gotAnchor, anchor)
+	}
+
+	gotDisplay, ok := df.GetProperty("display")
+	if !ok || gotDisplay != displayText {
+		t.Errorf("GetProperty(display) = %q, want %q", gotDisplay, displayText)
+	}
+
+	// Anchor-based hyperlinks should not have a URL
+	gotURL, hasURL := df.GetProperty("url")
+	if hasURL && gotURL != "" {
+		t.Errorf("GetProperty(url) = %q, want empty for anchor-based link", gotURL)
+	}
+}
+
 func TestStyleRefFieldProperties(t *testing.T) {
 	styleName := "Heading 1"
 

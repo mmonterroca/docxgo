@@ -99,10 +99,12 @@ func NewFloatingDrawing(img domain.Image, drawingID int) *Drawing {
 	anchor.PositionH = &PositionH{
 		RelativeFrom: convertHAlign(pos.HAlign),
 	}
-	if pos.OffsetX != 0 {
+	// Use offset if explicitly set (even if 0), otherwise use alignment if provided
+	if pos.UseOffsetX || pos.OffsetX != 0 {
 		offset := pos.OffsetX
 		anchor.PositionH.PosOffset = &offset
-	} else {
+	} else if pos.HAlign != "" {
+		// Only set Align if we have a non-empty value
 		align := string(pos.HAlign)
 		anchor.PositionH.Align = &align
 	}
@@ -111,10 +113,12 @@ func NewFloatingDrawing(img domain.Image, drawingID int) *Drawing {
 	anchor.PositionV = &PositionV{
 		RelativeFrom: convertVAlign(pos.VAlign),
 	}
-	if pos.OffsetY != 0 {
+	// Use offset if explicitly set (even if 0), otherwise use alignment if provided
+	if pos.UseOffsetY || pos.OffsetY != 0 {
 		offset := pos.OffsetY
 		anchor.PositionV.PosOffset = &offset
-	} else {
+	} else if pos.VAlign != "" {
+		// Only set Align if we have a non-empty value
 		align := string(pos.VAlign)
 		anchor.PositionV.Align = &align
 	}

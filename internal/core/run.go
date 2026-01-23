@@ -237,21 +237,29 @@ func (r *run) AddField(field domain.Field) error {
 			return errors.InvalidArgument("Run.AddField", "field", field, "hyperlink field must support property access")
 		}
 
-		if r.relManager == nil {
-			return errors.InvalidState("Run.AddField", "hyperlink relationship manager not initialized")
-		}
+		// Check if this hyperlink already has a relationship ID (preserved from read)
+		// If so, skip creating a new one to preserve original document references
+		existingRelID, hasExistingRelID := accessor.GetProperty("relationshipID")
+		if hasExistingRelID && existingRelID != "" {
+			// Already has a relationship ID, skip creating new one
+		} else {
+			// No existing relationship ID, create a new one
+			if r.relManager == nil {
+				return errors.InvalidState("Run.AddField", "hyperlink relationship manager not initialized")
+			}
 
-		url, ok := accessor.GetProperty("url")
-		if !ok || url == "" {
-			return errors.InvalidArgument("Run.AddField", "url", url, "hyperlink URL cannot be empty")
-		}
+			url, ok := accessor.GetProperty("url")
+			if !ok || url == "" {
+				return errors.InvalidArgument("Run.AddField", "url", url, "hyperlink URL cannot be empty")
+			}
 
-		relID, err := r.relManager.AddHyperlink(url)
-		if err != nil {
-			return errors.Wrap(err, "Run.AddField")
-		}
+			relID, err := r.relManager.AddHyperlink(url)
+			if err != nil {
+				return errors.Wrap(err, "Run.AddField")
+			}
 
-		accessor.SetProperty("relationshipID", relID)
+			accessor.SetProperty("relationshipID", relID)
+		}
 	}
 
 	if r.fields == nil {

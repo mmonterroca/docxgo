@@ -381,15 +381,62 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 			if accessor, ok := field.(interface {
 				GetProperty(string) (string, bool)
 			}); ok {
-				relID, relOK := accessor.GetProperty("relationshipID")
-				if relOK && relID != "" {
-					display := field.Result()
-					if display == "" {
-						if disp, ok := accessor.GetProperty("display"); ok {
-							display = disp
+				display := field.Result()
+				if display == "" {
+					if disp, ok := accessor.GetProperty("display"); ok {
+						display = disp
+					}
+				}
+
+				// Check if this is an internal bookmark link (anchor)
+				// Can be set via "anchor" property directly, or via URL starting with #
+				var anchor string
+				if anchorProp, anchorOK := accessor.GetProperty("anchor"); anchorOK && anchorProp != "" {
+					anchor = anchorProp
+				} else if url, urlOK := accessor.GetProperty("url"); urlOK && strings.HasPrefix(url, "#") {
+					anchor = strings.TrimPrefix(url, "#")
+				}
+
+				if anchor != "" {
+					var xmlRun *xml.Run
+					if setter, ok := run.(interface{ SetText(string) error }); ok {
+						origText := run.Text()
+						_ = setter.SetText(display)
+						xmlRun = s.runSerializer.Serialize(run)
+						_ = setter.SetText(origText)
+					} else {
+						xmlRun = &xml.Run{
+							Properties: s.runSerializer.serializeProperties(run),
+							Text:       &xml.Text{Content: display},
 						}
 					}
 
+					if xmlRun.Text == nil {
+						xmlRun.Text = &xml.Text{Content: display}
+					} else {
+						xmlRun.Text.Content = display
+					}
+
+					xmlRun.FieldChar = nil
+					xmlRun.InstrText = nil
+
+					if xmlRun.Properties == nil {
+						xmlRun.Properties = &xml.RunProperties{}
+					}
+					xmlRun.Properties.Style = &xml.RunStyle{Val: "Hyperlink"}
+
+					hyperlink := &xml.Hyperlink{
+						Anchor:  anchor,
+						History: "1",
+						Runs:    []*xml.Run{xmlRun},
+					}
+					elements = append(elements, hyperlink)
+					continue
+				}
+				
+				// Check for external hyperlink via relationship ID
+				relID, relOK := accessor.GetProperty("relationshipID")
+				if relOK && relID != "" {
 					var xmlRun *xml.Run
 					if setter, ok := run.(interface{ SetText(string) error }); ok {
 						origText := run.Text()
