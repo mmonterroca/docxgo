@@ -46,6 +46,22 @@ type NumberingPart struct {
 	Target string
 }
 
+// PreservedParts holds all parts that should be written verbatim from the original document.
+// This enables complete round-trip fidelity when reading and saving documents.
+type PreservedParts struct {
+	Headers          map[string][]byte // Original headers (e.g., "header1.xml" -> bytes)
+	Footers          map[string][]byte // Original footers (e.g., "footer1.xml" -> bytes)
+	DocRels          []byte            // Original word/_rels/document.xml.rels
+	ContentTypes     []byte            // Original [Content_Types].xml
+	Additional       map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
+	Themes           map[string][]byte // Original theme parts
+	FontTable        []byte            // Original fontTable.xml
+	Settings         []byte            // Original settings.xml
+	WebSettings      []byte            // Original webSettings.xml
+	CustomProperties []byte            // Original docProps/custom.xml
+	RootRels         []byte            // Original _rels/.rels
+}
+
 // NewZipWriter creates a new ZipWriter.
 func NewZipWriter(w io.Writer) *ZipWriter {
 	return &ZipWriter{
@@ -55,17 +71,34 @@ func NewZipWriter(w io.Writer) *ZipWriter {
 }
 
 // WriteDocument writes a complete .docx document structure.
-func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Relationships, coreProps *xmlstructs.CoreProperties, appProps *xmlstructs.AppProperties, styles *xmlstructs.Styles, media []*manager.MediaFile, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, numbering *NumberingPart) error {
+// If preservedStyles is provided (non-nil), it will be written verbatim instead of serializing styles.
+// If preserved is provided, those parts will be written verbatim for complete round-trip fidelity.
+func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Relationships, coreProps *xmlstructs.CoreProperties, appProps *xmlstructs.AppProperties, styles *xmlstructs.Styles, media []*manager.MediaFile, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, numbering *NumberingPart, preservedStyles []byte, preserved *PreservedParts) error {
 	numberingPart := sanitizeNumberingPart(numbering)
 
-	// Write [Content_Types].xml with optional header/footer overrides
-	if err := zw.writeContentTypes(headers, footers, media, numberingPart); err != nil {
-		return fmt.Errorf("write content types: %w", err)
+	// Determine if we're in round-trip mode (have preserved parts)
+	roundTrip := preserved != nil
+
+	// Write [Content_Types].xml
+	if roundTrip && len(preserved.ContentTypes) > 0 {
+		if err := zw.writeRaw("[Content_Types].xml", preserved.ContentTypes); err != nil {
+			return fmt.Errorf("write preserved content types: %w", err)
+		}
+	} else {
+		if err := zw.writeContentTypes(headers, footers, media, numberingPart); err != nil {
+			return fmt.Errorf("write content types: %w", err)
+		}
 	}
 
-	// Write _rels/.rels
-	if err := zw.writeRootRels(); err != nil {
-		return fmt.Errorf("write root rels: %w", err)
+	// Write _rels/.rels - use preserved if available
+	if roundTrip && len(preserved.RootRels) > 0 {
+		if err := zw.writeRaw("_rels/.rels", preserved.RootRels); err != nil {
+			return fmt.Errorf("write preserved root rels: %w", err)
+		}
+	} else {
+		if err := zw.writeRootRels(); err != nil {
+			return fmt.Errorf("write root rels: %w", err)
+		}
 	}
 
 	// Write word/document.xml
@@ -74,8 +107,14 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 	}
 
 	// Write word/_rels/document.xml.rels
-	if err := zw.writeDocumentRels(rels, numberingPart); err != nil {
-		return fmt.Errorf("write document rels: %w", err)
+	if roundTrip && len(preserved.DocRels) > 0 {
+		if err := zw.writeRaw("word/_rels/document.xml.rels", preserved.DocRels); err != nil {
+			return fmt.Errorf("write preserved document rels: %w", err)
+		}
+	} else {
+		if err := zw.writeDocumentRels(rels, numberingPart); err != nil {
+			return fmt.Errorf("write document rels: %w", err)
+		}
 	}
 
 	// Write docProps/core.xml
@@ -88,29 +127,59 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 		return fmt.Errorf("write app properties: %w", err)
 	}
 
-	// Write word/styles.xml
-	if err := zw.writeStyles(styles); err != nil {
+	// Write word/styles.xml - use preserved bytes if available
+	if len(preservedStyles) > 0 {
+		if err := zw.writeRaw("word/styles.xml", preservedStyles); err != nil {
+			return fmt.Errorf("write preserved styles: %w", err)
+		}
+	} else if err := zw.writeStyles(styles); err != nil {
 		return fmt.Errorf("write styles: %w", err)
 	}
 
-	// Write word/fontTable.xml (minimal default)
-	if err := zw.writeDefaultFontTable(); err != nil {
-		return fmt.Errorf("write font table: %w", err)
+	// Write word/fontTable.xml
+	if roundTrip && len(preserved.FontTable) > 0 {
+		if err := zw.writeRaw("word/fontTable.xml", preserved.FontTable); err != nil {
+			return fmt.Errorf("write preserved font table: %w", err)
+		}
+	} else {
+		if err := zw.writeDefaultFontTable(); err != nil {
+			return fmt.Errorf("write font table: %w", err)
+		}
 	}
 
-	// Write word/theme/theme1.xml (minimal default)
-	if err := zw.writeDefaultTheme(); err != nil {
-		return fmt.Errorf("write theme: %w", err)
+	// Write word/theme/theme1.xml
+	if roundTrip && len(preserved.Themes) > 0 {
+		for name, data := range preserved.Themes {
+			if err := zw.writeRaw(name, data); err != nil {
+				return fmt.Errorf("write preserved theme %s: %w", name, err)
+			}
+		}
+	} else {
+		if err := zw.writeDefaultTheme(); err != nil {
+			return fmt.Errorf("write theme: %w", err)
+		}
 	}
 
-	// Write word/settings.xml (minimal default)
-	if err := zw.writeDefaultSettings(); err != nil {
-		return fmt.Errorf("write settings: %w", err)
+	// Write word/settings.xml
+	if roundTrip && len(preserved.Settings) > 0 {
+		if err := zw.writeRaw("word/settings.xml", preserved.Settings); err != nil {
+			return fmt.Errorf("write preserved settings: %w", err)
+		}
+	} else {
+		if err := zw.writeDefaultSettings(); err != nil {
+			return fmt.Errorf("write settings: %w", err)
+		}
 	}
 
-	// Write word/webSettings.xml (minimal default)
-	if err := zw.writeDefaultWebSettings(); err != nil {
-		return fmt.Errorf("write web settings: %w", err)
+	// Write word/webSettings.xml
+	if roundTrip && len(preserved.WebSettings) > 0 {
+		if err := zw.writeRaw("word/webSettings.xml", preserved.WebSettings); err != nil {
+			return fmt.Errorf("write preserved web settings: %w", err)
+		}
+	} else {
+		if err := zw.writeDefaultWebSettings(); err != nil {
+			return fmt.Errorf("write web settings: %w", err)
+		}
 	}
 
 	// Write media files to word/media
@@ -118,23 +187,56 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 		return fmt.Errorf("write media: %w", err)
 	}
 
-	// Write headers
-	for name, header := range headers {
-		if err := zw.writeXML(fmt.Sprintf("word/%s", name), header); err != nil {
-			return fmt.Errorf("write header %s: %w", name, err)
+	// Write headers - use preserved if available, otherwise serialized
+	if roundTrip && len(preserved.Headers) > 0 {
+		for name, data := range preserved.Headers {
+			if err := zw.writeRaw(name, data); err != nil {
+				return fmt.Errorf("write preserved header %s: %w", name, err)
+			}
+		}
+	} else {
+		for name, header := range headers {
+			if err := zw.writeXML(fmt.Sprintf("word/%s", name), header); err != nil {
+				return fmt.Errorf("write header %s: %w", name, err)
+			}
 		}
 	}
 
-	// Write footers
-	for name, footer := range footers {
-		if err := zw.writeXML(fmt.Sprintf("word/%s", name), footer); err != nil {
-			return fmt.Errorf("write footer %s: %w", name, err)
+	// Write footers - use preserved if available, otherwise serialized
+	if roundTrip && len(preserved.Footers) > 0 {
+		for name, data := range preserved.Footers {
+			if err := zw.writeRaw(name, data); err != nil {
+				return fmt.Errorf("write preserved footer %s: %w", name, err)
+			}
+		}
+	} else {
+		for name, footer := range footers {
+			if err := zw.writeXML(fmt.Sprintf("word/%s", name), footer); err != nil {
+				return fmt.Errorf("write footer %s: %w", name, err)
+			}
 		}
 	}
 
+	// Write numbering part
 	if numberingPart != nil {
 		if err := zw.writeRaw(fmt.Sprintf("word/%s", numberingPart.Target), numberingPart.Data); err != nil {
 			return fmt.Errorf("write numbering part: %w", err)
+		}
+	}
+
+	// Write additional preserved parts (comments, footnotes, customXml, etc.)
+	if roundTrip && len(preserved.Additional) > 0 {
+		for name, data := range preserved.Additional {
+			if err := zw.writeRaw(name, data); err != nil {
+				return fmt.Errorf("write additional part %s: %w", name, err)
+			}
+		}
+	}
+
+	// Write custom properties if preserved
+	if roundTrip && len(preserved.CustomProperties) > 0 {
+		if err := zw.writeRaw("docProps/custom.xml", preserved.CustomProperties); err != nil {
+			return fmt.Errorf("write custom properties: %w", err)
 		}
 	}
 

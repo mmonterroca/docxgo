@@ -70,6 +70,21 @@ type document struct {
 	numberingPart   []byte
 	numberingTarget string
 	backgroundColor *domain.Color
+
+	// Preserved parts for round-trip operations (read-modify-write).
+	// When set, these parts are written verbatim to preserve original content.
+	preservedStylesPart      []byte            // Original styles.xml
+	preservedHeaders         map[string][]byte // Original headers (e.g., "header1.xml" -> bytes)
+	preservedFooters         map[string][]byte // Original footers (e.g., "footer1.xml" -> bytes)
+	preservedDocRels         []byte            // Original word/_rels/document.xml.rels
+	preservedContentTypes    []byte            // Original [Content_Types].xml
+	preservedAdditional      map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
+	preservedThemes          map[string][]byte // Original theme parts
+	preservedFontTable       []byte            // Original fontTable.xml
+	preservedSettings        []byte            // Original settings.xml
+	preservedWebSettings     []byte            // Original webSettings.xml
+	preservedCustomProps     []byte            // Original docProps/custom.xml
+	preservedRootRels        []byte            // Original _rels/.rels
 }
 
 // NewDocument creates a new Document.
@@ -398,7 +413,7 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	coreProps := ser.SerializeCoreProperties(d.metadata)
 	appProps := ser.SerializeAppProperties(d)
 
-	// Serialize styles
+	// Serialize styles (used only if no preserved styles are available)
 	styles := ser.SerializeStyles(d.styleManager)
 
 	mediaFiles := d.mediaManager.All()
@@ -412,7 +427,26 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 		}
 	}
 
-	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers, numberingPart); err != nil {
+	// Build writer.PreservedParts from core.PreservedParts if available
+	var writerPreserved *writer.PreservedParts
+	if corePreserved := d.GetPreservedParts(); corePreserved != nil {
+		writerPreserved = &writer.PreservedParts{
+			Headers:          corePreserved.Headers,
+			Footers:          corePreserved.Footers,
+			DocRels:          corePreserved.DocRels,
+			ContentTypes:     corePreserved.ContentTypes,
+			Additional:       corePreserved.Additional,
+			Themes:           corePreserved.Themes,
+			FontTable:        corePreserved.FontTable,
+			Settings:         corePreserved.Settings,
+			WebSettings:      corePreserved.WebSettings,
+			CustomProperties: corePreserved.CustomProperties,
+			RootRels:         corePreserved.RootRels,
+		}
+	}
+
+	// Use preserved styles and parts if available (from reading an existing document)
+	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers, numberingPart, d.preservedStylesPart, writerPreserved); err != nil {
 		return 0, errors.WrapWithCode(err, errors.ErrCodeIO, "Document.WriteTo")
 	}
 
@@ -535,6 +569,167 @@ func (d *document) NumberingPartInfo() ([]byte, string) {
 	copied := make([]byte, len(d.numberingPart))
 	copy(copied, d.numberingPart)
 	return copied, d.numberingTarget
+}
+
+// SetPreservedStylesPart stores the original styles.xml bytes from a read document.
+// When set, these bytes are written verbatim to preserve the original document styles.
+func (d *document) SetPreservedStylesPart(data []byte) {
+	if d == nil || len(data) == 0 {
+		return
+	}
+	copied := make([]byte, len(data))
+	copy(copied, data)
+	d.preservedStylesPart = copied
+}
+
+// PreservedStylesPartInfo returns the stored original styles.xml bytes, if any.
+func (d *document) PreservedStylesPartInfo() []byte {
+	if d == nil || len(d.preservedStylesPart) == 0 {
+		return nil
+	}
+	copied := make([]byte, len(d.preservedStylesPart))
+	copy(copied, d.preservedStylesPart)
+	return copied
+}
+
+// PreservedParts holds all preserved parts from a read document for round-trip operations.
+type PreservedParts struct {
+	Headers          map[string][]byte
+	Footers          map[string][]byte
+	DocRels          []byte
+	ContentTypes     []byte
+	Additional       map[string][]byte
+	Themes           map[string][]byte
+	FontTable        []byte
+	Settings         []byte
+	WebSettings      []byte
+	CustomProperties []byte // docProps/custom.xml
+	RootRels         []byte // _rels/.rels
+}
+
+// SetPreservedParts stores all preserved parts from a read document.
+func (d *document) SetPreservedParts(parts *PreservedParts) {
+	if d == nil || parts == nil {
+		return
+	}
+
+	// Copy headers
+	if len(parts.Headers) > 0 {
+		d.preservedHeaders = make(map[string][]byte, len(parts.Headers))
+		for k, v := range parts.Headers {
+			copied := make([]byte, len(v))
+			copy(copied, v)
+			d.preservedHeaders[k] = copied
+		}
+	}
+
+	// Copy footers
+	if len(parts.Footers) > 0 {
+		d.preservedFooters = make(map[string][]byte, len(parts.Footers))
+		for k, v := range parts.Footers {
+			copied := make([]byte, len(v))
+			copy(copied, v)
+			d.preservedFooters[k] = copied
+		}
+	}
+
+	// Copy document relationships
+	if len(parts.DocRels) > 0 {
+		d.preservedDocRels = make([]byte, len(parts.DocRels))
+		copy(d.preservedDocRels, parts.DocRels)
+	}
+
+	// Copy content types
+	if len(parts.ContentTypes) > 0 {
+		d.preservedContentTypes = make([]byte, len(parts.ContentTypes))
+		copy(d.preservedContentTypes, parts.ContentTypes)
+	}
+
+	// Copy additional parts
+	if len(parts.Additional) > 0 {
+		d.preservedAdditional = make(map[string][]byte, len(parts.Additional))
+		for k, v := range parts.Additional {
+			copied := make([]byte, len(v))
+			copy(copied, v)
+			d.preservedAdditional[k] = copied
+		}
+	}
+
+	// Copy themes
+	if len(parts.Themes) > 0 {
+		d.preservedThemes = make(map[string][]byte, len(parts.Themes))
+		for k, v := range parts.Themes {
+			copied := make([]byte, len(v))
+			copy(copied, v)
+			d.preservedThemes[k] = copied
+		}
+	}
+
+	// Copy font table
+	if len(parts.FontTable) > 0 {
+		d.preservedFontTable = make([]byte, len(parts.FontTable))
+		copy(d.preservedFontTable, parts.FontTable)
+	}
+
+	// Copy settings
+	if len(parts.Settings) > 0 {
+		d.preservedSettings = make([]byte, len(parts.Settings))
+		copy(d.preservedSettings, parts.Settings)
+	}
+
+	// Copy web settings
+	if len(parts.WebSettings) > 0 {
+		d.preservedWebSettings = make([]byte, len(parts.WebSettings))
+		copy(d.preservedWebSettings, parts.WebSettings)
+	}
+
+	// Copy custom properties
+	if len(parts.CustomProperties) > 0 {
+		d.preservedCustomProps = make([]byte, len(parts.CustomProperties))
+		copy(d.preservedCustomProps, parts.CustomProperties)
+	}
+
+	// Copy root relationships
+	if len(parts.RootRels) > 0 {
+		d.preservedRootRels = make([]byte, len(parts.RootRels))
+		copy(d.preservedRootRels, parts.RootRels)
+	}
+}
+
+// GetPreservedParts returns all preserved parts for writing.
+func (d *document) GetPreservedParts() *PreservedParts {
+	if d == nil {
+		return nil
+	}
+
+	// Only return if we have any preserved parts
+	if len(d.preservedHeaders) == 0 && len(d.preservedFooters) == 0 &&
+		len(d.preservedDocRels) == 0 && len(d.preservedContentTypes) == 0 &&
+		len(d.preservedAdditional) == 0 && len(d.preservedThemes) == 0 &&
+		len(d.preservedFontTable) == 0 && len(d.preservedSettings) == 0 &&
+		len(d.preservedWebSettings) == 0 && len(d.preservedCustomProps) == 0 &&
+		len(d.preservedRootRels) == 0 {
+		return nil
+	}
+
+	return &PreservedParts{
+		Headers:          d.preservedHeaders,
+		Footers:          d.preservedFooters,
+		DocRels:          d.preservedDocRels,
+		ContentTypes:     d.preservedContentTypes,
+		Additional:       d.preservedAdditional,
+		Themes:           d.preservedThemes,
+		FontTable:        d.preservedFontTable,
+		Settings:         d.preservedSettings,
+		WebSettings:      d.preservedWebSettings,
+		CustomProperties: d.preservedCustomProps,
+		RootRels:         d.preservedRootRels,
+	}
+}
+
+// HasPreservedParts returns true if this document has preserved parts from reading.
+func (d *document) HasPreservedParts() bool {
+	return d != nil && d.GetPreservedParts() != nil
 }
 
 func normalizeNumberingTarget(target string) string {

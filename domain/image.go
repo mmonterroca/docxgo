@@ -113,6 +113,8 @@ type ImagePosition struct {
 	VAlign     VerticalAlign     // Vertical alignment (for floating)
 	OffsetX    int               // Horizontal offset in EMUs
 	OffsetY    int               // Vertical offset in EMUs
+	UseOffsetX bool              // True if OffsetX should be used (even if 0)
+	UseOffsetY bool              // True if OffsetY should be used (even if 0)
 	WrapText   TextWrapType      // Text wrapping style
 	ZOrder     int               // Z-order for layering
 	BehindText bool              // Whether image is behind text

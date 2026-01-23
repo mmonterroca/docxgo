@@ -566,3 +566,159 @@ func TestNewGraphic(t *testing.T) {
 		t.Errorf("Ext.Cx = %d; want %d", graphic.GraphicData.Pic.SpPr.Xfrm.Ext.Cx, img.size.WidthEMU)
 	}
 }
+
+// TestNewFloatingDrawingWithUseOffset tests that UseOffsetX/UseOffsetY flags
+// correctly control whether posOffset or align elements are generated.
+// This is critical for preserving wp:posOffset elements during round-trip.
+// See: docs/TROUBLESHOOTING_DOCX_VALIDATION.md - Issue 2
+func TestNewFloatingDrawingWithUseOffset(t *testing.T) {
+	t.Run("UseOffset true with zero offset generates posOffset", func(t *testing.T) {
+		img := &mockImage{
+			id:             "img_offset",
+			format:         domain.ImageFormatPNG,
+			size:           domain.NewImageSize(100, 100),
+			relationshipID: "rId10",
+			position: domain.ImagePosition{
+				Type:       domain.ImagePositionFloating,
+				OffsetX:    0,
+				OffsetY:    0,
+				UseOffsetX: true, // Should generate posOffset even though value is 0
+				UseOffsetY: true,
+				HAlign:     "",
+				VAlign:     "",
+				WrapText:   domain.WrapNone,
+			},
+		}
+
+		drawing := NewFloatingDrawing(img, 1)
+
+		if drawing == nil || drawing.Anchor == nil {
+			t.Fatal("NewFloatingDrawing() returned nil or Anchor is nil")
+		}
+
+		// Should have posOffset, not align
+		if drawing.Anchor.PositionH.PosOffset == nil {
+			t.Error("PositionH.PosOffset = nil; want non-nil when UseOffsetX=true")
+		}
+		if drawing.Anchor.PositionH.Align != nil {
+			t.Error("PositionH.Align should be nil when UseOffsetX=true")
+		}
+		if drawing.Anchor.PositionV.PosOffset == nil {
+			t.Error("PositionV.PosOffset = nil; want non-nil when UseOffsetY=true")
+		}
+		if drawing.Anchor.PositionV.Align != nil {
+			t.Error("PositionV.Align should be nil when UseOffsetY=true")
+		}
+	})
+
+	t.Run("UseOffset false with alignment generates align", func(t *testing.T) {
+		img := &mockImage{
+			id:             "img_align",
+			format:         domain.ImageFormatPNG,
+			size:           domain.NewImageSize(100, 100),
+			relationshipID: "rId11",
+			position: domain.ImagePosition{
+				Type:       domain.ImagePositionFloating,
+				OffsetX:    0,
+				OffsetY:    0,
+				UseOffsetX: false,
+				UseOffsetY: false,
+				HAlign:     domain.HAlignCenter,
+				VAlign:     domain.VAlignTop,
+				WrapText:   domain.WrapNone,
+			},
+		}
+
+		drawing := NewFloatingDrawing(img, 1)
+
+		if drawing == nil || drawing.Anchor == nil {
+			t.Fatal("NewFloatingDrawing() returned nil or Anchor is nil")
+		}
+
+		// Should have align, not posOffset
+		if drawing.Anchor.PositionH.Align == nil {
+			t.Error("PositionH.Align = nil; want non-nil when HAlign is set")
+		}
+		if drawing.Anchor.PositionH.PosOffset != nil {
+			t.Error("PositionH.PosOffset should be nil when UseOffsetX=false and HAlign is set")
+		}
+		if drawing.Anchor.PositionV.Align == nil {
+			t.Error("PositionV.Align = nil; want non-nil when VAlign is set")
+		}
+		if drawing.Anchor.PositionV.PosOffset != nil {
+			t.Error("PositionV.PosOffset should be nil when UseOffsetY=false and VAlign is set")
+		}
+	})
+
+	t.Run("non-zero offset without UseOffset generates posOffset", func(t *testing.T) {
+		img := &mockImage{
+			id:             "img_nonzero",
+			format:         domain.ImageFormatPNG,
+			size:           domain.NewImageSize(100, 100),
+			relationshipID: "rId12",
+			position: domain.ImagePosition{
+				Type:       domain.ImagePositionFloating,
+				OffsetX:    12700, // 1 point in EMUs
+				OffsetY:    25400, // 2 points in EMUs
+				UseOffsetX: false, // Doesn't matter - non-zero offset takes priority
+				UseOffsetY: false,
+				HAlign:     domain.HAlignCenter,
+				VAlign:     domain.VAlignTop,
+				WrapText:   domain.WrapNone,
+			},
+		}
+
+		drawing := NewFloatingDrawing(img, 1)
+
+		if drawing == nil || drawing.Anchor == nil {
+			t.Fatal("NewFloatingDrawing() returned nil or Anchor is nil")
+		}
+
+		// Non-zero offset takes priority over alignment
+		if drawing.Anchor.PositionH.PosOffset == nil {
+			t.Error("PositionH.PosOffset = nil; want non-nil for non-zero OffsetX")
+		}
+		if *drawing.Anchor.PositionH.PosOffset != 12700 {
+			t.Errorf("PositionH.PosOffset = %d; want 12700", *drawing.Anchor.PositionH.PosOffset)
+		}
+		if drawing.Anchor.PositionV.PosOffset == nil {
+			t.Error("PositionV.PosOffset = nil; want non-nil for non-zero OffsetY")
+		}
+		if *drawing.Anchor.PositionV.PosOffset != 25400 {
+			t.Errorf("PositionV.PosOffset = %d; want 25400", *drawing.Anchor.PositionV.PosOffset)
+		}
+	})
+
+	t.Run("no offset and no align generates nothing", func(t *testing.T) {
+		img := &mockImage{
+			id:             "img_empty",
+			format:         domain.ImageFormatPNG,
+			size:           domain.NewImageSize(100, 100),
+			relationshipID: "rId13",
+			position: domain.ImagePosition{
+				Type:       domain.ImagePositionFloating,
+				OffsetX:    0,
+				OffsetY:    0,
+				UseOffsetX: false,
+				UseOffsetY: false,
+				HAlign:     "", // Empty - should not generate align element
+				VAlign:     "", // Empty - should not generate align element
+				WrapText:   domain.WrapNone,
+			},
+		}
+
+		drawing := NewFloatingDrawing(img, 1)
+
+		if drawing == nil || drawing.Anchor == nil {
+			t.Fatal("NewFloatingDrawing() returned nil or Anchor is nil")
+		}
+
+		// Neither should be set - this avoids the empty wp:align error
+		if drawing.Anchor.PositionH.Align != nil {
+			t.Error("PositionH.Align should be nil when HAlign is empty")
+		}
+		if drawing.Anchor.PositionV.Align != nil {
+			t.Error("PositionV.Align should be nil when VAlign is empty")
+		}
+	})
+}

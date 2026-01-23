@@ -121,6 +121,19 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 		}
 	}
 
+	// Preserve original styles.xml from the source document to ensure
+	// custom styles are retained during round-trip (read-modify-write).
+	if parsed.Package != nil && len(parsed.Package.Styles) > 0 {
+		if setter, ok := doc.(interface{ SetPreservedStylesPart([]byte) }); ok {
+			setter.SetPreservedStylesPart(parsed.Package.Styles)
+		}
+	}
+
+	// Preserve all original parts for complete round-trip fidelity.
+	if parsed.Package != nil {
+		preserveOriginalParts(doc, parsed.Package)
+	}
+
 	for _, child := range body.Children {
 		if child == nil {
 			continue
@@ -648,9 +661,11 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 	}
 
 	url := ""
+	originalRelID := "" // Preserve the original relationship ID for external hyperlinks
 	if relID, ok := getAttr(elem, "id"); ok {
 		if target, found := ctx.resolveRelationshipTarget(relID); found {
 			url = target
+			originalRelID = relID // Store the original relationship ID
 		}
 	}
 
@@ -677,6 +692,11 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 			}
 			if accessor, ok := field.(interface{ SetProperty(string, string) }); ok {
 				accessor.SetProperty("url", url)
+				// Preserve the original relationship ID for external hyperlinks
+				// so the serializer can reuse it instead of generating new IDs
+				if originalRelID != "" && !strings.HasPrefix(url, "#") {
+					accessor.SetProperty("relationshipID", originalRelID)
+				}
 			}
 			extraFields = []domain.Field{field}
 		}
@@ -935,6 +955,7 @@ func buildFloatingPosition(elem *Element) domain.ImagePosition {
 		}
 		if offset, ok := parseChildInt(positionH, "posOffset"); ok {
 			pos.OffsetX = offset
+			pos.UseOffsetX = true // Mark that we should use offset, even if 0
 		}
 	}
 
@@ -946,6 +967,7 @@ func buildFloatingPosition(elem *Element) domain.ImagePosition {
 		}
 		if offset, ok := parseChildInt(positionV, "posOffset"); ok {
 			pos.OffsetY = offset
+			pos.UseOffsetY = true // Mark that we should use offset, even if 0
 		}
 	}
 
@@ -1988,4 +2010,82 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 	}
 
 	return nil
+}
+
+// preserveOriginalParts stores all original document parts for round-trip operations.
+// This ensures that when a document is read and saved, all parts that we don't
+// actively modify are preserved exactly as they were in the original.
+func preserveOriginalParts(doc domain.Document, pkg *Package) {
+	setter, ok := doc.(interface {
+		SetPreservedParts(*core.PreservedParts)
+	})
+	if !ok {
+		return
+	}
+
+	parts := &core.PreservedParts{
+		Headers:    make(map[string][]byte, len(pkg.Headers)),
+		Footers:    make(map[string][]byte, len(pkg.Footers)),
+		Additional: make(map[string][]byte, len(pkg.AdditionalParts)),
+		Themes:     make(map[string][]byte, len(pkg.ThemeParts)),
+	}
+
+	// Preserve headers
+	for name, data := range pkg.Headers {
+		parts.Headers[name] = data
+	}
+
+	// Preserve footers
+	for name, data := range pkg.Footers {
+		parts.Footers[name] = data
+	}
+
+	// Preserve document relationships
+	if len(pkg.DocumentRelationships) > 0 {
+		parts.DocRels = pkg.DocumentRelationships
+	}
+
+	// Preserve content types as raw XML
+	if pkg.ContentTypes != nil {
+		if rawCT, exists := pkg.RawParts["[Content_Types].xml"]; exists {
+			parts.ContentTypes = rawCT
+		}
+	}
+
+	// Preserve additional parts (comments, footnotes, customXml, etc.)
+	for name, data := range pkg.AdditionalParts {
+		parts.Additional[name] = data
+	}
+
+	// Preserve themes
+	for name, data := range pkg.ThemeParts {
+		parts.Themes[name] = data
+	}
+
+	// Preserve font table
+	if len(pkg.FontTable) > 0 {
+		parts.FontTable = pkg.FontTable
+	}
+
+	// Preserve settings
+	if len(pkg.Settings) > 0 {
+		parts.Settings = pkg.Settings
+	}
+
+	// Preserve web settings
+	if len(pkg.WebSettings) > 0 {
+		parts.WebSettings = pkg.WebSettings
+	}
+
+	// Preserve custom properties
+	if len(pkg.CustomProperties) > 0 {
+		parts.CustomProperties = pkg.CustomProperties
+	}
+
+	// Preserve root relationships (_rels/.rels)
+	if len(pkg.RootRelationships) > 0 {
+		parts.RootRels = pkg.RootRelationships
+	}
+
+	setter.SetPreservedParts(parts)
 }
