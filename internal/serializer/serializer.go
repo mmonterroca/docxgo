@@ -387,11 +387,17 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 						display = disp
 					}
 				}
-				
-				// Check if this is an internal bookmark link (anchor) - URL starting with #
-				if url, urlOK := accessor.GetProperty("url"); urlOK && strings.HasPrefix(url, "#") {
-					anchor := strings.TrimPrefix(url, "#")
-					
+
+				// Check if this is an internal bookmark link (anchor)
+				// Can be set via "anchor" property directly, or via URL starting with #
+				var anchor string
+				if anchorProp, anchorOK := accessor.GetProperty("anchor"); anchorOK && anchorProp != "" {
+					anchor = anchorProp
+				} else if url, urlOK := accessor.GetProperty("url"); urlOK && strings.HasPrefix(url, "#") {
+					anchor = strings.TrimPrefix(url, "#")
+				}
+
+				if anchor != "" {
 					var xmlRun *xml.Run
 					if setter, ok := run.(interface{ SetText(string) error }); ok {
 						origText := run.Text()
