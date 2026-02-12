@@ -15,7 +15,7 @@ This project has evolved through multiple stages, with each contributor adding s
 
 **Status**: Current Active Development  
 **Repository**: https://github.com/mmonterroca/docxgo  
-**License**: AGPL-3.0
+**License**: MIT
 
 #### Author
 - **Misael Monterroca** - Complete architectural rewrite
@@ -98,7 +98,7 @@ This project has evolved through multiple stages, with each contributor adding s
 
 **Repository**: https://github.com/fumiama/go-docx  
 **Based on**: gonfva/docxlib  
-**License**: AGPL-3.0
+**License**: AGPL-3.0 (original fork license)
 
 #### Author
 - **fumiama** - Expanded functionality
@@ -129,7 +129,7 @@ This project has evolved through multiple stages, with each contributor adding s
 
 **Repository**: https://github.com/gonfva/docxlib  
 **Author**: Gonzalo Fernández-Victorio  
-**License**: AGPL-3.0
+**License**: AGPL-3.0 (original library license)
 
 #### Original Purpose
 
@@ -208,7 +208,7 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
 We maintain **full transparency** about project history:
 - Original authors credited in LICENSE
 - This CREDITS.md preserved indefinitely
-- AGPL-3.0 license maintained
+- MIT license adopted for v2
 - Fork history acknowledged in documentation
 
 ---
@@ -224,7 +224,7 @@ We maintain **full transparency** about project history:
 
 ### Why Choose mmonterroca/docxgo v2?
 
-- ✅ **Open source** (AGPL-3.0) - no commercial license needed
+- ✅ **Open source** (MIT) - no commercial license needed
 - ✅ **Clean architecture** - testable, maintainable, extensible
 - ✅ **Both read and write** - parse existing + create new documents
 - ✅ **Type safe** - no `interface{}`, proper error handling
@@ -251,7 +251,7 @@ We welcome contributions from the community. See [CONTRIBUTING.md](CONTRIBUTING.
 
 ## License
 
-This project is licensed under **AGPL-3.0** (GNU Affero General Public License v3.0).
+This project is licensed under the **MIT License**.
 
 See [LICENSE](LICENSE) for full text.
 
