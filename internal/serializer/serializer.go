@@ -433,7 +433,7 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 					elements = append(elements, hyperlink)
 					continue
 				}
-				
+
 				// Check for external hyperlink via relationship ID
 				relID, relOK := accessor.GetProperty("relationshipID")
 				if relOK && relID != "" {

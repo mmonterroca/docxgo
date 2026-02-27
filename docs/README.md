@@ -20,7 +20,7 @@ This index helps you find the right documentation for your needs.
 → **[MIGRATION.md](../MIGRATION.md)** - Step-by-step migration from v1 to v2
 
 ### See Working Examples
-→ **[examples/README.md](../examples/README.md)** - 11 working examples (including read/modify)  
+→ **[examples/README.md](../examples/README.md)** - 13 working examples (including read/modify and themes)  
 → **[examples/v2_README.md](../examples/v2_README.md)** - v2-specific examples
 
 ### Understand Error Handling
@@ -83,12 +83,17 @@ This index helps you find the right documentation for your needs.
 2. **[examples/README.md](../examples/README.md)** - Working examples
    - 01_basic - Builder pattern basics
    - 02_intermediate - Multi-section documents
+   - 03_toc - Table of Contents
    - 04_fields - Field system
    - 05_styles - Style management
    - 06_sections - Page layout
    - 07_advanced - Advanced integration
    - 08_images - Image handling
    - 09_advanced_tables - Table features
+   - 10_paragraph_spacing - Line and paragraph spacing
+   - 11_multi_section - Multi-section layouts
+   - 12_read_and_modify - Read/modify existing documents
+   - 13_themes - Theme system (7 preset themes)
 
 ### Architecture and Design
 1. **[V2_DESIGN.md](./V2_DESIGN.md)** - Architecture overview
@@ -98,7 +103,7 @@ This index helps you find the right documentation for your needs.
    - Implementation phases
 
 2. **[IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)** - Current status
-   - ✅ What's implemented (95%)
+   - ✅ What's implemented (production ready)
    - 🚧 What's partial
    - ⏳ What's planned
    - Known limitations

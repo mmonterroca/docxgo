@@ -1,8 +1,8 @@
 # go-docx v2.0 - Clean Architecture Design
 
-**Status**: ✅ v2.0.0-beta Ready  
-**Progress**: ~95% (Phases 1-9, 11 complete | Phase 10 reader in progress for v2.1)  
-**Target**: v2.0.0-beta in Q4 2025, v2.0.0 in Q1 2026  
+**Status**: ✅ v2.2.1 Stable  
+**Progress**: Production Ready (all core features complete)  
+**Latest Release**: v2.2.1 (January 2026)  
 **Breaking Changes**: Yes (major version bump from original fork)
 
 > **Project Note**: This project originated as a fork of `fumiama/go-docx` but has been completely rewritten with a clean architecture design. The current version represents a ground-up rebuild focused on maintainability, type safety, and modern Go practices.
