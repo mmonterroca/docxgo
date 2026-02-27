@@ -90,6 +90,15 @@ type Run interface {
 
 	// AddField adds a field to this run (e.g., page number, TOC, hyperlink).
 	AddField(field Field) error
+
+	// Fields returns the fields embedded in this run.
+	Fields() []Field
+
+	// Breaks returns the breaks in this run.
+	Breaks() []BreakType
+
+	// Image returns the image associated with this run, if any.
+	Image() Image
 }
 
 // Font represents font settings.

@@ -384,3 +384,145 @@ func TestTableCell_AddParagraph(t *testing.T) {
 		t.Errorf("expected 1 paragraph, got %d", len(paras))
 	}
 }
+
+func TestParagraph_ClearRuns(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	// Add 3 runs
+	r1, _ := para.AddRun()
+	r1.SetText("one")
+	r2, _ := para.AddRun()
+	r2.SetText("two")
+	r3, _ := para.AddRun()
+	r3.SetText("three")
+
+	if len(para.Runs()) != 3 {
+		t.Fatalf("expected 3 runs, got %d", len(para.Runs()))
+	}
+
+	para.ClearRuns()
+
+	if len(para.Runs()) != 0 {
+		t.Errorf("expected 0 runs after ClearRuns, got %d", len(para.Runs()))
+	}
+	if para.Text() != "" {
+		t.Errorf("expected empty text after ClearRuns, got %q", para.Text())
+	}
+}
+
+func TestParagraph_RemoveRun(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("first")
+	r2, _ := para.AddRun()
+	r2.SetText("second")
+	r3, _ := para.AddRun()
+	r3.SetText("third")
+
+	// Remove middle run
+	err := para.RemoveRun(1)
+	if err != nil {
+		t.Fatalf("RemoveRun(1) failed: %v", err)
+	}
+
+	runs := para.Runs()
+	if len(runs) != 2 {
+		t.Fatalf("expected 2 runs, got %d", len(runs))
+	}
+	if runs[0].Text() != "first" {
+		t.Errorf("expected first run text 'first', got %q", runs[0].Text())
+	}
+	if runs[1].Text() != "third" {
+		t.Errorf("expected second run text 'third', got %q", runs[1].Text())
+	}
+}
+
+func TestParagraph_RemoveRun_OutOfRange(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	para.AddRun()
+
+	tests := []struct {
+		name  string
+		index int
+	}{
+		{"negative index", -1},
+		{"equal to length", 1},
+		{"way out of range", 100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := para.RemoveRun(tt.index)
+			if err == nil {
+				t.Errorf("expected error for index %d, got nil", tt.index)
+			}
+		})
+	}
+}
+
+func TestParagraph_InsertRunAt(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("A")
+	r2, _ := para.AddRun()
+	r2.SetText("C")
+
+	// Insert at beginning
+	rBegin, err := para.InsertRunAt(0)
+	if err != nil {
+		t.Fatalf("InsertRunAt(0) failed: %v", err)
+	}
+	rBegin.SetText("Z")
+
+	// Insert in middle (between Z and A, which are now at 0 and 1)
+	rMid, err := para.InsertRunAt(2)
+	if err != nil {
+		t.Fatalf("InsertRunAt(2) failed: %v", err)
+	}
+	rMid.SetText("B")
+
+	// Insert at end
+	rEnd, err := para.InsertRunAt(len(para.Runs()))
+	if err != nil {
+		t.Fatalf("InsertRunAt(end) failed: %v", err)
+	}
+	rEnd.SetText("D")
+
+	runs := para.Runs()
+	if len(runs) != 5 {
+		t.Fatalf("expected 5 runs, got %d", len(runs))
+	}
+
+	expected := []string{"Z", "A", "B", "C", "D"}
+	for i, exp := range expected {
+		if runs[i].Text() != exp {
+			t.Errorf("run[%d]: expected %q, got %q", i, exp, runs[i].Text())
+		}
+	}
+}
+
+func TestParagraph_InsertRunAt_OutOfRange(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	tests := []struct {
+		name  string
+		index int
+	}{
+		{"negative index", -1},
+		{"beyond length", 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := para.InsertRunAt(tt.index)
+			if err == nil {
+				t.Errorf("expected error for index %d, got nil", tt.index)
+			}
+		})
+	}
+}

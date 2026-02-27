@@ -122,6 +122,16 @@ type Paragraph interface {
 
 	// SetBorderRight sets the right border.
 	SetBorderRight(border BorderStyle) error
+
+	// ClearRuns removes all runs from the paragraph.
+	ClearRuns()
+
+	// RemoveRun removes the run at the given index.
+	RemoveRun(index int) error
+
+	// InsertRunAt inserts a new empty run at the given index and returns it.
+	// Index must be in [0, len(Runs())].
+	InsertRunAt(index int) (Run, error)
 }
 
 // ParagraphBorders represents borders for a paragraph.
