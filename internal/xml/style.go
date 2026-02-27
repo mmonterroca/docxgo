@@ -70,6 +70,7 @@ type Style struct {
 	QFormat     *struct{}                 `xml:"w:qFormat,omitempty"`
 	ParaProps   *StyleParagraphProperties `xml:"w:pPr,omitempty"` // Must come before rPr per OOXML spec
 	RunProps    *RunProperties            `xml:"w:rPr,omitempty"`
+	TblPr       *TableStyleProperties     `xml:"w:tblPr,omitempty"`
 }
 
 // StyleName represents w:name element.
@@ -206,4 +207,26 @@ func NewCharacterStyle(styleID, name string, isDefault bool) *Style {
 		style.Default = &defaultVal
 	}
 	return style
+}
+
+// TableStyleProperties represents w:tblPr element inside a w:style of type table.
+type TableStyleProperties struct {
+	XMLName xml.Name           `xml:"w:tblPr"`
+	Borders *TableLevelBorders `xml:"w:tblBorders,omitempty"`
+	CellMar *TableCellMargins  `xml:"w:tblCellMar,omitempty"`
+}
+
+// TableCellMargins represents w:tblCellMar element.
+type TableCellMargins struct {
+	XMLName xml.Name         `xml:"w:tblCellMar"`
+	Top     *TableCellMargin `xml:"w:top,omitempty"`
+	Left    *TableCellMargin `xml:"w:left,omitempty"`
+	Bottom  *TableCellMargin `xml:"w:bottom,omitempty"`
+	Right   *TableCellMargin `xml:"w:right,omitempty"`
+}
+
+// TableCellMargin represents a single cell margin element.
+type TableCellMargin struct {
+	W    int    `xml:"w:w,attr"`
+	Type string `xml:"w:type,attr"`
 }

@@ -244,3 +244,23 @@ type CharacterStyle interface {
 	// SetSize sets the font size in half-points.
 	SetSize(halfPoints int) error
 }
+
+// TableStyleDef extends Style with table-specific properties.
+type TableStyleDef interface {
+	Style
+
+	// TableBorders returns the table-level borders for this style.
+	TableBorders() TableLevelBorders
+
+	// SetTableBorders sets the table-level borders for this style.
+	SetTableBorders(borders TableLevelBorders) error
+
+	// HasTableBorders returns whether this style defines table borders.
+	HasTableBorders() bool
+
+	// CellMargins returns the default cell margins for this style.
+	CellMargins() (top, left, bottom, right int)
+
+	// SetCellMargins sets the default cell margins for this style.
+	SetCellMargins(top, left, bottom, right int) error
+}

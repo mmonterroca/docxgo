@@ -8,16 +8,22 @@ import (
 	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
-// tableStyle implements domain.Style for table styles.
+// tableStyle implements domain.Style and domain.TableStyleDef for table styles.
 type tableStyle struct {
-	mu        sync.RWMutex
-	id        string
-	name      string
-	basedOn   string
-	next      string
-	font      domain.Font
-	isDefault bool
-	isBuiltIn bool
+	mu              sync.RWMutex
+	id              string
+	name            string
+	basedOn         string
+	next            string
+	font            domain.Font
+	isDefault       bool
+	isBuiltIn       bool
+	tableBorders    domain.TableLevelBorders
+	hasTableBorders bool
+	cellMarginTop   int
+	cellMarginLeft  int
+	cellMarginBottom int
+	cellMarginRight int
 }
 
 // newTableStyle creates a new table style.
@@ -125,4 +131,45 @@ func (ts *tableStyle) IsCustom() bool {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
 	return !ts.isBuiltIn
+}
+
+// TableBorders returns the table-level borders for this style.
+func (ts *tableStyle) TableBorders() domain.TableLevelBorders {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	return ts.tableBorders
+}
+
+// SetTableBorders sets the table-level borders for this style.
+func (ts *tableStyle) SetTableBorders(borders domain.TableLevelBorders) error {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.tableBorders = borders
+	ts.hasTableBorders = true
+	return nil
+}
+
+// HasTableBorders returns whether this style defines table borders.
+func (ts *tableStyle) HasTableBorders() bool {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	return ts.hasTableBorders
+}
+
+// CellMargins returns the default cell margins for this style.
+func (ts *tableStyle) CellMargins() (top, left, bottom, right int) {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	return ts.cellMarginTop, ts.cellMarginLeft, ts.cellMarginBottom, ts.cellMarginRight
+}
+
+// SetCellMargins sets the default cell margins for this style.
+func (ts *tableStyle) SetCellMargins(top, left, bottom, right int) error {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.cellMarginTop = top
+	ts.cellMarginLeft = left
+	ts.cellMarginBottom = bottom
+	ts.cellMarginRight = right
+	return nil
 }

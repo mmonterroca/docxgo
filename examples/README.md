@@ -173,17 +173,17 @@ cd 11_multi_section && go run main.go
 cd 12_read_and_modify && go run main.go
 ```
 
-### [basic/](./basic/) - Simple API Example
+### [13_themes/](./13_themes/) - Theme System (NEW!)
 **Status**: ✅ Fully functional  
-**Demonstrates**: Direct domain API (non-builder)
-- Simple document creation
-- Basic paragraphs and text runs
-- Text formatting
-- Basic tables
+**Demonstrates**: Complete theme system
+- 7 preset themes (Corporate, Startup, Modern, Fintech, Academic, TechPresentation, TechDarkMode)
+- Custom colors, fonts, spacing, and heading styles
+- Professional document generation with consistent branding
+- Theme application via `WithTheme()` builder option
 
 **Run:**
 ```bash
-cd basic && go run main.go
+cd 13_themes && go run main.go
 ```
 
 ## Testing All Examples
@@ -195,7 +195,7 @@ Run the included test script to verify all examples compile:
 ./test_all.sh
 ```
 
-This will test all 11 working examples and report results.
+This will test all 13 working examples and report results.
 
 ---
 
@@ -208,7 +208,7 @@ Execute all examples and generate .docx files:
 ./run_all_examples.sh
 ```
 
-**Output**: 8 .docx files in their respective directories
+**Output**: .docx files in their respective directories
 
 #### 🔍 Validate OOXML Integrity
 Verify the generated documents are valid:
@@ -245,9 +245,11 @@ examples/
 ├── 08_images/08_images_output.docx (4.2KB)
 ├── 09_advanced_tables/09_advanced_tables_output.docx (4.8KB)
 ├── 11_multi_section/11_multi_section_demo.docx (4.4KB)
-└── 12_read_and_modify/
-    ├── 12_showcase_original.docx (3.8KB)
-    └── 12_modified_document.docx (4.2KB)
+├── 12_read_and_modify/
+│   ├── 12_showcase_original.docx (3.8KB)
+│   └── 12_modified_document.docx (4.2KB)
+└── 13_themes/
+    └── theme_*.docx (7 themed documents)
 ```
 
 **All documents are ready to open in**:
