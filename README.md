@@ -29,9 +29,9 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 **Released**: February 2026
 **Test Coverage**: 50.7%
 
-**Latest Features**: Table Style Borders (dev), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
+**Latest Features**: Table Style Borders (v2.2.2), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
 
-> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0 and continued improvements through v2.2.1.
+> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0 and continued improvements through v2.2.2.
 
 ---
 
@@ -521,7 +521,13 @@ For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
 ### Release History
 
-- **v2.2.1** (January 2026 - Current Stable)
+- **v2.2.2** (February 2026 - Current Stable)
+  - Table style borders fix (TableGrid, PlainTable1 now render with visible borders)
+  - Grid column width calculation from cell widths
+  - Comprehensive documentation overhaul
+  - Restored 13_themes example
+
+- **v2.2.1** (January 2026)
   - Hyperlink RelationshipID preservation during round-trip
   - Drawing position serialization fix
   - Internal hyperlink anchor support
