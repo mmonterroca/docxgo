@@ -22,6 +22,7 @@
   - [Sections and Page Layout](#sections-and-page-layout)
   - [Styles](#styles)
 - [Examples](#examples)
+- [Template / Mail Merge](#template--mail-merge)
 - [Migration from v1](#migration-from-v1)
 
 ---
@@ -866,6 +867,102 @@ doc.SaveAs("output.docx")
 
 ---
 
+## Template / Mail Merge
+
+The `pkg/template` package provides mail merge functionality for replacing `{{placeholder}}` tokens in documents with actual data.
+
+### Basic Usage
+
+```go
+import (
+    docx "github.com/mmonterroca/docxgo/v2"
+    "github.com/mmonterroca/docxgo/v2/pkg/template"
+)
+
+// Open a template document
+doc, _ := docx.OpenDocument("invoice_template.docx")
+
+// Merge with data
+err := template.MergeTemplate(doc, template.MergeData{
+    "customer_name": "Acme Corp",
+    "invoice_date":  "2025-01-15",
+    "total":         "$1,234.56",
+})
+
+// Save the result
+doc.SaveAs("invoice_acme.docx")
+```
+
+### Finding Placeholders
+
+```go
+// Inspect all placeholders in a document
+names := template.PlaceholderNames(doc)
+// ["customer_name", "invoice_date", "total"]
+
+// Get detailed placeholder info with locations
+placeholders := template.FindPlaceholders(doc)
+for _, p := range placeholders {
+    fmt.Printf("%s at %v\n", p.Name, p.Location.Type)
+}
+```
+
+### Template Validation
+
+```go
+// Check for missing or unused keys before merging
+errors := template.ValidateTemplate(doc, data)
+for _, e := range errors {
+    fmt.Println(e.Error())
+    // [ERROR] missing_key: placeholder has no corresponding data key
+    // [WARNING] unused_key: data key has no corresponding placeholder
+}
+```
+
+### Custom Delimiters
+
+```go
+// Use ${key} instead of {{key}}
+opts := template.MergeOptions{
+    OpenDelimiter:  "${",
+    CloseDelimiter: "}",
+}
+err := template.MergeTemplate(doc, data, opts)
+```
+
+### Strict Mode
+
+```go
+// Return error if any placeholder has no matching data key
+opts := template.MergeOptions{
+    OpenDelimiter:  "{{",
+    CloseDelimiter: "}}",
+    StrictMode:     true,
+}
+err := template.MergeTemplate(doc, data, opts)
+// err: "template: missing keys: role, department"
+```
+
+### Batch Merge
+
+```go
+// Generate multiple documents from the same template
+customers := []template.MergeData{
+    {"name": "Alice", "email": "alice@example.com"},
+    {"name": "Bob", "email": "bob@example.com"},
+}
+
+for _, customer := range customers {
+    doc, _ := docx.OpenDocument("template.docx")
+    template.MergeTemplate(doc, customer)
+    doc.SaveAs(fmt.Sprintf("letter_%s.docx", customer["name"]))
+}
+```
+
+See [`examples/14_mail_merge/`](../examples/14_mail_merge/) for a complete working example.
+
+---
+
 ## 📚 See Also
 
 - [Examples Directory](../examples/) - Working code examples
@@ -875,5 +972,5 @@ doc.SaveAs("output.docx")
 
 ---
 
-**Last Updated**: October 27, 2025
-**Version**: 2.0.0-beta
+**Last Updated**: February 27, 2026
+**Version**: 2.3.0

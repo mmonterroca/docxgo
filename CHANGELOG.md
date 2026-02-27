@@ -1,3 +1,20 @@
+## v2.3.0 — 2026-02-27
+
+### Added
+- **Template / Mail Merge** (`pkg/template/`) — new package for document template processing
+  - `MergeTemplate()` — replace `{{placeholder}}` tokens with data values, preserving formatting
+  - `FindPlaceholders()` / `PlaceholderNames()` — detect all placeholders in body, tables, headers, footers
+  - `ValidateTemplate()` — check for missing/unused data keys before merging
+  - `ConsolidateRuns()` — merge adjacent runs with identical formatting to heal split placeholders
+  - Custom delimiter support (e.g., `${key}` instead of `{{key}}`)
+  - Strict mode for missing key error reporting
+  - Batch merge support (reopen template for each record)
+- `Paragraph.ClearRuns()`, `Paragraph.RemoveRun(index)`, `Paragraph.InsertRunAt(index)` — paragraph mutation APIs
+- `Run.Fields()`, `Run.Breaks()`, `Run.Image()` — run content inspection methods
+- Example 14: Mail merge invoice template with batch generation
+
+---
+
 ## v2.2.2 — 2026-02-26
 
 ### Fixed

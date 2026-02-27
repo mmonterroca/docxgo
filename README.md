@@ -18,6 +18,7 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 - ✅ **Thread-Safe** - Concurrent access supported with atomic operations
 - ✅ **Production Ready** - EXCELLENT error handling, comprehensive validation
 - ✅ **Well Documented** - Complete godoc, examples, and architecture docs
+- ✅ **Template / Mail Merge** - Placeholder detection, data merging, batch document generation
 - ✅ **Open Source** - MIT License, use in commercial and private projects
 
 ---
@@ -172,7 +173,7 @@ func main() {
 
 ### More Examples
 
-See the [`examples/`](examples/) directory for 13 comprehensive examples:
+See the [`examples/`](examples/) directory for 14 comprehensive examples:
 
 - **[01_basic](examples/01_basic/)** - Simple document with builder pattern
 - **[02_intermediate](examples/02_intermediate/)** - Professional product catalog
@@ -187,6 +188,7 @@ See the [`examples/`](examples/) directory for 13 comprehensive examples:
 - **[11_multi_section](examples/11_multi_section/)** - Multi-section layouts
 - **[12_read_and_modify](examples/12_read_and_modify/)** - Read and modify existing documents
 - **[13_themes](examples/13_themes/)** - Theme system with 7 preset themes
+- **[14_mail_merge](examples/14_mail_merge/)** - Template engine with mail merge and batch generation
 
 ---
 

@@ -186,6 +186,20 @@ cd 12_read_and_modify && go run main.go
 cd 13_themes && go run main.go
 ```
 
+### [14_mail_merge/](./14_mail_merge/) - Mail Merge / Templates (NEW!)
+**Status**: ✅ Fully functional  
+**Demonstrates**: Template engine with mail merge
+- Placeholder detection (`{{key}}` syntax) across body, tables, headers, footers
+- Template validation (missing/unused keys)
+- Single and batch mail merge
+- Formatting preservation during merge
+- Custom delimiter support
+
+**Run:**
+```bash
+cd 14_mail_merge && go run main.go
+```
+
 ## Testing All Examples
 
 ### Quick Test - Verify Compilation
@@ -195,7 +209,7 @@ Run the included test script to verify all examples compile:
 ./test_all.sh
 ```
 
-This will test all 13 working examples and report results.
+This will test all 14 working examples and report results.
 
 ---
 
