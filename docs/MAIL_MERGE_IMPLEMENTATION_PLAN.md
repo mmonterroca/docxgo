@@ -109,9 +109,9 @@ func (p *paragraph) InsertRunAt(index int) (domain.Run, error) {
 
 **Acceptance criteria:**
 
-- [ ] All 3 methods added to `domain.Paragraph` interface
-- [ ] Implementations handle edge cases (empty runs, boundary indices)
-- [ ] Tests pass with `go test ./domain/... ./internal/core/...`
+- [x] All 3 methods added to `domain.Paragraph` interface
+- [x] Implementations handle edge cases (empty runs, boundary indices)
+- [x] Tests pass with `go test ./domain/... ./internal/core/...`
 
 ---
 
@@ -183,11 +183,11 @@ func formatsEqual(a, b domain.Run) bool {
 
 **Acceptance criteria:**
 
-- [ ] `ConsolidateRuns()` correctly merges adjacent text runs with identical formatting
-- [ ] Runs with fields, breaks, or images are never merged
-- [ ] Text content is preserved exactly
-- [ ] Formatting from the first run in a merge group is applied
-- [ ] Tests cover edge cases (empty, single, all-different, all-same)
+- [x] `ConsolidateRuns()` correctly merges adjacent text runs with identical formatting
+- [x] Runs with fields, breaks, or images are never merged
+- [x] Text content is preserved exactly
+- [x] Formatting from the first run in a merge group is applied
+- [x] Tests cover edge cases (empty, single, all-different, all-same)
 
 ---
 
@@ -283,10 +283,10 @@ FindPlaceholders(doc, options):
 
 **Acceptance criteria:**
 
-- [ ] Finds placeholders in paragraphs, table cells, headers, and footers
-- [ ] Runs are consolidated before scanning (Phase 2 dependency)
-- [ ] Returns accurate location metadata for each placeholder
-- [ ] Custom delimiter support via options
+- [x] Finds placeholders in paragraphs, table cells, headers, and footers
+- [x] Runs are consolidated before scanning (Phase 2 dependency)
+- [x] Returns accurate location metadata for each placeholder
+- [x] Custom delimiter support via options
 
 ---
 
@@ -388,12 +388,12 @@ func walkParagraphs(doc domain.Document, fn func(para domain.Paragraph) error) e
 
 **Acceptance criteria:**
 
-- [ ] All placeholders in body, tables, headers, footers are replaced
-- [ ] Formatting (bold, italic, color, font, size) is preserved on replaced text
-- [ ] Cross-run placeholders are handled correctly
-- [ ] StrictMode correctly reports missing keys
-- [ ] ValidateTemplate returns actionable errors
-- [ ] No panics on edge cases (empty doc, no runs, nil data)
+- [x] All placeholders in body, tables, headers, footers are replaced
+- [x] Formatting (bold, italic, color, font, size) is preserved on replaced text
+- [x] Cross-run placeholders are handled correctly
+- [x] StrictMode correctly reports missing keys
+- [x] ValidateTemplate returns actionable errors
+- [x] No panics on edge cases (empty doc, no runs, nil data)
 
 ---
 
@@ -454,9 +454,9 @@ This demonstrates the real-world workflow: designers create templates in Word, d
 
 **Acceptance criteria:**
 
-- [ ] Example runs and produces a valid `.docx` file
-- [ ] `go doc ./pkg/template/` shows clean API documentation
-- [ ] Package is importable as `github.com/mmonterroca/docxgo/v2/pkg/template`
+- [x] Example runs and produces a valid `.docx` file
+- [x] `go doc ./pkg/template/` shows clean API documentation
+- [x] Package is importable as `github.com/mmonterroca/docxgo/v2/pkg/template`
 
 ---
 
@@ -483,10 +483,10 @@ This demonstrates the real-world workflow: designers create templates in Word, d
 
 **Acceptance criteria:**
 
-- [ ] All integration tests pass
-- [ ] `go test ./...` passes (all packages)
-- [ ] Documentation accurately reflects the new feature
-- [ ] No regressions in existing tests
+- [x] All integration tests pass
+- [x] `go test ./...` passes (all packages)
+- [x] Documentation accurately reflects the new feature
+- [x] No regressions in existing tests
 
 ---
 
@@ -563,9 +563,9 @@ Each phase produces a working, testable increment. Phases cannot be parallelized
 
 ## Success Metrics
 
-- [ ] `go test ./...` — all tests pass (existing + new)
-- [ ] Example 14 generates valid `.docx` files that open in Word
-- [ ] Placeholders in body, tables, headers, and footers are all replaced
-- [ ] Formatting is preserved on all replaced text
-- [ ] Zero external dependencies maintained
-- [ ] API is clean: 4 public functions, 3 public types
+- [x] `go test ./...` — all tests pass (existing + new)
+- [x] Example 14 generates valid `.docx` files that open in Word
+- [x] Placeholders in body, tables, headers, and footers are all replaced
+- [x] Formatting is preserved on all replaced text
+- [x] Zero external dependencies maintained
+- [x] API is clean: 6 public functions, 5 public types
