@@ -701,3 +701,174 @@ func TestTableSerializer_CellBorders(t *testing.T) {
 		}
 	}
 }
+
+func TestTableSerializer_GridColumnWidths(t *testing.T) {
+	t.Run("derives widths from first row cells", func(t *testing.T) {
+		doc := core.NewDocument()
+		table, _ := doc.AddTable(2, 3)
+
+		row, _ := table.Row(0)
+		c0, _ := row.Cell(0)
+		c0.SetWidth(2000)
+		c1, _ := row.Cell(1)
+		c1.SetWidth(3000)
+		c2, _ := row.Cell(2)
+		c2.SetWidth(4000)
+
+		ser := serializer.NewTableSerializer()
+		xmlTable := ser.Serialize(table)
+
+		if xmlTable.Grid == nil {
+			t.Fatal("expected grid to be set")
+		}
+		if len(xmlTable.Grid.Cols) != 3 {
+			t.Fatalf("expected 3 grid columns, got %d", len(xmlTable.Grid.Cols))
+		}
+
+		expected := []int{2000, 3000, 4000}
+		for i, col := range xmlTable.Grid.Cols {
+			if col.W == nil {
+				t.Errorf("column %d: expected width to be set", i)
+				continue
+			}
+			if *col.W != expected[i] {
+				t.Errorf("column %d: expected width %d, got %d", i, expected[i], *col.W)
+			}
+		}
+	})
+
+	t.Run("omits widths when cells have no explicit width", func(t *testing.T) {
+		doc := core.NewDocument()
+		table, _ := doc.AddTable(1, 2)
+
+		ser := serializer.NewTableSerializer()
+		xmlTable := ser.Serialize(table)
+
+		if xmlTable.Grid == nil {
+			t.Fatal("expected grid to be set")
+		}
+		for i, col := range xmlTable.Grid.Cols {
+			if col.W != nil {
+				t.Errorf("column %d: expected width to be omitted (nil), got %d", i, *col.W)
+			}
+		}
+	})
+
+	t.Run("distributes spanned cell width across grid columns", func(t *testing.T) {
+		doc := core.NewDocument()
+		table, _ := doc.AddTable(1, 4)
+
+		row, _ := table.Row(0)
+		// Merge first two cells horizontally (span=2)
+		c0, _ := row.Cell(0)
+		c0.SetWidth(6000)
+		c0.Merge(2, 1) // merge 2 cols, 1 row
+
+		c2, _ := row.Cell(2)
+		c2.SetWidth(2000)
+		c3, _ := row.Cell(3)
+		c3.SetWidth(1000)
+
+		ser := serializer.NewTableSerializer()
+		xmlTable := ser.Serialize(table)
+
+		if xmlTable.Grid == nil {
+			t.Fatal("expected grid to be set")
+		}
+		if len(xmlTable.Grid.Cols) != 4 {
+			t.Fatalf("expected 4 grid columns, got %d", len(xmlTable.Grid.Cols))
+		}
+
+		// 6000 / 2 = 3000 per spanned column
+		expected := []int{3000, 3000, 2000, 1000}
+		for i, col := range xmlTable.Grid.Cols {
+			if col.W == nil {
+				t.Errorf("column %d: expected width to be set", i)
+				continue
+			}
+			if *col.W != expected[i] {
+				t.Errorf("column %d: expected width %d, got %d", i, expected[i], *col.W)
+			}
+		}
+	})
+}
+
+func TestDocumentSerializer_TableStyleBorders(t *testing.T) {
+	doc := core.NewDocument()
+
+	// The built-in style manager should include TableGrid with borders
+	sm := doc.StyleManager()
+
+	ser := serializer.NewDocumentSerializer()
+	xmlStyles := ser.SerializeStyles(sm)
+
+	// Find the TableGrid style
+	var tableGridStyle *xmlstructs.Style
+	for _, s := range xmlStyles.Styles {
+		if s.StyleID == "TableGrid" {
+			tableGridStyle = s
+			break
+		}
+	}
+
+	if tableGridStyle == nil {
+		t.Fatal("expected TableGrid style to be present in serialized styles")
+	}
+
+	if tableGridStyle.Type != "table" {
+		t.Errorf("expected TableGrid type to be 'table', got %q", tableGridStyle.Type)
+	}
+
+	if tableGridStyle.TblPr == nil {
+		t.Fatal("expected TableGrid to have w:tblPr element")
+	}
+
+	if tableGridStyle.TblPr.Borders == nil {
+		t.Fatal("expected TableGrid w:tblPr to have w:tblBorders element")
+	}
+
+	borders := tableGridStyle.TblPr.Borders
+
+	// TableGrid should have all 6 border sides (top, left, bottom, right, insideH, insideV)
+	sides := map[string]*xmlstructs.Border{
+		"top":     borders.Top,
+		"left":    borders.Left,
+		"bottom":  borders.Bottom,
+		"right":   borders.Right,
+		"insideH": borders.InsideH,
+		"insideV": borders.InsideV,
+	}
+
+	for name, border := range sides {
+		if border == nil {
+			t.Errorf("expected %s border to be set", name)
+			continue
+		}
+		if border.Val != "single" {
+			t.Errorf("%s border: expected style 'single', got %q", name, border.Val)
+		}
+		if border.Sz != 4 {
+			t.Errorf("%s border: expected width 4, got %d", name, border.Sz)
+		}
+	}
+
+	// Verify XML output contains expected elements
+	data, err := stdxml.MarshalIndent(tableGridStyle, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal TableGrid style: %v", err)
+	}
+	xmlStr := string(data)
+
+	if !contains(xmlStr, "<w:tblPr>") {
+		t.Error("expected <w:tblPr> in serialized TableGrid style")
+	}
+	if !contains(xmlStr, "<w:tblBorders>") {
+		t.Error("expected <w:tblBorders> in serialized TableGrid style")
+	}
+	if !contains(xmlStr, "<w:insideH") {
+		t.Error("expected <w:insideH> border in serialized TableGrid style")
+	}
+	if !contains(xmlStr, "<w:insideV") {
+		t.Error("expected <w:insideV> border in serialized TableGrid style")
+	}
+}

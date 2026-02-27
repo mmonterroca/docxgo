@@ -75,8 +75,8 @@ func createThemedDocument(theme themes.Theme) error {
 		docx.WithAuthor("go-docx Themes"),
 	)
 
-	// Build the document first, then add content using the domain API
-	// so the theme styles are fully applied.
+	// Add initial content via builder, then Build() to get the document.
+	// After building, use the domain API to apply styles and add more content.
 	builder.AddParagraph().
 		Text("Sample Document").
 		End()
@@ -286,7 +286,7 @@ func createComparisonDocument(allThemes []themes.Theme) error {
 		codePara.SetStyle(domain.StyleIDListParagraph)
 		codeRun, _ := codePara.AddRun()
 		codeRun.SetFont(domain.Font{Name: "Courier New"})
-		codeRun.AddText(fmt.Sprintf("docx.NewDocumentBuilder(docx.WithTheme(themes.%s))", capitalizeFirst(theme.Name())))
+		codeRun.AddText("docx.NewDocumentBuilder(docx.WithTheme(theme))")
 
 		// Colors info
 		colors := theme.Colors()
@@ -340,16 +340,4 @@ func createComparisonDocument(allThemes []themes.Theme) error {
 	}
 
 	return doc.SaveAs("theme_comparison.docx")
-}
-
-// capitalizeFirst capitalizes the first letter of a string.
-func capitalizeFirst(s string) string {
-	if len(s) == 0 {
-		return s
-	}
-	runes := []rune(s)
-	if runes[0] >= 'a' && runes[0] <= 'z' {
-		runes[0] -= 32
-	}
-	return string(runes)
 }

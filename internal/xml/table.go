@@ -155,7 +155,7 @@ type TableLevelBorders struct {
 type Border struct {
 	Val   string `xml:"w:val,attr"`
 	Sz    int    `xml:"w:sz,attr,omitempty"`
-	Space int    `xml:"w:space,attr"`
+	Space int    `xml:"w:space,attr,omitempty"`
 	Color string `xml:"w:color,attr,omitempty"`
 }
 

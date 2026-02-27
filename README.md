@@ -314,7 +314,7 @@ github.com/mmonterroca/docxgo/v2/
 - **0 Linter Warnings** (golangci-lint with 30+ linters)
 - Complete godoc documentation
 
-### � Planned Features
+### Planned Features
 
 - Mail merge and templates
 - Comments and change tracking

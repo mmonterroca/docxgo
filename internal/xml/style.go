@@ -70,7 +70,7 @@ type Style struct {
 	QFormat     *struct{}                 `xml:"w:qFormat,omitempty"`
 	ParaProps   *StyleParagraphProperties `xml:"w:pPr,omitempty"` // Must come before rPr per OOXML spec
 	RunProps    *RunProperties            `xml:"w:rPr,omitempty"`
-	TblPr       *TableStyleProperties      `xml:"w:tblPr,omitempty"`
+	TblPr       *TableStyleProperties     `xml:"w:tblPr,omitempty"`
 }
 
 // StyleName represents w:name element.
