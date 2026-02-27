@@ -5,6 +5,7 @@ import (
 	"log"
 
 	docx "github.com/mmonterroca/docxgo/v2"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func main() {
@@ -113,8 +114,9 @@ func main() {
 		FontSize(14).
 		End()
 
-	// Create a simple 3x3 table
+	// Create a simple 3x3 table with grid borders
 	builder.AddTable(3, 3).
+		Style(domain.TableStyleGrid).
 		Row(0).
 		Cell(0).Text("Header 1").Bold().End().
 		Cell(1).Text("Header 2").Bold().End().

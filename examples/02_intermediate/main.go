@@ -5,6 +5,7 @@ import (
 	"log"
 
 	docx "github.com/mmonterroca/docxgo/v2"
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 func main() {
@@ -78,6 +79,7 @@ func main() {
 
 	// Product table (4 rows x 3 cols)
 	builder.AddTable(4, 3).
+		Style(domain.TableStyleGrid).
 		Row(0).
 		Cell(0).Text("Product").Bold().End().
 		Cell(1).Text("Description").Bold().End().
@@ -142,6 +144,7 @@ func main() {
 	builder.AddParagraph().End()
 
 	builder.AddTable(4, 3).
+		Style(domain.TableStyleGrid).
 		Row(0).
 		Cell(0).Text("Product").Bold().End().
 		Cell(1).Text("Description").Bold().End().
@@ -181,6 +184,7 @@ func main() {
 	builder.AddParagraph().End()
 
 	builder.AddTable(4, 3).
+		Style(domain.TableStyleGrid).
 		Row(0).
 		Cell(0).Text("Product").Bold().End().
 		Cell(1).Text("Description").Bold().End().
