@@ -125,18 +125,35 @@ func (sm *styleManager) initializeBuiltInStyles() {
 //
 //nolint:errcheck // Built-in styles use hardcoded valid values
 func (sm *styleManager) createBuiltInTableStyles() {
+	// Single border: 4 eighths-of-a-point (standard 0.5pt line)
+	singleBorder := domain.BorderStyle{
+		Style: domain.BorderSingle,
+		Width: 4,
+	}
+
+	// All-around + inside grid borders (used by TableGrid)
+	gridBorders := domain.TableLevelBorders{
+		Top:     singleBorder,
+		Left:    singleBorder,
+		Bottom:  singleBorder,
+		Right:   singleBorder,
+		InsideH: singleBorder,
+		InsideV: singleBorder,
+	}
+
 	styles := []struct {
-		id   string
-		name string
+		id      string
+		name    string
+		borders *domain.TableLevelBorders
 	}{
-		{domain.StyleIDTableNormal, "Table Normal"},
-		{domain.StyleIDTableGrid, "Table Grid"},
-		{domain.StyleIDTablePlain, "Plain Table 1"},
-		{domain.StyleIDTableMediumShading, "Medium Shading 1"},
-		{domain.StyleIDTableLightShading, "Light Shading"},
-		{domain.StyleIDTableColorful, "Colorful List"},
-		{domain.StyleIDTableAccent1, "Medium Shading 1 Accent 1"},
-		{domain.StyleIDTableAccent2, "Medium Shading 1 Accent 2"},
+		{domain.StyleIDTableNormal, "Table Normal", nil},
+		{domain.StyleIDTableGrid, "Table Grid", &gridBorders},
+		{domain.StyleIDTablePlain, "Plain Table 1", &gridBorders},
+		{domain.StyleIDTableMediumShading, "Medium Shading 1", nil},
+		{domain.StyleIDTableLightShading, "Light Shading", nil},
+		{domain.StyleIDTableColorful, "Colorful List", nil},
+		{domain.StyleIDTableAccent1, "Medium Shading 1 Accent 1", nil},
+		{domain.StyleIDTableAccent2, "Medium Shading 1 Accent 2", nil},
 	}
 
 	for idx, def := range styles {
@@ -146,6 +163,9 @@ func (sm *styleManager) createBuiltInTableStyles() {
 		}
 		if idx == 0 { // Table Normal is the default
 			style.SetDefault(true)
+		}
+		if def.borders != nil {
+			style.SetTableBorders(*def.borders)
 		}
 		sm.styles[def.id] = style
 	}

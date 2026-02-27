@@ -709,12 +709,52 @@ func (s *TableSerializer) serializeTableProperties(table domain.Table) *xml.Tabl
 }
 
 func (s *TableSerializer) serializeGrid(table domain.Table) *xml.TableGrid {
+	colCount := table.ColumnCount()
 	grid := &xml.TableGrid{
-		Cols: make([]*xml.GridCol, table.ColumnCount()),
+		Cols: make([]*xml.GridCol, colCount),
 	}
 
-	for i := 0; i < table.ColumnCount(); i++ {
-		grid.Cols[i] = &xml.GridCol{W: intPtr(0)}
+	// Try to derive column widths from the first row's cell widths.
+	// If cells have explicit widths, use them for the grid columns;
+	// otherwise fall back to nil (omitted) so Word auto-calculates.
+	if table.RowCount() > 0 {
+		if firstRow, err := table.Row(0); err == nil {
+			cells := firstRow.Cells()
+			colIdx := 0
+			for _, cell := range cells {
+				if cell.IsHorizontallyMergedContinuation() {
+					continue
+				}
+				w := cell.Width()
+				span := cell.GridSpan()
+				if span < 1 {
+					span = 1
+				}
+				// Distribute the cell width evenly across spanned columns.
+				perCol := 0
+				if w > 0 && span > 0 {
+					perCol = w / span
+				}
+				for j := 0; j < span && colIdx < colCount; j++ {
+					if perCol > 0 {
+						grid.Cols[colIdx] = &xml.GridCol{W: intPtr(perCol)}
+					} else {
+						grid.Cols[colIdx] = &xml.GridCol{}
+					}
+					colIdx++
+				}
+			}
+			// Fill remaining columns (safety).
+			for ; colIdx < colCount; colIdx++ {
+				grid.Cols[colIdx] = &xml.GridCol{}
+			}
+			return grid
+		}
+	}
+
+	// Fallback: no rows or error – omit widths so Word auto-calculates.
+	for i := 0; i < colCount; i++ {
+		grid.Cols[i] = &xml.GridCol{}
 	}
 
 	return grid
@@ -1255,7 +1295,7 @@ func (s *DocumentSerializer) serializeStyle(style domain.Style) *xml.Style {
 	case domain.StyleTypeCharacter:
 		xmlStyle.RunProps = s.serializeRunStyleProperties(style)
 	case domain.StyleTypeTable:
-		// Table styles are handled differently, no props to serialize here
+		xmlStyle.TblPr = s.serializeTableStyleProperties(style)
 	case domain.StyleTypeNumbering:
 		// Numbering styles are handled differently, no props to serialize here
 	}
@@ -1405,6 +1445,112 @@ func (s *DocumentSerializer) serializeRunStyleProperties(style domain.Style) *xm
 		return nil
 	}
 	return props
+}
+
+func (s *DocumentSerializer) serializeTableStyleProperties(style domain.Style) *xml.TableStyleProperties {
+	tsd, ok := style.(domain.TableStyleDef)
+	if !ok {
+		return nil
+	}
+
+	props := &xml.TableStyleProperties{}
+	hasProps := false
+
+	// Table borders
+	if tsd.HasTableBorders() {
+		borders := tsd.TableBorders()
+		xmlBorders := &xml.TableLevelBorders{}
+		hasBorders := false
+
+		if borders.Top.Style != domain.BorderNone {
+			xmlBorders.Top = s.serializeStyleBorder(borders.Top)
+			hasBorders = true
+		}
+		if borders.Left.Style != domain.BorderNone {
+			xmlBorders.Left = s.serializeStyleBorder(borders.Left)
+			hasBorders = true
+		}
+		if borders.Bottom.Style != domain.BorderNone {
+			xmlBorders.Bottom = s.serializeStyleBorder(borders.Bottom)
+			hasBorders = true
+		}
+		if borders.Right.Style != domain.BorderNone {
+			xmlBorders.Right = s.serializeStyleBorder(borders.Right)
+			hasBorders = true
+		}
+		if borders.InsideH.Style != domain.BorderNone {
+			xmlBorders.InsideH = s.serializeStyleBorder(borders.InsideH)
+			hasBorders = true
+		}
+		if borders.InsideV.Style != domain.BorderNone {
+			xmlBorders.InsideV = s.serializeStyleBorder(borders.InsideV)
+			hasBorders = true
+		}
+
+		if hasBorders {
+			props.Borders = xmlBorders
+			hasProps = true
+		}
+	}
+
+	// Cell margins
+	top, left, bottom, right := tsd.CellMargins()
+	if top > 0 || left > 0 || bottom > 0 || right > 0 {
+		props.CellMar = &xml.TableCellMargins{}
+		if top > 0 {
+			props.CellMar.Top = &xml.TableCellMargin{W: top, Type: constants.WidthTypeDXA}
+		}
+		if left > 0 {
+			props.CellMar.Left = &xml.TableCellMargin{W: left, Type: constants.WidthTypeDXA}
+		}
+		if bottom > 0 {
+			props.CellMar.Bottom = &xml.TableCellMargin{W: bottom, Type: constants.WidthTypeDXA}
+		}
+		if right > 0 {
+			props.CellMar.Right = &xml.TableCellMargin{W: right, Type: constants.WidthTypeDXA}
+		}
+		hasProps = true
+	}
+
+	if !hasProps {
+		return nil
+	}
+	return props
+}
+
+func (s *DocumentSerializer) serializeStyleBorder(border domain.BorderStyle) *xml.Border {
+	b := &xml.Border{
+		Val: s.borderLineStyleToString(border.Style),
+		Sz:  border.Width,
+	}
+	// Use "auto" for zero-value color (black), otherwise convert to hex
+	if border.Color == (domain.Color{}) {
+		b.Color = "auto"
+	} else {
+		b.Color = color.ToHex(border.Color)
+	}
+	return b
+}
+
+func (s *DocumentSerializer) borderLineStyleToString(style domain.BorderLineStyle) string {
+	switch style {
+	case domain.BorderNone:
+		return "none"
+	case domain.BorderSingle:
+		return "single"
+	case domain.BorderDashed:
+		return "dashed"
+	case domain.BorderDotted:
+		return "dotted"
+	case domain.BorderDouble:
+		return "double"
+	case domain.BorderThick:
+		return "thick"
+	case domain.BorderTriple:
+		return "triple"
+	default:
+		return "none"
+	}
 }
 
 func (s *DocumentSerializer) styleTypeToString(t domain.StyleType) string {

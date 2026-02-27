@@ -37,11 +37,12 @@ type Table struct {
 
 // TableProperties represents w:tblPr element.
 type TableProperties struct {
-	XMLName xml.Name       `xml:"w:tblPr"`
-	Style   *TableStyle    `xml:"w:tblStyle,omitempty"`
-	Width   *TableWidth    `xml:"w:tblW,omitempty"`
-	Look    *TableLook     `xml:"w:tblLook,omitempty"`
-	Jc      *Justification `xml:"w:jc,omitempty"`
+	XMLName xml.Name            `xml:"w:tblPr"`
+	Style   *TableStyle         `xml:"w:tblStyle,omitempty"`
+	Width   *TableWidth         `xml:"w:tblW,omitempty"`
+	Borders *TableLevelBorders  `xml:"w:tblBorders,omitempty"`
+	Look    *TableLook          `xml:"w:tblLook,omitempty"`
+	Jc      *Justification      `xml:"w:jc,omitempty"`
 }
 
 // TableStyle represents w:tblStyle element.
@@ -139,10 +140,22 @@ type TableBorders struct {
 	Right   *Border  `xml:"w:right,omitempty"`
 }
 
+// TableLevelBorders represents w:tblBorders element (used in table properties and table styles).
+type TableLevelBorders struct {
+	XMLName xml.Name `xml:"w:tblBorders"`
+	Top     *Border  `xml:"w:top,omitempty"`
+	Left    *Border  `xml:"w:left,omitempty"`
+	Bottom  *Border  `xml:"w:bottom,omitempty"`
+	Right   *Border  `xml:"w:right,omitempty"`
+	InsideH *Border  `xml:"w:insideH,omitempty"`
+	InsideV *Border  `xml:"w:insideV,omitempty"`
+}
+
 // Border represents a border element.
 type Border struct {
 	Val   string `xml:"w:val,attr"`
 	Sz    int    `xml:"w:sz,attr,omitempty"`
+	Space int    `xml:"w:space,attr"`
 	Color string `xml:"w:color,attr,omitempty"`
 }
 

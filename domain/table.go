@@ -167,12 +167,22 @@ const (
 	VerticalAlignBottom                          // Align to bottom of cell
 )
 
-// TableBorders represents borders for a table or cell.
+// TableBorders represents borders for a table cell.
 type TableBorders struct {
 	Top    BorderStyle
 	Left   BorderStyle
 	Bottom BorderStyle
 	Right  BorderStyle
+}
+
+// TableLevelBorders represents borders for a table style (includes inside borders).
+type TableLevelBorders struct {
+	Top     BorderStyle
+	Left    BorderStyle
+	Bottom  BorderStyle
+	Right   BorderStyle
+	InsideH BorderStyle
+	InsideV BorderStyle
 }
 
 // BorderStyle represents a border's appearance.
