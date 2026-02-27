@@ -1,3 +1,21 @@
+## v2.2.2 — 2026-02-26
+
+### Fixed
+- Table style borders not rendering in Word: styles like `TableGrid` now emit proper `w:tblPr > w:tblBorders` in `styles.xml` (#15)
+- Grid column width calculation: derive widths from first row cells instead of emitting `w:w="0"`
+
+### Added
+- `TableStyleDef` interface for table-specific style properties (borders, cell margins)
+- `TableLevelBorders` struct with `InsideH`/`InsideV` for inner grid borders
+- Example 13_themes restored with full v2 API (7 preset themes)
+
+### Changed
+- Examples 01_basic and 02_intermediate now use `Style(domain.TableStyleGrid)` for visible table borders
+- Comprehensive documentation overhaul across all docs files (#14)
+- CHANGELOG.md now contains complete version history (v2.0.0-beta through v2.2.2)
+
+---
+
 ## v2.2.1 — 2026-01-22
 
 ### Fixed

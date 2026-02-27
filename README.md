@@ -24,9 +24,9 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 
 ## Status
 
-**Current Version**: v2.2.1 (Stable)
+**Current Version**: v2.2.2 (Stable)
 **Stability**: Production Ready
-**Released**: January 2026
+**Released**: February 2026
 **Test Coverage**: 50.7%
 
 **Latest Features**: Table Style Borders (dev), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
