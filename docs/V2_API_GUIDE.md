@@ -860,5 +860,5 @@ doc.SaveAs("output.docx")
 
 ---
 
-**Last Updated**: October 27, 2025  
-**Version**: 2.0.0-beta
+**Last Updated**: February 2026  
+**Version**: 2.2.2
