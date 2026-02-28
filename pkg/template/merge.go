@@ -94,7 +94,7 @@ func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Reg
 	var missing []string
 	runs := para.Runs()
 
-	for _, run := range runs {
+	for i, run := range runs {
 		text := run.Text()
 		if !pattern.MatchString(text) {
 			continue
@@ -111,6 +111,19 @@ func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Reg
 
 		if newText != text {
 			run.SetText(newText)
+			// Clear fields on this run if it has any.
+			if len(run.Fields()) > 0 {
+				run.ClearFields()
+			}
+			// Word MERGEFIELDs are read as two adjacent runs:
+			//   Run[i-1]: text="" + Field (fldChar begin/instrText/separate/end)
+			//   Run[i]:   text="«Placeholder»" (display text, no fields)
+			// The field lives in the preceding run while the replaceable text
+			// is in the current run. Clear the field from the preceding run so
+			// the serializer does not re-emit the original MERGEFIELD XML.
+			if i > 0 && len(runs[i-1].Fields()) > 0 && runs[i-1].Text() == "" {
+				runs[i-1].ClearFields()
+			}
 		}
 	}
 

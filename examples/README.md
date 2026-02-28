@@ -5,8 +5,10 @@ This directory contains practical, runnable examples demonstrating go-docx v2 ca
 ## ✅ Working Examples (v2)
 
 ### [01_basic/](./01_basic/) - Basic Builder Pattern
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Document creation with fluent builder API
+
 - DocumentBuilder with options (title, author, font, margins)
 - Fluent paragraph building (Text, Bold, Italic, Color, FontSize, Alignment)
 - Mixed formatting in paragraphs
@@ -14,13 +16,16 @@ This directory contains practical, runnable examples demonstrating go-docx v2 ca
 - Predefined color constants
 
 **Run:**
+
 ```bash
 cd 01_basic && go run main.go
 ```
 
 ### [02_intermediate/](./02_intermediate/) - Product Catalog
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Professional multi-section document
+
 - Professional document layout
 - Multiple sections with headings
 - Product tables (3 tables with different products)
@@ -28,26 +33,32 @@ cd 01_basic && go run main.go
 - Document metadata (title, author, subject)
 
 **Run:**
+
 ```bash
 cd 02_intermediate && go run main.go
 ```
 
 ### [03_toc/](./03_toc/) - Table of Contents (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Automatic Table of Contents generation
+
 - Cover page with Title and Subtitle styles
 - TOC field configured for Heading 1 and Heading 2
 - Placeholder result so the TOC looks polished before updating
 - Chapters, sub-sections, and appendix content driven by heading styles
 
 **Run:**
+
 ```bash
 cd 03_toc && go run main.go
 ```
 
 ### [04_fields/](./04_fields/) - Fields System (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Complete field system
+
 - Page numbers and page count fields
 - Table of Contents (TOC) with custom options
 - Hyperlinks to external URLs
@@ -55,26 +66,32 @@ cd 03_toc && go run main.go
 - Page breaks
 
 **Run:**
+
 ```bash
 cd 04_fields && go run main.go
 ```
 
 ### [05_styles/](./05_styles/) - Style Management (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Built-in style system
+
 - 40+ built-in paragraph styles (Normal, Heading1-9, Title, Subtitle, etc.)
 - Character-level formatting (bold, italic, color, font size)
 - Mixed formatting within paragraphs
 - Quote and list paragraph styles
 
 **Run:**
+
 ```bash
 cd 05_styles && go run main.go
 ```
 
 ### [06_sections/](./06_sections/) - Sections and Page Layout (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Advanced page layout
+
 - Custom page sizes (A4, Letter, Legal, etc.)
 - Page orientation (portrait, landscape)
 - Custom margins
@@ -82,13 +99,16 @@ cd 05_styles && go run main.go
 - Multi-page documents
 
 **Run:**
+
 ```bash
 cd 06_sections && go run main.go
 ```
 
 ### [07_advanced/](./07_advanced/) - Advanced Integration (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: All Phase 6 features combined
+
 - Professional cover page
 - Table of Contents with hyperlinks
 - Headers and footers
@@ -99,13 +119,16 @@ cd 06_sections && go run main.go
 - Quotes and emphasis
 
 **Run:**
+
 ```bash
 cd 07_advanced && go run main.go
 ```
 
 ### [08_images/](./08_images/) - Image Insertion
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Complete image handling
+
 - 9 image formats (PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP, ICO, EMF)
 - Inline and floating images
 - Custom dimensions (pixels, inches, EMUs)
@@ -113,13 +136,16 @@ cd 07_advanced && go run main.go
 - Automatic format detection
 
 **Run:**
+
 ```bash
 cd 08_images && go run main.go
 ```
 
 ### [09_advanced_tables/](./09_advanced_tables/) - Advanced Table Features
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Complete table manipulation
+
 - Cell merging (horizontal colspan, vertical rowspan)
 - Nested tables (tables within cells)
 - 8 built-in table styles
@@ -127,26 +153,32 @@ cd 08_images && go run main.go
 - Cell alignment and styling
 
 **Run:**
+
 ```bash
 cd 09_advanced_tables && go run main.go
 ```
 
 ### [10_paragraph_spacing/](./10_paragraph_spacing/) - Paragraph Spacing (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Line and paragraph spacing controls
+
 - Set spacing before and after paragraphs (twips)
 - Configure exact vs. at-least line spacing rules
 - Mix typography blocks for comparison
 - Save finished document ready for inspection
 
 **Run:**
+
 ```bash
 cd 10_paragraph_spacing && go run main.go
 ```
 
 ### [11_multi_section/](./11_multi_section/) - Multi-Section Layouts (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Independent layouts per section
+
 - Section breaks (Next Page, Continuous)
 - Per-section headers and footers
 - Portrait ↔ landscape transitions
@@ -154,13 +186,16 @@ cd 10_paragraph_spacing && go run main.go
 - Dynamic page numbering maintained across sections
 
 **Run:**
+
 ```bash
 cd 11_multi_section && go run main.go
 ```
 
 ### [12_read_and_modify/](./12_read_and_modify/) - Read and Modify Documents (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Complete read/modify/write workflow
+
 - Create comprehensive showcase document with all features
 - Read existing .docx files using OpenDocument()
 - Inspect document content (paragraphs, tables, text)
@@ -169,26 +204,32 @@ cd 11_multi_section && go run main.go
 - Preserve existing formatting and content
 
 **Run:**
+
 ```bash
 cd 12_read_and_modify && go run main.go
 ```
 
 ### [13_themes/](./13_themes/) - Theme System (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Complete theme system
+
 - 7 preset themes (Corporate, Startup, Modern, Fintech, Academic, TechPresentation, TechDarkMode)
 - Custom colors, fonts, spacing, and heading styles
 - Professional document generation with consistent branding
 - Theme application via `WithTheme()` builder option
 
 **Run:**
+
 ```bash
 cd 13_themes && go run main.go
 ```
 
 ### [14_mail_merge/](./14_mail_merge/) - Mail Merge / Templates (NEW!)
-**Status**: ✅ Fully functional  
+
+**Status**: ✅ Fully functional
 **Demonstrates**: Template engine with mail merge
+
 - Placeholder detection (`{{key}}` syntax) across body, tables, headers, footers
 - Template validation (missing/unused keys)
 - Single and batch mail merge
@@ -196,13 +237,32 @@ cd 13_themes && go run main.go
 - Custom delimiter support
 
 **Run:**
+
 ```bash
 cd 14_mail_merge && go run main.go
+```
+
+### [15_external_template/](./15_external_template/) - External Word Template (NEW!)
+
+**Status**: ✅ Fully functional
+**Demonstrates**: Reading an existing Word document as a mail merge template
+
+- Opens a real `.docx` file created in Microsoft Word with MERGEFIELD fields
+- Custom delimiters (`«»` guillemet syntax) for Word-style merge fields
+- Placeholder detection, validation, and batch merge
+- Preserves original document formatting and structure
+- Includes `reminder_letter.docx` — a real Word template with 20 merge fields
+
+**Run:**
+
+```bash
+cd 15_external_template && go run main.go
 ```
 
 ## Testing All Examples
 
 ### Quick Test - Verify Compilation
+
 Run the included test script to verify all examples compile:
 
 ```bash
@@ -216,6 +276,7 @@ This will test all 14 working examples and report results.
 ### Complete Validation - Generate and Validate Documents
 
 #### 🚀 Run All Examples
+
 Execute all examples and generate .docx files:
 
 ```bash
@@ -225,6 +286,7 @@ Execute all examples and generate .docx files:
 **Output**: .docx files in their respective directories
 
 #### 🔍 Validate OOXML Integrity
+
 Verify the generated documents are valid:
 
 ```bash
@@ -232,12 +294,15 @@ Verify the generated documents are valid:
 ```
 
 **Checks**:
+
 - ✅ ZIP structure integrity
 - ✅ Required OOXML files present
 - ✅ Valid Office Open XML format
 
 #### 📊 View Validation Results
+
 See detailed validation reports:
+
 - [VALIDATION_COMPLETE.md](./VALIDATION_COMPLETE.md) - Full validation report
 - [VALIDATION_RESULTS.md](./VALIDATION_RESULTS.md) - Detailed feature checklist
 
@@ -267,6 +332,7 @@ examples/
 ```
 
 **All documents are ready to open in**:
+
 - Microsoft Word (Windows/macOS)
 - LibreOffice Writer
 - Google Docs

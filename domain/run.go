@@ -91,6 +91,11 @@ type Run interface {
 	// AddField adds a field to this run (e.g., page number, TOC, hyperlink).
 	AddField(field Field) error
 
+	// ClearFields removes all fields from this run.
+	// This is used when replacing MERGEFIELD placeholders to prevent the
+	// serializer from writing the field structure alongside the replaced text.
+	ClearFields()
+
 	// Fields returns the fields embedded in this run.
 	Fields() []Field
 

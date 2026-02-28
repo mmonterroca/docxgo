@@ -270,6 +270,11 @@ func (r *run) AddField(field domain.Field) error {
 	return nil
 }
 
+// ClearFields removes all fields from this run.
+func (r *run) ClearFields() {
+	r.fields = nil
+}
+
 // Fields returns all fields in this run.
 func (r *run) Fields() []domain.Field {
 	if r.fields == nil {

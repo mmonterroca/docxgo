@@ -51,11 +51,20 @@ func walkParagraphs(doc domain.Document, fn func(para domain.Paragraph, ctx para
 	}
 
 	// 3. Walk headers and footers
+	// Use HeadersAll/FootersAll to read only existing headers/footers
+	// without creating new ones (section.Header() auto-creates if missing).
 	for si, section := range doc.Sections() {
-		headerTypes := []domain.HeaderType{domain.HeaderDefault, domain.HeaderFirst, domain.HeaderEven}
-		for _, ht := range headerTypes {
-			header, err := section.Header(ht)
-			if err != nil || header == nil {
+		type sectionWithMaps interface {
+			HeadersAll() map[domain.HeaderType]domain.Header
+			FootersAll() map[domain.FooterType]domain.Footer
+		}
+		secMaps, ok := section.(sectionWithMaps)
+		if !ok {
+			continue
+		}
+
+		for ht, header := range secMaps.HeadersAll() {
+			if header == nil {
 				continue
 			}
 			for pi, para := range header.Paragraphs() {
@@ -71,10 +80,8 @@ func walkParagraphs(doc domain.Document, fn func(para domain.Paragraph, ctx para
 			}
 		}
 
-		footerTypes := []domain.FooterType{domain.FooterDefault, domain.FooterFirst, domain.FooterEven}
-		for _, ft := range footerTypes {
-			footer, err := section.Footer(ft)
-			if err != nil || footer == nil {
+		for ft, footer := range secMaps.FootersAll() {
+			if footer == nil {
 				continue
 			}
 			for pi, para := range footer.Paragraphs() {
