@@ -94,6 +94,11 @@ func scanParagraph(para domain.Paragraph, pattern *regexp.Regexp, ctx paragraphC
 		matches := pattern.FindAllStringSubmatchIndex(text, -1)
 
 		for _, match := range matches {
+			// Ensure there is at least one capturing group before indexing.
+			if len(match) < 4 {
+				// Pattern does not provide the expected capturing group; skip this match.
+				continue
+			}
 			// match[0:2] is full match, match[2:4] is first capture group
 			fullMatch := text[match[0]:match[1]]
 			name := text[match[2]:match[3]]

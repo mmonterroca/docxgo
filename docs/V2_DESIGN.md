@@ -1350,9 +1350,5 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 - ✅ Advanced tables: Complete (merging, nesting, 8 styles, proper border serialization)
 - ✅ Theme system: Complete (7 preset themes, custom theme support)
 - ✅ Document reading: Complete (round-trip with style/hyperlink/image preservation)
-- ✅ Documentation: Comprehensive (13 working examples, full API guide)
+- ✅ Documentation: Comprehensive (15 working examples, full API guide)
 - ✅ All 12 phases complete
-
-```
-
-```

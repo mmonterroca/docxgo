@@ -173,7 +173,7 @@ func main() {
 
 ### More Examples
 
-See the [`examples/`](examples/) directory for 14 comprehensive examples:
+See the [`examples/`](examples/) directory for 15 comprehensive examples:
 
 - **[01_basic](examples/01_basic/)** - Simple document with builder pattern
 - **[02_intermediate](examples/02_intermediate/)** - Professional product catalog
