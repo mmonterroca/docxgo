@@ -43,6 +43,7 @@ func main() {
 	// -------------------------------------------------------------------------
 	// Step 2: Configure custom delimiters for Word-style merge fields
 	// -------------------------------------------------------------------------
+	fmt.Println("Step 2: Configuring custom delimiters for Word-style merge fields...")
 	// Microsoft Word uses « » (guillemet) delimiters for mail merge fields.
 	// Our template engine supports custom delimiters through MergeOptions.
 	opts := template.MergeOptions{
@@ -50,11 +51,14 @@ func main() {
 		CloseDelimiter: "»",
 		StrictMode:     true, // require all placeholders to have data
 	}
+	fmt.Println("  Delimiters: « »")
+	fmt.Println("  Strict mode: enabled")
+	fmt.Println()
 
 	// -------------------------------------------------------------------------
 	// Step 3: Inspect the template — discover all placeholders
 	// -------------------------------------------------------------------------
-	fmt.Println("Step 2: Inspecting template placeholders...")
+	fmt.Println("Step 3: Inspecting template placeholders...")
 
 	// Use FindPlaceholdersCustom with a pattern matching « » delimiters
 	pattern := buildGuillemetsPattern()
@@ -89,7 +93,7 @@ func main() {
 	// -------------------------------------------------------------------------
 	// Step 4: Prepare merge data and validate
 	// -------------------------------------------------------------------------
-	fmt.Println("Step 3: Validating template against data...")
+	fmt.Println("Step 4: Validating template against data...")
 
 	data := template.MergeData{
 		// Organization info
@@ -142,7 +146,7 @@ func main() {
 	// -------------------------------------------------------------------------
 	// Step 5: Merge the template to produce a personalized letter
 	// -------------------------------------------------------------------------
-	fmt.Println("Step 4: Merging template with data...")
+	fmt.Println("Step 5: Merging template with data...")
 
 	if err := template.MergeTemplate(doc, data, opts); err != nil {
 		log.Fatalf("Merge failed: %v", err)
@@ -157,7 +161,7 @@ func main() {
 	// -------------------------------------------------------------------------
 	// Step 6: Verify — reopen the merged document and print its content
 	// -------------------------------------------------------------------------
-	fmt.Println("Step 5: Verifying merged document content...")
+	fmt.Println("Step 6: Verifying merged document content...")
 
 	merged, err := docx.OpenDocument(outputPath)
 	if err != nil {
@@ -175,7 +179,7 @@ func main() {
 	// -------------------------------------------------------------------------
 	// Step 7: Batch merge — send reminders to multiple contacts
 	// -------------------------------------------------------------------------
-	fmt.Println("Step 6: Batch merge for multiple contacts...")
+	fmt.Println("Step 7: Batch merge for multiple contacts...")
 
 	contacts := []template.MergeData{
 		{

@@ -70,15 +70,17 @@ import (
 
 doc := docx.NewDocument()
 para, _ := doc.AddParagraph()
-para.AddRun().SetText("Hello {{name}}, welcome to {{company}}!")
+run, _ := para.AddRun()
+run.SetText("Hello {{name}}, welcome to {{company}}!")
 
-data := map[string]string{
+data := template.MergeData{
     "name":    "John",
     "company": "Acme Corp",
 }
 
-result, _ := template.MergeTemplate(doc, data, nil)
-result.SaveAs("output.docx")
+err := template.MergeTemplate(doc, data)
+// MergeTemplate modifies the document in place
+doc.SaveAs("output.docx")
 ```
 
 ### External Word Template with MERGEFIELDs
@@ -86,49 +88,49 @@ result.SaveAs("output.docx")
 ```go
 doc, _ := docx.OpenDocument("template.docx")
 
-opts := &template.MergeOptions{
+opts := template.MergeOptions{
     OpenDelimiter:  "«",
     CloseDelimiter: "»",
 }
 
-data := map[string]string{
+data := template.MergeData{
     "Contact_FullName": "Jane Doe",
     "Account_Name":     "Acme Corp",
 }
 
-result, _ := template.MergeTemplate(doc, data, opts)
-result.SaveAs("merged_output.docx")
+err := template.MergeTemplate(doc, data, opts)
+// MergeTemplate modifies the document in place
+doc.SaveAs("merged_output.docx")
 ```
 
 ### Batch Merge
 
 ```go
-doc, _ := docx.OpenDocument("invoice_template.docx")
-
-records := []map[string]string{
+records := []template.MergeData{
     {"name": "John Smith", "amount": "$1,500.00"},
     {"name": "Alice Johnson", "amount": "$2,300.00"},
 }
 
-results, _ := template.BatchMerge("invoice_template.docx", records, nil)
-for i, result := range results {
-    result.SaveAs(fmt.Sprintf("invoice_%d.docx", i+1))
+for i, data := range records {
+    doc, _ := docx.OpenDocument("invoice_template.docx")
+    template.MergeTemplate(doc, data)
+    doc.SaveAs(fmt.Sprintf("invoice_%d.docx", i+1))
 }
 ```
 
 ## Files Added
 
-- `pkg/template/engine.go` — Main template engine
+- `pkg/template/doc.go` — Package documentation
 - `pkg/template/merge.go` — Core merge logic
 - `pkg/template/merge_test.go` — Merge tests
 - `pkg/template/placeholder.go` — Placeholder detection
 - `pkg/template/placeholder_test.go` — Placeholder tests
 - `pkg/template/consolidate.go` — Run consolidation
 - `pkg/template/consolidate_test.go` — Consolidation tests
-- `pkg/template/validate.go` — Template validation
-- `pkg/template/validate_test.go` — Validation tests
+- `pkg/template/format.go` — Run formatting comparison helper
+- `pkg/template/options.go` — MergeData, MergeOptions, ValidationError types
 - `pkg/template/walk.go` — Document traversal
-- `pkg/template/batch.go` — Batch merge support
+- `pkg/template/integration_test.go` — Integration tests
 - `examples/14_mail_merge/main.go` — Programmatic template example
 - `examples/15_external_template/main.go` — External Word template example
 
