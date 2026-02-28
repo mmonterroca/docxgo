@@ -1,7 +1,7 @@
 # go-docx v2 Implementation Status
 
 **Last Updated**: February 2026
-**Version**: 2.2.1 (Stable)
+**Version**: 2.2.2 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -29,6 +29,7 @@ All development phases have been completed. The library has gone through multipl
 | v2.1.1      | Nov 2025 | Go module path fix                                   |
 | v2.2.0      | Jan 2026 | Table cell border serialization                      |
 | v2.2.1      | Jan 2026 | Round-trip fixes (hyperlinks, styles, images)        |
+| v2.2.2      | Feb 2026 | Table style borders fix, grid width calc, docs overhaul |
 
 ---
 
@@ -411,5 +412,5 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 ---
 
 **Last Updated**: February 2026
-**Status**: Production Ready (v2.2.1 Stable)
+**Status**: Production Ready (v2.2.2 Stable)
 **Maintained by**: Misael Monterroca ([@mmonterroca](https://github.com/mmonterroca))

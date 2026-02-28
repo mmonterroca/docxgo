@@ -524,7 +524,13 @@ For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
 ### Release History
 
-- **v2.2.1** (January 2026 - Current Stable)
+- **v2.2.2** (February 2026 - Current Stable)
+  - Table style borders fix (TableGrid, PlainTable1 now render with visible borders)
+  - Grid column width calculation from cell widths
+  - Comprehensive documentation overhaul
+  - Restored 13_themes example
+
+- **v2.2.1** (January 2026)
   - Hyperlink RelationshipID preservation during round-trip
   - Drawing position serialization fix
   - Internal hyperlink anchor support
