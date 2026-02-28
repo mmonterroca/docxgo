@@ -696,3 +696,106 @@ func TestHandleOpen_Base64(t *testing.T) {
 		t.Error("expected documentId in open result")
 	}
 }
+
+// ─── document.close tests ────────────────────────────────────────────────────
+
+func TestHandleClose(t *testing.T) {
+	s := newServer()
+	createResp := s.dispatch(makeRequest("c1", "document.create", map[string]interface{}{
+		"content": []interface{}{},
+		"output":  "buffer",
+	}))
+	if createResp.Error != nil {
+		t.Fatalf("create failed: %+v", createResp.Error)
+	}
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	// Close the document
+	closeResp := s.dispatch(makeRequest("c2", "document.close", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if closeResp.Error != nil {
+		t.Fatalf("close failed: %+v", closeResp.Error)
+	}
+
+	// Trying to inspect the closed document should fail
+	inspectResp := s.dispatch(makeRequest("c3", "document.inspect", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if inspectResp.Error == nil {
+		t.Fatal("expected error when inspecting closed document")
+	}
+	if inspectResp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND, got %s", inspectResp.Error.Code)
+	}
+}
+
+func TestHandleClose_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest("c4", "document.close", map[string]interface{}{
+		"documentId": "nonexistent",
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for unknown documentId")
+	}
+	if resp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND, got %s", resp.Error.Code)
+	}
+}
+
+// ─── Strict output validation tests ──────────────────────────────────────────
+
+func TestHandleCreate_InvalidOutput(t *testing.T) {
+	s := newServer()
+	params := map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{
+					map[string]interface{}{"text": "test"},
+				},
+			},
+		},
+		"output": "invalid_output",
+	}
+	resp := s.dispatch(makeRequest("o1", "document.create", params))
+	if resp.Error == nil {
+		t.Fatal("expected error for invalid output format")
+	}
+	if resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Error.Code)
+	}
+}
+
+// ─── Unknown theme tests ─────────────────────────────────────────────────────
+
+func TestHandleCreate_UnknownTheme(t *testing.T) {
+	s := newServer()
+	params := map[string]interface{}{
+		"options": map[string]interface{}{
+			"theme": "NonExistentTheme",
+		},
+		"content": []interface{}{},
+		"output":  "buffer",
+	}
+	resp := s.dispatch(makeRequest("t1", "document.create", params))
+	if resp.Error == nil {
+		t.Fatal("expected error for unknown theme")
+	}
+	if resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Error.Code)
+	}
+}
+
+// ─── Nil params tests ────────────────────────────────────────────────────────
+
+func TestHandleCreate_NilParams(t *testing.T) {
+	s := newServer()
+	// Simulate a request with no params at all
+	req := &Request{ID: "n1", Method: "document.create"}
+	resp := s.dispatch(req)
+	// Should succeed with empty document (no content, default buffer output)
+	if resp.Error != nil {
+		t.Fatalf("unexpected error for nil params: %+v", resp.Error)
+	}
+}

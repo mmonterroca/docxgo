@@ -55,6 +55,17 @@ func (s *server) getDoc(id string) (domain.Document, bool) {
 	return d, ok
 }
 
+// removeDoc removes a document from the session map.
+func (s *server) removeDoc(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.docs[id]
+	if ok {
+		delete(s.docs, id)
+	}
+	return ok
+}
+
 // dispatch routes a request to the appropriate handler.
 func (s *server) dispatch(req *Request) Response {
 	switch req.Method {
@@ -72,6 +83,8 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleSetMetadata(req)
 	case "document.setBackgroundColor":
 		return s.handleSetBackgroundColor(req)
+	case "document.close":
+		return s.handleClose(req)
 	default:
 		return errorResponse(req.ID, "METHOD_NOT_FOUND",
 			fmt.Sprintf("unknown method: %s", req.Method), req.Method)
@@ -90,15 +103,12 @@ type createParams struct {
 
 // docOptions configures the document.
 type docOptions struct {
-	Title            string      `json:"title,omitempty"`
-	Author           string      `json:"author,omitempty"`
-	Subject          string      `json:"subject,omitempty"`
-	DefaultFont      string      `json:"defaultFont,omitempty"`
-	DefaultFontSize  int         `json:"defaultFontSize,omitempty"` // in points
-	PageSize         interface{} `json:"pageSize,omitempty"`        // string or object
-	Margins          interface{} `json:"margins,omitempty"`         // string or object
-	StrictValidation bool        `json:"strictValidation,omitempty"`
-	Theme            string      `json:"theme,omitempty"`
+	Title    string      `json:"title,omitempty"`
+	Author   string      `json:"author,omitempty"`
+	Subject  string      `json:"subject,omitempty"`
+	PageSize interface{} `json:"pageSize,omitempty"` // string or object
+	Margins  interface{} `json:"margins,omitempty"`  // string or object
+	Theme    string      `json:"theme,omitempty"`
 }
 
 // openParams are the parameters for document.open.
@@ -140,6 +150,11 @@ type setMetadataParams struct {
 type setBackgroundColorParams struct {
 	DocumentID string `json:"documentId"`
 	Color      string `json:"color"` // hex string e.g. "#FF0000"
+}
+
+// closeParams are the parameters for document.close.
+type closeParams struct {
+	DocumentID string `json:"documentId"`
 }
 
 // ─── Content item types ──────────────────────────────────────────────────────
@@ -296,7 +311,11 @@ func (s *server) handleCreate(req *Request) Response {
 	const op = "document.create"
 
 	var params createParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -328,7 +347,11 @@ func (s *server) handleOpen(req *Request) Response {
 	const op = "document.open"
 
 	var params openParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -362,7 +385,11 @@ func (s *server) handleSave(req *Request) Response {
 	const op = "document.save"
 
 	var params saveParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -384,7 +411,11 @@ func (s *server) handleValidate(req *Request) Response {
 	const op = "document.validate"
 
 	var params validateParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -409,7 +440,11 @@ func (s *server) handleInspect(req *Request) Response {
 	const op = "document.inspect"
 
 	var params inspectParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -458,7 +493,11 @@ func (s *server) handleSetMetadata(req *Request) Response {
 	const op = "document.setMetadata"
 
 	var params setMetadataParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -489,7 +528,11 @@ func (s *server) handleSetBackgroundColor(req *Request) Response {
 	const op = "document.setBackgroundColor"
 
 	var params setBackgroundColorParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -506,6 +549,30 @@ func (s *server) handleSetBackgroundColor(req *Request) Response {
 
 	if err := doc.SetBackgroundColor(color); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{"ok": true}}
+}
+
+func (s *server) handleClose(req *Request) Response {
+	const op = "document.close"
+
+	var params closeParams
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	if params.DocumentID == "" {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "documentId is required", op)
+	}
+
+	if !s.removeDoc(params.DocumentID) {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
 	}
 
 	return Response{ID: req.ID, Result: map[string]interface{}{"ok": true}}
@@ -533,14 +600,17 @@ func applyDocOptions(doc domain.Document, opts *docOptions) *RPCError {
 	// Page size and margins on the default section
 	if opts.PageSize != nil || opts.Margins != nil {
 		sec, err := doc.DefaultSection()
-		if err == nil {
-			if opts.PageSize != nil {
-				ps := parsePageSize(opts.PageSize)
-				_ = sec.SetPageSize(ps)
+		if err != nil {
+			return &RPCError{Code: errors.ErrCodeInternal, Message: "failed to get default section: " + err.Error()}
+		}
+		if opts.PageSize != nil {
+			if err := sec.SetPageSize(parsePageSize(opts.PageSize)); err != nil {
+				return &RPCError{Code: errors.ErrCodeValidation, Message: "failed to set page size: " + err.Error()}
 			}
-			if opts.Margins != nil {
-				m := parseMargins(opts.Margins)
-				_ = sec.SetMargins(m)
+		}
+		if opts.Margins != nil {
+			if err := sec.SetMargins(parseMargins(opts.Margins)); err != nil {
+				return &RPCError{Code: errors.ErrCodeValidation, Message: "failed to set margins: " + err.Error()}
 			}
 		}
 	}
@@ -548,10 +618,14 @@ func applyDocOptions(doc domain.Document, opts *docOptions) *RPCError {
 	// Theme
 	if opts.Theme != "" {
 		theme := lookupTheme(opts.Theme)
-		if theme != nil {
-			if err := theme.ApplyTo(doc); err != nil {
-				return &RPCError{Code: errors.ErrCodeValidation, Message: "theme error: " + err.Error()}
+		if theme == nil {
+			return &RPCError{
+				Code:    errors.ErrCodeValidation,
+				Message: fmt.Sprintf("unknown theme: %s", opts.Theme),
 			}
+		}
+		if err := theme.ApplyTo(doc); err != nil {
+			return &RPCError{Code: errors.ErrCodeValidation, Message: "theme error: " + err.Error()}
 		}
 	}
 
@@ -891,53 +965,67 @@ func applySection(doc domain.Document, item sectionItem) error {
 	}
 
 	if item.PageSize != nil {
-		_ = sec.SetPageSize(parsePageSize(item.PageSize))
+		if err := sec.SetPageSize(parsePageSize(item.PageSize)); err != nil {
+			return fmt.Errorf("failed to set page size: %w", err)
+		}
 	}
 	if item.Margins != nil {
-		_ = sec.SetMargins(parseMargins(item.Margins))
+		if err := sec.SetMargins(parseMargins(item.Margins)); err != nil {
+			return fmt.Errorf("failed to set margins: %w", err)
+		}
 	}
 	if item.Orientation == "landscape" {
-		_ = sec.SetOrientation(domain.OrientationLandscape)
+		if err := sec.SetOrientation(domain.OrientationLandscape); err != nil {
+			return fmt.Errorf("failed to set orientation: %w", err)
+		}
 	} else if item.Orientation == "portrait" {
-		_ = sec.SetOrientation(domain.OrientationPortrait)
+		if err := sec.SetOrientation(domain.OrientationPortrait); err != nil {
+			return fmt.Errorf("failed to set orientation: %w", err)
+		}
 	}
 	if item.Columns > 0 {
-		_ = sec.SetColumns(item.Columns)
+		if err := sec.SetColumns(item.Columns); err != nil {
+			return fmt.Errorf("failed to set columns: %w", err)
+		}
 	}
 
 	for hType, content := range item.Headers {
 		header, err := sec.Header(parseHeaderType(hType))
 		if err != nil {
-			continue
+			return fmt.Errorf("failed to get header %q: %w", hType, err)
 		}
 		for _, paraRaw := range content {
 			var pItem paragraphItem
 			if err := json.Unmarshal(paraRaw, &pItem); err != nil {
-				continue
+				return fmt.Errorf("invalid header paragraph: %w", err)
 			}
 			para, err := header.AddParagraph()
 			if err != nil {
-				continue
+				return fmt.Errorf("failed to add header paragraph: %w", err)
 			}
-			_ = applyParagraph(para, pItem)
+			if err := applyParagraph(para, pItem); err != nil {
+				return fmt.Errorf("failed to apply header paragraph: %w", err)
+			}
 		}
 	}
 
 	for fType, content := range item.Footers {
 		footer, err := sec.Footer(parseFooterType(fType))
 		if err != nil {
-			continue
+			return fmt.Errorf("failed to get footer %q: %w", fType, err)
 		}
 		for _, paraRaw := range content {
 			var pItem paragraphItem
 			if err := json.Unmarshal(paraRaw, &pItem); err != nil {
-				continue
+				return fmt.Errorf("invalid footer paragraph: %w", err)
 			}
 			para, err := footer.AddParagraph()
 			if err != nil {
-				continue
+				return fmt.Errorf("failed to add footer paragraph: %w", err)
 			}
-			_ = applyParagraph(para, pItem)
+			if err := applyParagraph(para, pItem); err != nil {
+				return fmt.Errorf("failed to apply footer paragraph: %w", err)
+			}
 		}
 	}
 
@@ -963,7 +1051,7 @@ func serializeOutput(doc domain.Document, output, filePath, docID string) (inter
 			"filePath":   filePath,
 			"documentId": docID,
 		}, nil
-	default: // "buffer" or unspecified
+	case "buffer", "":
 		var buf bytes.Buffer
 		if _, err := doc.WriteTo(&buf); err != nil {
 			return nil, &RPCError{Code: errors.ErrCodeIO, Message: err.Error()}
@@ -972,6 +1060,11 @@ func serializeOutput(doc domain.Document, output, filePath, docID string) (inter
 			"data":       base64.StdEncoding.EncodeToString(buf.Bytes()),
 			"documentId": docID,
 		}, nil
+	default:
+		return nil, &RPCError{
+			Code:    errors.ErrCodeValidation,
+			Message: fmt.Sprintf("unsupported output format: %q (use \"buffer\" or \"file\")", output),
+		}
 	}
 }
 

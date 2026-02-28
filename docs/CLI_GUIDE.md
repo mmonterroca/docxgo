@@ -15,6 +15,7 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
   - [document.inspect](#documentinspect)
   - [document.setMetadata](#documentsetmetadata)
   - [document.setBackgroundColor](#documentsetbackgroundcolor)
+  - [document.close](#documentclose)
 - [Content Types](#content-types)
   - [Paragraph](#paragraph)
   - [Table](#table)
@@ -149,11 +150,8 @@ Creates a new Word document and returns it as base64 or saves it to a file.
 | `title` | String | Document title |
 | `author` | String | Document author |
 | `subject` | String | Document subject |
-| `defaultFont` | String | Default font name (e.g. `"Calibri"`) |
-| `defaultFontSize` | Number | Default font size in **points** |
 | `pageSize` | `"A4"` \| `"Letter"` \| `"Legal"` \| `"A3"` \| `"Tabloid"` \| `{width, height}` | Page dimensions (twips) |
 | `margins` | `"normal"` \| `"narrow"` \| `"wide"` \| `{top, bottom, left, right}` | Page margins (twips) |
-| `strictValidation` | Boolean | Enable strict document validation |
 | `theme` | `"Corporate"` \| `"Startup"` \| `"Modern"` \| `"Fintech"` \| `"Academic"` | Apply a preset theme |
 
 **Success result:**
@@ -336,6 +334,20 @@ Sets the page background color for the entire document.
 |-------|------|----------|-------------|
 | `documentId` | String | Yes | Session document ID |
 | `color` | String | Yes | Hex color string (e.g. `"#E8F0FE"` or `"E8F0FE"`) |
+
+**Success result:** `{ "ok": true }`
+
+---
+
+### document.close
+
+Removes a document from the session, freeing associated memory. Should be called when a document is no longer needed in RPC mode.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
 
 **Success result:** `{ "ok": true }`
 

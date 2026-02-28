@@ -21,8 +21,14 @@ func runRPC() int {
 	lineCh := make(chan string)
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
+		// Increase the scanner buffer so large JSON-RPC requests don't hit the
+		// default 64K token limit and get treated as an unexpected EOF.
+		scanner.Buffer(make([]byte, 0, 1024*1024), 16*1024*1024)
 		for scanner.Scan() {
 			lineCh <- scanner.Text()
+		}
+		if err := scanner.Err(); err != nil {
+			fmt.Fprintf(os.Stderr, "docxgo rpc: scanner error: %v\n", err)
 		}
 		close(lineCh)
 	}()
@@ -50,7 +56,6 @@ func runRPC() int {
 			}
 			resp := s.dispatch(&req)
 			writeResponse(resp)
-			fmt.Fprintf(os.Stderr, "docxgo rpc: handled %s (id=%v)\n", req.Method, req.ID)
 		case <-sigCh:
 			// Graceful shutdown on signal
 			return 0
