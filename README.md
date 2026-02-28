@@ -18,20 +18,21 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 - ✅ **Thread-Safe** - Concurrent access supported with atomic operations
 - ✅ **Production Ready** - EXCELLENT error handling, comprehensive validation
 - ✅ **Well Documented** - Complete godoc, examples, and architecture docs
+- ✅ **Template / Mail Merge** - Placeholder detection, data merging, batch document generation
 - ✅ **Open Source** - MIT License, use in commercial and private projects
 
 ---
 
 ## Status
 
-**Current Version**: v2.2.2 (Stable)
+**Current Version**: v2.3.0 (Stable)
 **Stability**: Production Ready
 **Released**: February 2026
 **Test Coverage**: 50.7%
 
-**Latest Features**: Table Style Borders (v2.2.2), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
+**Latest Features**: Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
 
-> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0 and continued improvements through v2.2.2.
+> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, and template/mail merge engine in v2.3.0.
 
 ---
 
@@ -172,7 +173,7 @@ func main() {
 
 ### More Examples
 
-See the [`examples/`](examples/) directory for 13 comprehensive examples:
+See the [`examples/`](examples/) directory for 14 comprehensive examples:
 
 - **[01_basic](examples/01_basic/)** - Simple document with builder pattern
 - **[02_intermediate](examples/02_intermediate/)** - Professional product catalog
@@ -187,6 +188,8 @@ See the [`examples/`](examples/) directory for 13 comprehensive examples:
 - **[11_multi_section](examples/11_multi_section/)** - Multi-section layouts
 - **[12_read_and_modify](examples/12_read_and_modify/)** - Read and modify existing documents
 - **[13_themes](examples/13_themes/)** - Theme system with 7 preset themes
+- **[14_mail_merge](examples/14_mail_merge/)** - Template engine with mail merge and batch generation
+- **[15_external_template](examples/15_external_template/)** - Mail merge with external Word template (MERGEFIELD)
 
 ---
 

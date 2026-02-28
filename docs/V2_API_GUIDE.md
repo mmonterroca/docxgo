@@ -1,6 +1,6 @@
 # go-docx v2 API Guide
 
-**Version**: 2.2.2  
+**Version**: 2.3.0
 **Last Updated**: February 2026
 
 ---
@@ -22,6 +22,7 @@
   - [Sections and Page Layout](#sections-and-page-layout)
   - [Styles](#styles)
 - [Examples](#examples)
+- [Template / Mail Merge](#template--mail-merge)
 - [Migration from v1](#migration-from-v1)
 
 ---
@@ -31,10 +32,12 @@
 **go-docx v2** is a complete rewrite with clean architecture, proper error handling, and comprehensive OOXML support. Key improvements:
 
 ✅ **Two API Styles**:
+
 - **Builder Pattern**: Fluent API with error accumulation (recommended for new code)
 - **Direct Domain API**: Interface-based design for advanced use cases
 
 ✅ **Complete Feature Set**:
+
 - Paragraphs, runs, tables, images
 - Fields (PAGE, NUMPAGES, TOC, HYPERLINK, etc.)
 - Sections with headers/footers
@@ -42,6 +45,7 @@
 - Advanced table features (cell merging, nested tables)
 
 ✅ **Better Quality**:
+
 - Type-safe API (minimal `interface{}`)
 - Comprehensive error handling
 - Thread-safe operations
@@ -77,7 +81,7 @@ func main() {
         docx.WithTitle("My Document"),
         docx.WithAuthor("John Doe"),
     )
-    
+
     // Add content with fluent API
     builder.AddParagraph().
         Text("Hello, World!").
@@ -86,13 +90,13 @@ func main() {
         Color(docx.Red).
         Alignment(docx.AlignmentCenter).
         End()
-    
+
     // Build and validate
     doc, err := builder.Build()
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Save
     if err := doc.SaveAs("hello.docx"); err != nil {
         log.Fatal(err)
@@ -113,24 +117,24 @@ import (
 func main() {
     // Create document
     doc := docx.NewDocument()
-    
+
     // Add paragraph
     para, err := doc.AddParagraph()
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Add run with text
     run, err := para.AddRun()
     if err != nil {
         log.Fatal(err)
     }
-    
+
     run.SetText("Hello, World!")
     run.SetBold(true)
     run.SetSize(28) // 14pt (size is in half-points)
     run.SetColor(docx.Red)
-    
+
     // Save
     if err := doc.SaveAs("hello.docx"); err != nil {
         log.Fatal(err)
@@ -147,6 +151,7 @@ func main() {
 The builder pattern accumulates errors and returns them in `Build()`. This allows for fluent chaining without checking errors at every step.
 
 **Benefits**:
+
 - Cleaner code with method chaining
 - Error accumulation (all errors collected and returned in `Build()`)
 - Better for sequential document construction
@@ -179,6 +184,7 @@ if err != nil {
 The direct API returns errors immediately, giving you fine-grained control.
 
 **Benefits**:
+
 - Explicit error handling at each step
 - Better for conditional logic
 - More control over document construction
@@ -316,6 +322,7 @@ Available methods (both APIs):
 ```
 
 **Predefined Colors**:
+
 - `docx.Black`, `docx.White`
 - `docx.Red`, `docx.Green`, `docx.Blue`
 - `docx.Yellow`, `docx.Cyan`, `docx.Magenta`
@@ -401,6 +408,7 @@ table.SetStyle(domain.TableStyleGrid)
 ```
 
 Predefined table styles:
+
 - `TableStyleGrid`
 - `TableStyleList`
 - `TableStyleColorful`
@@ -463,11 +471,13 @@ img, _ := para.AddImageWithPosition("diagram.png",
 ```
 
 **Supported Formats**:
+
 - PNG, JPEG, GIF, BMP
 - TIFF, SVG, WEBP
 - ICO, EMF
 
 **Size Units**:
+
 - **EMUs** (English Metric Units): 914400 EMUs = 1 inch
 - **Pixels** to EMUs: `pixels * 9525`
 - **Inches** to EMUs: `inches * 914400`
@@ -633,6 +643,7 @@ run4.AddField(docx.NewPageCountField())
 ```
 
 **Header/Footer Types**:
+
 - `domain.HeaderDefault` - Default header for all pages
 - `domain.HeaderFirst` - Header for first page only
 - `domain.HeaderEven` - Header for even pages
@@ -663,23 +674,28 @@ run.SetText("Chapter 1: Introduction")
 #### Built-in Styles
 
 **Headings**:
+
 - `Heading1`, `Heading2`, `Heading3`, `Heading4`, `Heading5`, `Heading6`, `Heading7`, `Heading8`, `Heading9`
 
 **Title Styles**:
+
 - `Title`, `Subtitle`
 
 **Text Styles**:
+
 - `Normal` (default)
 - `BodyText`, `BodyText2`, `BodyText3`
 - `Quote`, `IntenseQuote`
 - `Emphasis`, `Strong`, `IntenseEmphasis`
 
 **List Styles**:
+
 - `ListParagraph`
 - `ListNumber`, `ListNumber2`, `ListNumber3`
 - `ListBullet`, `ListBullet2`, `ListBullet3`
 
 **Special Styles**:
+
 - `NoSpacing`
 - `Caption`
 - `Footer`, `Header`
@@ -838,16 +854,112 @@ doc.SaveAs("output.docx")
 
 ### Key Differences
 
-| Feature | v1 (Legacy) | v2 (Builder) | v2 (Direct) |
-|---------|-------------|--------------|-------------|
-| Import | `fumiama/go-docx` | `mmonterroca/docxgo` | `mmonterroca/docxgo` |
-| Create doc | `docx.New()` | `NewDocumentBuilder()` | `NewDocument()` |
-| Add text | `para.AddText()` | `para.Text()` | `run.SetText()` |
-| Bold | `run.Bold()` | `para.Bold()` | `run.SetBold(true)` |
-| Color | `run.Color("FF0000")` | `para.Color(docx.Red)` | `run.SetColor(docx.Red)` |
-| Size | `run.Size("28")` (string) | `para.FontSize(14)` (points) | `run.SetSize(28)` (half-points) |
-| Error handling | No errors | Accumulated in `Build()` | Immediate errors |
-| Save | `WriteTo(file)` | `doc.SaveAs(path)` | `doc.SaveAs(path)` |
+| Feature        | v1 (Legacy)               | v2 (Builder)                 | v2 (Direct)                     |
+| -------------- | ------------------------- | ---------------------------- | ------------------------------- |
+| Import         | `fumiama/go-docx`         | `mmonterroca/docxgo`         | `mmonterroca/docxgo`            |
+| Create doc     | `docx.New()`              | `NewDocumentBuilder()`       | `NewDocument()`                 |
+| Add text       | `para.AddText()`          | `para.Text()`                | `run.SetText()`                 |
+| Bold           | `run.Bold()`              | `para.Bold()`                | `run.SetBold(true)`             |
+| Color          | `run.Color("FF0000")`     | `para.Color(docx.Red)`       | `run.SetColor(docx.Red)`        |
+| Size           | `run.Size("28")` (string) | `para.FontSize(14)` (points) | `run.SetSize(28)` (half-points) |
+| Error handling | No errors                 | Accumulated in `Build()`     | Immediate errors                |
+| Save           | `WriteTo(file)`           | `doc.SaveAs(path)`           | `doc.SaveAs(path)`              |
+
+---
+
+## Template / Mail Merge
+
+The `pkg/template` package provides mail merge functionality for replacing `{{placeholder}}` tokens in documents with actual data.
+
+### Basic Usage
+
+```go
+import (
+    docx "github.com/mmonterroca/docxgo/v2"
+    "github.com/mmonterroca/docxgo/v2/pkg/template"
+)
+
+// Open a template document
+doc, _ := docx.OpenDocument("invoice_template.docx")
+
+// Merge with data
+err := template.MergeTemplate(doc, template.MergeData{
+    "customer_name": "Acme Corp",
+    "invoice_date":  "2025-01-15",
+    "total":         "$1,234.56",
+})
+
+// Save the result
+doc.SaveAs("invoice_acme.docx")
+```
+
+### Finding Placeholders
+
+```go
+// Inspect all placeholders in a document
+names := template.PlaceholderNames(doc)
+// ["customer_name", "invoice_date", "total"]
+
+// Get detailed placeholder info with locations
+placeholders := template.FindPlaceholders(doc)
+for _, p := range placeholders {
+    fmt.Printf("%s at %v\n", p.Name, p.Location.Type)
+}
+```
+
+### Template Validation
+
+```go
+// Check for missing or unused keys before merging
+errors := template.ValidateTemplate(doc, data)
+for _, e := range errors {
+    fmt.Println(e.Error())
+    // [ERROR] missing_key: placeholder has no corresponding data key
+    // [WARNING] unused_key: data key has no corresponding placeholder
+}
+```
+
+### Custom Delimiters
+
+```go
+// Use ${key} instead of {{key}}
+opts := template.MergeOptions{
+    OpenDelimiter:  "${",
+    CloseDelimiter: "}",
+}
+err := template.MergeTemplate(doc, data, opts)
+```
+
+### Strict Mode
+
+```go
+// Return error if any placeholder has no matching data key
+opts := template.MergeOptions{
+    OpenDelimiter:  "{{",
+    CloseDelimiter: "}}",
+    StrictMode:     true,
+}
+err := template.MergeTemplate(doc, data, opts)
+// err: "template: missing keys: role, department"
+```
+
+### Batch Merge
+
+```go
+// Generate multiple documents from the same template
+customers := []template.MergeData{
+    {"name": "Alice", "email": "alice@example.com"},
+    {"name": "Bob", "email": "bob@example.com"},
+}
+
+for _, customer := range customers {
+    doc, _ := docx.OpenDocument("template.docx")
+    template.MergeTemplate(doc, customer)
+    doc.SaveAs(fmt.Sprintf("letter_%s.docx", customer["name"]))
+}
+```
+
+See [`examples/14_mail_merge/`](../examples/14_mail_merge/) for a complete working example.
 
 ---
 
@@ -860,5 +972,5 @@ doc.SaveAs("output.docx")
 
 ---
 
-**Last Updated**: February 2026  
-**Version**: 2.2.2
+**Last Updated**: February 2026
+**Version**: 2.3.0

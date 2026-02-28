@@ -283,19 +283,25 @@ All development phases have been completed. The library has gone through multipl
 
 ## Planned Features (Not Yet Implemented)
 
-### Mail Merge / Templates
+### ~~Mail Merge / Templates~~ ✅ IMPLEMENTED (v2.3.0)
 
 **Priority**: MEDIUM
-**Status**: Not started
+**Status**: ✅ Fully implemented in `pkg/template/`
 
 **Features**:
 
-- Document templates with variable substitution
-- Conditional content
-- Template validation
-- Batch document generation from data sources
+- ✅ Document templates with `{{placeholder}}` variable substitution
+- ✅ Automatic run consolidation to heal split placeholders
+- ✅ Placeholder detection across body, tables, headers, and footers
+- ✅ Template validation (missing/unused key detection)
+- ✅ Batch document generation from data sources
+- ✅ Custom delimiter support
+- ✅ Strict mode for missing key errors
+- Conditional content (planned for future release)
 
 **Use Cases**: Generating personalized letters, invoices, reports from templates.
+
+**Available Now**: Use `pkg/template` package — See `examples/14_mail_merge/`
 
 ---
 
@@ -380,7 +386,7 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 
 ### Priority Areas for Contributions
 
-1. **Mail Merge / Templates** - Most requested feature
+1. ~~**Mail Merge / Templates**~~ ✅ Implemented in v2.3.0
 2. **Custom Style Creation** - Brand-specific styling
 3. **Comments and Track Changes** - Collaborative editing
 4. **Form Controls** - Interactive documents

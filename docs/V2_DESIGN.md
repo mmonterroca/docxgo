@@ -1,14 +1,14 @@
 # go-docx v2.0 - Clean Architecture Design
 
-**Status**: ✅ v2.2.2 Stable  
-**Progress**: Production Ready (all core features complete)  
-**Latest Release**: v2.2.2 (February 2026)  
+**Status**: ✅ v2.3.0 Stable
+**Progress**: Production Ready (all core features complete)
+**Latest Release**: v2.3.0 (February 2026)
 **Breaking Changes**: Yes (major version bump from original fork)
 
 > **Project Note**: This project originated as a fork of `fumiama/go-docx` but has been completely rewritten with a clean architecture design. The current version represents a ground-up rebuild focused on maintainability, type safety, and modern Go practices.
 
-> **✅ Validation Status**: All examples pass DocxValidator (strict OOXML schema). Ready for beta release.  
-> **📖 For API usage, see [V2_API_GUIDE.md](./V2_API_GUIDE.md)**  
+> **✅ Validation Status**: All examples pass DocxValidator (strict OOXML schema). Ready for beta release.
+> **📖 For API usage, see [V2_API_GUIDE.md](./V2_API_GUIDE.md)**
 > **📊 For implementation status, see [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)**
 > **🛠️ Planning & Roadmap live in [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md); this document remains the canonical architecture reference.**
 
@@ -17,6 +17,7 @@
 ## 🎯 Goals
 
 ### Primary Objectives
+
 1. **Clean Architecture** - Proper separation of concerns
 2. **Interface-Based Design** - Testable and extensible
 3. **Better Error Handling** - Errors in fluent API
@@ -24,6 +25,7 @@
 5. **Performance** - Optimized for real-world usage
 
 ### Non-Goals
+
 - Backward compatibility with v1.x (breaking changes allowed)
 - Supporting every OOXML feature (focus on 80% use cases)
 
@@ -68,6 +70,7 @@
 ## 📦 Package Structure
 
 ### Current Structure
+
 ```
 github.com/mmonterroca/docxgo/
 ├── docx.go                     # Main entry point
@@ -149,16 +152,16 @@ type Document interface {
     AddParagraph() (ParagraphBuilder, error)
     AddTable(rows, cols int) (TableBuilder, error)
     AddSection() (SectionBuilder, error)
-    
+
     // Query methods
     Paragraphs() []Paragraph
     Tables() []Table
     Sections() []Section
-    
+
     // Persistence
     WriteTo(w io.Writer) (int64, error)
     SaveAs(path string) error
-    
+
     // Validation
     Validate() error
 }
@@ -167,13 +170,13 @@ type Document interface {
 type Paragraph interface {
     AddRun() (RunBuilder, error)
     AddField(fieldType FieldType) (FieldBuilder, error)
-    
+
     // Properties
     Style() Style
     SetStyle(name string) error
     Alignment() Alignment
     SetAlignment(align Alignment) error
-    
+
     // Content
     Text() string
     Runs() []Run
@@ -183,7 +186,7 @@ type Paragraph interface {
 type Run interface {
     SetText(text string) error
     Text() string
-    
+
     // Formatting
     SetBold(bold bool) error
     IsBold() bool
@@ -212,7 +215,7 @@ func NewDocument(opts ...Option) *DocumentBuilder {
     for _, opt := range opts {
         opt(config)
     }
-    
+
     return &DocumentBuilder{
         doc: internal.NewDocxDocument(config),
     }
@@ -233,11 +236,11 @@ func (b *DocumentBuilder) Build() (domain.Document, error) {
     if len(b.errors) > 0 {
         return nil, fmt.Errorf("document has %d errors: %w", len(b.errors), b.errors[0])
     }
-    
+
     if err := b.doc.Validate(); err != nil {
         return nil, fmt.Errorf("validation failed: %w", err)
     }
-    
+
     return b.doc, nil
 }
 
@@ -253,19 +256,19 @@ func (pb *ParagraphBuilder) Text(text string) *ParagraphBuilder {
     if pb.err != nil {
         return pb // Propagate error
     }
-    
+
     run, err := pb.para.AddRun()
     if err != nil {
         pb.err = err
         pb.parent.errors = append(pb.parent.errors, err)
         return pb
     }
-    
+
     if err := run.SetText(text); err != nil {
         pb.err = err
         pb.parent.errors = append(pb.parent.errors, err)
     }
-    
+
     return pb
 }
 
@@ -274,19 +277,19 @@ func (pb *ParagraphBuilder) Bold() *ParagraphBuilder {
     if pb.err != nil {
         return pb
     }
-    
+
     // Get last run and make it bold
     runs := pb.para.Runs()
     if len(runs) == 0 {
         pb.err = errors.New("no runs to make bold")
         return pb
     }
-    
+
     if err := runs[len(runs)-1].SetBold(true); err != nil {
         pb.err = err
         pb.parent.errors = append(pb.parent.errors, err)
     }
-    
+
     return pb
 }
 
@@ -356,12 +359,12 @@ type docxDocument struct {
     styleMgr     manager.StyleManager
     validator    service.Validator
     serializer   service.Serializer
-    
+
     // Domain data
     paragraphs   []domain.Paragraph
     tables       []domain.Table
     sections     []domain.Section
-    
+
     // Configuration
     config       *Config
 }
@@ -437,6 +440,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 ## 📊 Implementation Phases
 
 ### ✅ Phase 1: Foundation (Weeks 1-2) - COMPLETE
+
 - [x] Set up v2 module (`go mod init github.com/mmonterroca/docxgo`)
 - [x] Define core interfaces (`domain/`)
 - [x] Create package structure
@@ -444,6 +448,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - [x] Design error handling strategy
 
 ### ✅ Phase 2: Core Domain (Weeks 3-4) - COMPLETE
+
 - [x] Implement Document interface
 - [x] Implement Paragraph interface
 - [x] Implement Run interface
@@ -451,6 +456,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - [x] Add basic validation
 
 ### ✅ Phase 3: Managers (Weeks 5-6) - COMPLETE
+
 - [x] Implement RelationshipManager
 - [x] Implement MediaManager
 - [x] Implement IDGenerator
@@ -458,6 +464,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - [x] Add comprehensive tests
 
 ### ✅ Phase 4: Builders (Weeks 7-8) - COMPLETE
+
 - [x] Implement DocumentBuilder
 - [x] Implement ParagraphBuilder
 - [x] Implement TableBuilder
@@ -465,6 +472,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - [x] Integration tests
 
 ### ✅ Phase 5: Serialization (Weeks 9-10) - COMPLETE
+
 - [x] Refactor pack/unpack
 - [x] Implement Serializer service
 - [x] OOXML generation
@@ -472,7 +480,9 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - [x] Validation
 
 ### ✅ Phase 5.5: Project Restructuring - COMPLETE
+
 **Goal**: Transform from fork to independent project
+
 - [x] Create CREDITS.md with complete project history
 - [x] Move to personal namespace (github.com/mmonterroca/docxgo)
 - [x] Update LICENSE to MIT (allows private/commercial use)
@@ -482,6 +492,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - [x] Complete internal/core implementation
 
 ### ✅ Phase 6: Advanced Features (Weeks 11-12) - COMPLETE
+
 - [x] Headers/Footers (proper implementation with Section interface)
 - [x] Fields (complete: TOC, PageNumber, Hyperlink, StyleRef, etc.)
 - [x] Styles (comprehensive: 40+ built-in styles, ParagraphStyle, CharacterStyle)
@@ -489,6 +500,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - [x] Tests (95%+ coverage for all Phase 6 components)
 
 **Achievements:**
+
 - Implemented Section/Header/Footer with thread-safe operations
 - Complete Field system with 9 field types and dirty tracking
 - StyleManager with built-in and custom style support
@@ -497,9 +509,11 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - Core architecture 95% complete and functional
 
 ### ✅ Phase 6.5: Builder Pattern & API Polish - COMPLETE
+
 **Goal**: Implement fluent API with builder pattern
 
 **Status**: ✅ COMPLETE (October 26, 2025)
+
 - [x] Create builder.go with fluent API (~500 lines)
   - [x] DocumentBuilder with error accumulation
   - [x] ParagraphBuilder with chainable methods (Text, Bold, Italic, Color, FontSize, Alignment, Underline, End)
@@ -529,6 +543,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
   - [x] Chaining tests
 
 **Achievements:**
+
 - Complete fluent API with builder pattern (500 lines)
 - Functional options pattern with presets (200 lines)
 - 12 predefined color constants for convenience
@@ -541,6 +556,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 **Priority**: ✅ COMPLETE - Beta-ready
 
 ### Phase 7: Documentation & Release ✅ COMPLETE
+
 - [x] Headers/Footers (proper implementation with Section interface)
 - [x] Fields (complete: TOC, PageNumber, Hyperlink, StyleRef, etc.)
 - [x] Styles (comprehensive: 40+ built-in styles, ParagraphStyle, CharacterStyle)
@@ -548,6 +564,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - [x] Tests (95%+ coverage for all Phase 6 components)
 
 **Achievements:**
+
 - Implemented Section/Header/Footer with thread-safe operations
 - Complete Field system with 9 field types and dirty tracking
 - StyleManager with built-in and custom style support
@@ -556,6 +573,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - Example documentation and README files
 
 ### Phase 7: Documentation & Release ✅ COMPLETE
+
 - [x] Complete API documentation (docs/API_DOCUMENTATION.md updated with 465+ lines)
 - [x] Finalize migration guide from v1 (MIGRATION.md enhanced with Phase 6 examples)
 - [x] Complete examples (examples/05_styles, 06_sections, 07_advanced)
@@ -567,6 +585,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 **Status**: All documentation complete. Ready for beta release.
 
 **Achievements**:
+
 - 465 lines added to API_DOCUMENTATION.md covering all Phase 6 features
 - 400+ lines of migration examples in MIGRATION.md
 - 3 new comprehensive examples (05, 06, 07) with READMEs
@@ -576,9 +595,11 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 - All field creation functions exported with documentation
 
 ### ✅ Phase 8: Images & Media (Week 14) - COMPLETE
+
 **Goal**: Implement image insertion and media management
 
 **Status**: 100% Complete (commits 15cc7ce, 44c102e)
+
 - [x] Domain interfaces (image.go) (~172 lines)
   - [x] Image interface with dimensions, format, data
   - [x] ImageFormat enum (PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP)
@@ -630,6 +651,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
   - [x] Builds and runs successfully ✅
 
 **Completed**: ~1,600 lines across 7 files
+
 - domain/image.go: 172 lines
 - internal/core/image.go: 270 lines
 - internal/xml/drawing.go: 280 lines
@@ -643,9 +665,11 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 **Priority**: ✅ COMPLETE - Production ready
 
 ### ✅ Phase 9: Advanced Tables (Week 15)
+
 **Goal**: Implement advanced table features
 
 **Status**: 100% Complete (commits 34c439b, 38a08b1, e78d809)
+
 - [x] Cell merging (table.go enhancement) (~200 lines)
   - [x] Merge(cols, rows) method
   - [x] GridSpan() and SetGridSpan() for horizontal merge
@@ -681,6 +705,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 **Completed Files**:
 
 Part 1 (commits 34c439b, 38a08b1):
+
 - domain/table.go: +30 lines (GridSpan, VMerge, AddTable methods, VerticalMergeType enum)
 - internal/core/table.go: +80 lines (cell merge implementation)
 - internal/xml/table.go: +15 lines (GridSpan, VMerge XML structs)
@@ -688,6 +713,7 @@ Part 1 (commits 34c439b, 38a08b1):
 - internal/manager/id.go: +8 lines (GenerateID method)
 
 Part 2 (commit e78d809):
+
 - domain/table.go: +12 lines (8 predefined styles)
 - builder.go: +30 lines (Style, Merge methods)
 - internal/xml/table.go: +6 lines (TableStyle struct)
@@ -696,6 +722,7 @@ Part 2 (commit e78d809):
 - v2/examples/09_advanced_tables/main.go: 393 lines (6 use cases)
 
 **Tests**: 10 test cases (100% passing)
+
 - TestTableCellMerge_Horizontal ✅
 - TestTableCellMerge_Vertical ✅
 - TestTableCellMerge_Both ✅
@@ -708,6 +735,7 @@ Part 2 (commit e78d809):
 - TestTableCellAddTable_InvalidArguments ✅ (6 subcases)
 
 **Statistics**:
+
 - Total lines: ~1,000 lines
 - Part 1: ~153 lines (cell merging, nested tables)
 - Part 2: ~808 lines (styles, builder, tests, example)
@@ -715,6 +743,7 @@ Part 2 (commit e78d809):
 - Example: 393 lines (6 use cases)
 
 **Resolved Issues**:
+
 - ✅ Fixed w:tblStyle vs w:style XML tag conflict by creating separate TableStyle struct
 - ✅ Fixed package naming conflicts and interface definitions
 - ✅ All tests passing (100% success rate)
@@ -726,9 +755,11 @@ Part 2 (commit e78d809):
 **Priority**: HIGH - Essential for professional documents
 
 ### Phase 10: Document Reading (Week 16)
+
 **Goal**: Implement .docx file reading and modification
 
 **Status**: 🟡 In Progress (scaffolding + inline image hydration complete)
+
 - [x] Reader infrastructure (`internal/reader/`, ~300 LOC)
   - [x] ZIP extraction and content type detection
   - [x] Relationship resolution and media staging
@@ -739,14 +770,14 @@ Part 2 (commit e78d809):
   - [ ] Styles.xml import (preserve unknown nodes)
   - [ ] Relationship and media mapping
 - [ ] Domain reconstruction (`internal/core/`, ~300 LOC)
-  - [ ] Build sections, paragraphs, runs, tables from XML *(paragraph spacing/alignment/indentation, run text + formatting, breaks/tabs/fields, basic table hydration, inline image reconstruction, and paragraph numbering references complete)*
+  - [ ] Build sections, paragraphs, runs, tables from XML _(paragraph spacing/alignment/indentation, run text + formatting, breaks/tabs/fields, basic table hydration, inline image reconstruction, and paragraph numbering references complete)_
   - [x] Rehydrate inline media (images/drawings) and register media assets in managers
   - [x] Hydrate paragraph numbering references (numPr) and register numbering.xml
   - [x] Hydrate per-section layout (margins, headers/footers)
   - [ ] Rehydrate managers (IDs, styles, media)
   - [ ] Preserve forward compatibility fields where possible
 - [ ] Public API (`docx.go`, ~120 LOC)
-  - [ ] `OpenDocument(path string, opts ...Option)` *(basic path/stream/bytes helpers in place; awaits richer reconstruction before marking complete)*
+  - [ ] `OpenDocument(path string, opts ...Option)` _(basic path/stream/bytes helpers in place; awaits richer reconstruction before marking complete)_
   - [ ] `Open(r io.Reader)`, future `Document.Reload()` hook
   - [ ] Validation + error taxonomy alignment
 - [ ] Quality bar (`internal/core/reader_test.go`, ~500 LOC)
@@ -762,6 +793,7 @@ Part 2 (commit e78d809):
 **Priority**: MEDIUM - Nice to have for v2.0.0, essential for v2.1.0
 
 ### ✅ Phase 11: Code Quality & Optimization (Week 17) - COMPLETE
+
 **Goal**: Refactoring, optimization, and polish
 
 **Status**: 100% Complete (8/10 tasks completed, 1 task skipped)
@@ -769,17 +801,20 @@ Part 2 (commit e78d809):
 #### Completed Tasks (commits c120cb6, 67b3056, c445405, 098ceaf, 917f48d, b648bfe, 725d7d0)
 
 **Task 1: Review & Resolve TODOs** ✅
+
 - Analyzed entire codebase for TODO comments
 - Found 8 TODOs (4 in legacy, 4 legitimate)
 - Result: All legacy TODOs removed with code deletion
 
 **Task 2: Remove Dead Code** ✅
+
 - Deleted legacy/ directory: **95 files, 5.5MB, ~17,900 lines**
 - Removed internal/legacy/ and all v1 artifacts
 - Updated docs (V2_DESIGN.md, README.md, CONTRIBUTING.md)
 - Commit: c120cb6
 
 **Task 3: Naming Conventions & go vet** ✅
+
 - Fixed lock copy warnings in internal/core/section.go
 - Changed section managers to pointers (idMgr, mediaMgr, relMgr)
 - Updated NewSection() call in document.go
@@ -787,12 +822,14 @@ Part 2 (commit e78d809):
 - Commit: 67b3056
 
 **Task 4: Linter Setup** ✅
+
 - Updated .golangci.yml configuration
 - Enabled 30+ linters (errcheck, godoc, unparam, exhaustive, etc.)
 - Added custom rules for error wrapping and switch coverage
 - Commit: 67b3056
 
 **Task 5: Linter Fixes** ✅ (3 commits)
+
 - Fixed 100+ golangci-lint warnings across 20+ files
 - Part 1 (commit c445405):
   - Fixed errcheck warnings (22 instances)
@@ -805,6 +842,7 @@ Part 2 (commit e78d809):
 - Result: **100+ warnings → 0 warnings** (100% reduction)
 
 **Task 6: godoc Completion** ✅
+
 - Created comprehensive doc.go (240+ lines):
   - Package documentation with architecture overview
   - Quick start examples
@@ -827,6 +865,7 @@ Part 2 (commit e78d809):
 - Commit: 917f48d
 
 **Task 7: Test Coverage Analysis** ✅
+
 - Generated coverage reports:
   - coverage.out (raw data)
   - coverage.html (interactive visualization)
@@ -835,60 +874,62 @@ Part 2 (commit e78d809):
   - Executive summary
   - Coverage by package breakdown
   - Critical gaps identified:
-    * Section management (0% - CRITICAL)
-    * Document metadata/validation (0%)
-    * Paragraph advanced features (0%)
-    * Run advanced features (0%)
-    * All manager packages (0%)
-    * Utility packages (0%)
+    - Section management (0% - CRITICAL)
+    - Document metadata/validation (0%)
+    - Paragraph advanced features (0%)
+    - Run advanced features (0%)
+    - All manager packages (0%)
+    - Utility packages (0%)
   - **4-Week Improvement Plan** to reach 95%:
-    * Week 1: Critical Infrastructure → 67.7%
-    * Week 2: Core Functionality → 81.7%
-    * Week 3: Serialization & XML → 94.7%
-    * Week 4: Utilities & Edge Cases → 99.7%
+    - Week 1: Critical Infrastructure → 67.7%
+    - Week 2: Core Functionality → 81.7%
+    - Week 3: Serialization & XML → 94.7%
+    - Week 4: Utilities & Edge Cases → 99.7%
   - Test files to create (20+ files)
   - Testing strategy
   - Timeline and success metrics
 - Commit: b648bfe
 
 **Task 8: Benchmark Tests** ⏸️
+
 - Status: SKIPPED (by user choice)
 - Reason: Prioritized other improvements
 - Can be added later if performance issues arise
 
 **Task 9: Error Handling Review** ✅
+
 - Analyzed 34 error usage instances across codebase
 - Assessment: **✅ EXCELLENT** (production-ready)
 - Created comprehensive ERROR_HANDLING.md (900+ lines):
   - Error infrastructure analysis:
-    * DocxError - structured with rich context
-    * ValidationError - domain-specific validation
-    * BuilderError - error accumulation for fluent API
-    * 7 error codes defined
-    * 10+ helper functions
+    - DocxError - structured with rich context
+    - ValidationError - domain-specific validation
+    - BuilderError - error accumulation for fluent API
+    - 7 error codes defined
+    - 10+ helper functions
   - Usage analysis:
-    * 17 validation errors (consistent patterns)
-    * 5 not found errors (consistent patterns)
-    * 15 error wrapping (all use %w correctly)
+    - 17 validation errors (consistent patterns)
+    - 5 not found errors (consistent patterns)
+    - 15 error wrapping (all use %w correctly)
   - Best practices compliance:
-    * ✅ Error wrapping with %w
-    * ✅ Sentinel errors via codes
-    * ✅ Rich error context
-    * ✅ Error chains with Unwrap()
-    * ✅ Descriptive messages
-    * ✅ No panics in production code
-    * ⚠️ Could add godoc examples (LOW priority)
-    * ❌ 0% test coverage (LOW priority to fix)
+    - ✅ Error wrapping with %w
+    - ✅ Sentinel errors via codes
+    - ✅ Rich error context
+    - ✅ Error chains with Unwrap()
+    - ✅ Descriptive messages
+    - ✅ No panics in production code
+    - ⚠️ Could add godoc examples (LOW priority)
+    - ❌ 0% test coverage (LOW priority to fix)
   - Patterns by package:
-    * internal/core: EXCELLENT (consistent InvalidArgument)
-    * internal/manager: EXCELLENT (consistent NewValidationError)
-    * internal/writer: EXCELLENT (proper context wrapping)
-    * internal/serializer: GOOD (all use %w)
-    * internal/xml: GOOD (consistent patterns)
+    - internal/core: EXCELLENT (consistent InvalidArgument)
+    - internal/manager: EXCELLENT (consistent NewValidationError)
+    - internal/writer: EXCELLENT (proper context wrapping)
+    - internal/serializer: GOOD (all use %w)
+    - internal/xml: GOOD (consistent patterns)
   - Recommendations (all LOW priority):
-    * Add error tests (2-3 hours, 0% → 80%)
-    * Add godoc examples (1 hour)
-    * Consider sentinel errors (optional)
+    - Add error tests (2-3 hours, 0% → 80%)
+    - Add godoc examples (1 hour)
+    - Consider sentinel errors (optional)
   - Error handling guidelines (DO/DON'T)
   - 3 examples of excellent usage
   - Testing checklist
@@ -896,6 +937,7 @@ Part 2 (commit e78d809):
 - Commit: 725d7d0
 
 **Task 10: Documentation Overhaul** ✅
+
 - **Status**: COMPLETE (October 27, 2025)
 - Comprehensive documentation review and update
 - **Actions Taken**:
@@ -941,6 +983,7 @@ Part 2 (commit e78d809):
 - **Commit**: (in progress)
 
 **Documentation Organization**:
+
 ```
 docs/
 ├── V2_API_GUIDE.md             ⭐ Primary API reference (850 lines)
@@ -953,6 +996,7 @@ docs/
 ```
 
 **Key Improvements**:
+
 - ✅ Clean v2-only documentation (no legacy confusion)
 - ✅ Complete API reference for v2
 - ✅ Feature status transparency
@@ -962,6 +1006,7 @@ docs/
 #### Phase 11 Statistics
 
 **Code Changes:**
+
 - **Lines deleted**: ~17,900 (legacy code removal)
 - **Lines added**: ~4,500 (documentation, fixes, new docs)
 - **Files deleted**: 95 (legacy/)
@@ -971,6 +1016,7 @@ docs/
 - **Net change**: -13,400 lines (75% reduction)
 
 **Quality Improvements:**
+
 - **Linter warnings**: 100+ → 0 (100% reduction)
 - **go vet warnings**: 5 → 0
 - **TODOs**: 8 → 1 (87% reduction - 1 non-critical optimization TODO remains)
@@ -979,6 +1025,7 @@ docs/
 - **Documentation**: Comprehensive (3,500+ lines added)
 
 **Commits:**
+
 1. c120cb6 - Remove legacy v1 code (98 files, -17,922 lines)
 2. 67b3056 - Fix lock copy warnings and go vet issues
 3. c445405 - Fix golangci-lint warnings Part 1 (errcheck, godoc)
@@ -989,6 +1036,7 @@ docs/
 8. (pending) - Complete documentation overhaul - Task 10
 
 **Documentation Created/Updated:**
+
 - **doc.go**: 240+ lines (comprehensive package docs with examples)
 - **docs/COVERAGE_ANALYSIS.md**: 420 lines (coverage analysis + 4-week plan)
 - **docs/ERROR_HANDLING.md**: 900+ lines (error system review + guidelines)
@@ -999,6 +1047,7 @@ docs/
 - **Total documentation**: ~3,500 lines
 
 **Files Modified:**
+
 - .golangci.yml (linter configuration)
 - internal/core/section.go (lock fixes)
 - internal/core/document.go (NewSection call, TODO clarification)
@@ -1009,6 +1058,7 @@ docs/
 - 9 files with enhanced documentation
 
 **Quality Metrics:**
+
 - **Code cleanliness**: 99% (1 non-critical optimization TODO)
 - **Linting compliance**: 100% (0 warnings)
 - **Documentation**: EXCELLENT (comprehensive, organized, discoverable)
@@ -1019,9 +1069,11 @@ docs/
 #### Next Steps
 
 **Immediate:**
+
 - ✅ Complete Phase 11 documentation overhaul
 
 **Post-Phase 11 (Optional):**
+
 - Implement 4-week test coverage plan (50.7% → 95%)
 - Add benchmark tests (Task 8, skipped)
 - Add error package tests (0% → 80%)
@@ -1029,6 +1081,7 @@ docs/
 - Address optimization TODO in serializer.go (insertion order)
 
 **Phase 12 (v2.0.0 Release):**
+
 - Beta testing period
 - Community feedback integration
 - Bug fixes and stability improvements
@@ -1039,6 +1092,7 @@ docs/
 **Priority**: ✅ COMPLETE - Production-ready quality + comprehensive documentation achieved
 
 ### Phase 12: Beta Testing & Release (Week 18)
+
 - [ ] Integration testing
 - [ ] Community feedback integration
 - [ ] Bug fixes
@@ -1051,6 +1105,7 @@ docs/
 ## 🎯 Key Improvements Over v1
 
 ### 1. Type Safety
+
 ```go
 // v1: interface{} everywhere
 Children []interface{}
@@ -1061,6 +1116,7 @@ Tables []Table
 ```
 
 ### 2. Error Handling
+
 ```go
 // v1: No errors in fluent API
 para.AddText("test").Bold().Color("invalid") // Silent failure
@@ -1071,11 +1127,12 @@ doc.AddParagraph().
     Bold().
     Color("invalid"). // Error recorded
     End()
-    
+
 doc, err := builder.Build() // Errors surface here
 ```
 
 ### 3. Testability
+
 ```go
 // v2: Interface-based, easy to mock
 type MockDocument struct {
@@ -1089,6 +1146,7 @@ func (m *MockDocument) AddParagraph() (ParagraphBuilder, error) {
 ```
 
 ### 4. Separation of Concerns
+
 ```go
 // v1: God Object
 type Docx struct {
@@ -1104,6 +1162,7 @@ type docxDocument struct {
 ```
 
 ### 5. Performance
+
 ```go
 // v2: Optimizations
 - sync.Pool for frequently allocated objects
@@ -1117,22 +1176,26 @@ type docxDocument struct {
 ## 🧪 Testing Strategy
 
 ### Unit Tests
+
 - Every interface has a mock
 - Every implementation has tests
 - 80%+ coverage target
 
 ### Integration Tests
+
 - Full document creation → save → reload
 - Validation in Microsoft Word
 - Large document handling
 - Concurrent access
 
 ### Validation Tooling
+
 - DocxValidator (strict schema) integrated in example regression suite
 - Current status: ✅ All 12 generated examples pass strict OOXML validation
 - Regression guard: examples script filters legacy artifacts and runs validator on all fresh outputs
 
 ### Benchmark Tests
+
 ```go
 BenchmarkDocumentCreation
 BenchmarkParagraphAddition
@@ -1141,6 +1204,7 @@ BenchmarkSerialization
 ```
 
 ### Compatibility Tests
+
 - v1 → v2 migration examples
 - Roundtrip tests (create → save → load → verify)
 
@@ -1149,6 +1213,7 @@ BenchmarkSerialization
 ## 📝 API Examples
 
 ### Basic Document
+
 ```go
 doc := docx.NewDocument()
 
@@ -1164,6 +1229,7 @@ finalDoc.SaveAs("hello.docx")
 ```
 
 ### Complex Document
+
 ```go
 doc := docx.NewDocument(
     docx.WithDefaultFont("Arial"),
@@ -1193,6 +1259,7 @@ return finalDoc.SaveAs("report.docx")
 ```
 
 ### With Error Handling
+
 ```go
 doc := docx.NewDocument()
 
@@ -1216,6 +1283,7 @@ if err != nil {
 ## 🚀 Success Criteria
 
 ### Must Have
+
 - [ ] Clean, interface-based architecture
 - [ ] Proper error handling throughout
 - [ ] 80%+ test coverage
@@ -1224,6 +1292,7 @@ if err != nil {
 - [ ] Can open/edit files created by v1
 
 ### Nice to Have
+
 - [ ] 90%+ test coverage
 - [ ] Performance > v1 (10%+ improvement)
 - [ ] Plugin system for custom elements
@@ -1247,11 +1316,13 @@ if err != nil {
 ## 🤝 Credits & Authorship
 
 ### Current Development (v2)
+
 - **Author**: Misael Monterroca (misael@monterroca.com)
 - **GitHub**: https://github.com/mmonterroca/docxgo
 - **Role**: Complete architectural rewrite, clean architecture implementation
 
 ### Previous Contributions
+
 - **fumiama** (2022-2024): Original fork with enhanced features
 - **Gonzalo Fernández-Victorio** (2020-2022): Original `gonfva/docxlib` library
 
@@ -1268,8 +1339,8 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 
 ---
 
-**Last Updated**: February 2026  
-**Status**: ✅ v2.2.2 Stable  
+**Last Updated**: February 2026
+**Status**: ✅ v2.3.0 Stable
 **Progress**: Production Ready (all core features complete)
 
 **Current State:**
@@ -1282,4 +1353,6 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 - ✅ Documentation: Comprehensive (13 working examples, full API guide)
 - ✅ All 12 phases complete
 
-````
+```
+
+```

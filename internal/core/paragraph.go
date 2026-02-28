@@ -521,3 +521,34 @@ func (p *paragraph) SetBorderRight(border domain.BorderStyle) error {
 	p.borders.Right = border
 	return nil
 }
+
+// ClearRuns removes all runs from the paragraph.
+func (p *paragraph) ClearRuns() {
+	p.runs = p.runs[:0]
+}
+
+// RemoveRun removes the run at the given index.
+func (p *paragraph) RemoveRun(index int) error {
+	if index < 0 || index >= len(p.runs) {
+		return errors.NewValidationError("Paragraph.RemoveRun", "index", index, "run index out of range")
+	}
+	p.runs = append(p.runs[:index], p.runs[index+1:]...)
+	return nil
+}
+
+// InsertRunAt inserts a new empty run at the given index and returns it.
+// Index must be in [0, len(runs)].
+func (p *paragraph) InsertRunAt(index int) (domain.Run, error) {
+	if index < 0 || index > len(p.runs) {
+		return nil, errors.NewValidationError("Paragraph.InsertRunAt", "index", index, "run index out of range")
+	}
+	id := p.idGen.NextRunID()
+	r := NewRun(id, p.relManager)
+	if index == len(p.runs) {
+		p.runs = append(p.runs, r)
+	} else {
+		p.runs = append(p.runs[:index+1], p.runs[index:]...)
+		p.runs[index] = r
+	}
+	return r, nil
+}
