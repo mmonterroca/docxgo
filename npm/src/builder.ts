@@ -24,6 +24,15 @@ import type {
   IndexResult,
   ParagraphListResult,
   TableListResult,
+  PingResult,
+  SystemVersionResult,
+  SystemCapabilitiesResult,
+  BatchRequest,
+  BatchResult,
+  TemplateInspectResult,
+  TemplateRenderResult,
+  PatchOperation,
+  ApplyPatchResult,
 } from './types';
 
 export { DocxgoError };
@@ -404,6 +413,98 @@ export class DocumentBuilder {
       await this.rpc.call('document.close', { documentId: this.documentId });
       this.documentId = null;
     }
+  }
+
+  // ─── System methods ──────────────────────────────────────────────────
+
+  /** Ping the RPC process to verify it's alive. */
+  async ping(): Promise<PingResult> {
+    return this.rpc.call<PingResult>('system.ping');
+  }
+
+  /** Get version and platform info from the RPC process. */
+  async version(): Promise<SystemVersionResult> {
+    return this.rpc.call<SystemVersionResult>('system.version');
+  }
+
+  /** Get the list of supported features/capabilities. */
+  async capabilities(): Promise<SystemCapabilitiesResult> {
+    return this.rpc.call<SystemCapabilitiesResult>('system.capabilities');
+  }
+
+  /**
+   * Execute multiple RPC requests in a single roundtrip.
+   *
+   * @param requests Array of { method, params } objects.
+   * @returns Batch result with an array of per-request responses.
+   */
+  async batch(requests: BatchRequest[]): Promise<BatchResult> {
+    return this.rpc.call<BatchResult>('system.batch', {
+      requests,
+    } as Record<string, unknown>);
+  }
+
+  // ─── Template methods ────────────────────────────────────────────────
+
+  /**
+   * Inspect template placeholders in the currently opened document.
+   *
+   * @param options Optional delimiter overrides.
+   * @returns Placeholder names, count, occurrences, and detailed locations.
+   */
+  async inspectTemplate(options?: {
+    openDelimiter?: string;
+    closeDelimiter?: string;
+  }): Promise<TemplateInspectResult> {
+    this.requireDocumentId();
+    return this.rpc.call<TemplateInspectResult>('template.inspect', {
+      documentId: this.documentId,
+      ...options,
+    });
+  }
+
+  /**
+   * Render template placeholders in the currently opened document.
+   *
+   * Replaces `{{key}}` placeholders with the provided data values.
+   *
+   * @param data Key-value map of placeholder replacements.
+   * @param options Optional strictMode and delimiter overrides.
+   * @returns Render result with optional validation warnings.
+   */
+  async renderTemplate(
+    data: Record<string, string>,
+    options?: {
+      strictMode?: boolean;
+      openDelimiter?: string;
+      closeDelimiter?: string;
+    },
+  ): Promise<TemplateRenderResult> {
+    this.requireDocumentId();
+    return this.rpc.call<TemplateRenderResult>('template.render', {
+      documentId: this.documentId,
+      data,
+      ...options,
+    });
+  }
+
+  // ─── Patch method ────────────────────────────────────────────────────
+
+  /**
+   * Apply a sequence of patch operations to the currently opened document.
+   *
+   * Operations are applied atomically — if any fails, subsequent ones
+   * are not applied and the error includes the failing index.
+   *
+   * @param operations Array of patch operations.
+   * @returns Result with count of applied operations.
+   */
+  async applyPatch(operations: PatchOperation[]): Promise<ApplyPatchResult> {
+    this.requireDocumentId();
+    return this.rpc.call<ApplyPatchResult>('document.applyPatch', {
+      documentId: this.documentId,
+      operations,
+    });
   }
 
   // ─── Lifecycle ───────────────────────────────────────────────────────

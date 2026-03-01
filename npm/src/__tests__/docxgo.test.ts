@@ -5,7 +5,11 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs
 import { tmpdir } from 'os';
 
 import { DocxgoRPC, DocxgoExec, DocumentBuilder, DocxgoError, resolveBinary } from '../index';
-import type { BufferResult, FileResult, InspectResult, ParagraphListResult, TableListResult } from '../types';
+import type {
+  BufferResult, FileResult, InspectResult, ParagraphListResult, TableListResult,
+  PingResult, SystemVersionResult, SystemCapabilitiesResult, BatchResult,
+  TemplateInspectResult, TemplateRenderResult, ApplyPatchResult,
+} from '../types';
 
 const BINARY = join(__dirname, '..', '..', 'bin', 'docxgo');
 
@@ -350,5 +354,328 @@ describe('DocumentBuilder', () => {
       () => doc.inspect(),
       { message: 'No document is open. Call open() first.' },
     );
+  });
+});
+
+// ─── System Methods ──────────────────────────────────────────────────────────
+
+describe('System Methods (via DocumentBuilder)', () => {
+  let doc: DocumentBuilder;
+
+  before(() => {
+    doc = new DocumentBuilder({ binaryPath: BINARY });
+  });
+
+  after(() => {
+    doc.dispose();
+  });
+
+  it('system.ping returns ok', async () => {
+    const result = await doc.ping();
+    assert.equal(result.status, 'ok');
+  });
+
+  it('system.version returns version info', async () => {
+    const result = await doc.version();
+    assert.equal(result.name, 'docxgo');
+    assert.ok(result.version);
+    assert.ok(result.protocolVersion);
+    assert.ok(result.goVersion);
+    assert.ok(result.platform);
+    assert.ok(result.arch);
+  });
+
+  it('system.capabilities returns features', async () => {
+    const result = await doc.capabilities();
+    assert.equal(result.rpc, true);
+    assert.equal(result.template, true);
+    assert.equal(result.batch, true);
+    assert.equal(result.applyPatch, true);
+  });
+});
+
+// ─── Batch Methods ───────────────────────────────────────────────────────────
+
+describe('system.batch (via DocumentBuilder)', () => {
+  let doc: DocumentBuilder;
+
+  before(() => {
+    doc = new DocumentBuilder({ binaryPath: BINARY });
+  });
+
+  after(() => {
+    doc.dispose();
+  });
+
+  it('executes multiple requests in a single batch', async () => {
+    const result = await doc.batch([
+      { method: 'system.ping' },
+      { method: 'system.version' },
+    ]);
+
+    assert.equal(result.responses.length, 2);
+    assert.deepEqual((result.responses[0].result as PingResult).status, 'ok');
+    assert.ok((result.responses[1].result as SystemVersionResult).version);
+  });
+
+  it('returns per-request error for invalid method', async () => {
+    const result = await doc.batch([
+      { method: 'system.ping' },
+      { method: 'nonexistent.method' },
+    ]);
+
+    assert.equal(result.responses.length, 2);
+    assert.ok(result.responses[0].result);
+    assert.ok(result.responses[1].error);
+    assert.equal(result.responses[1].error!.code, 'METHOD_NOT_FOUND');
+  });
+
+  it('rejects nested batch', async () => {
+    const result = await doc.batch([
+      { method: 'system.batch', params: { requests: [{ method: 'system.ping' }] } },
+    ]);
+
+    assert.equal(result.responses.length, 1);
+    assert.ok(result.responses[0].error);
+    assert.equal(result.responses[0].error!.code, 'VALIDATION_ERROR');
+  });
+});
+
+// ─── Template Methods ────────────────────────────────────────────────────────
+
+describe('Template Methods (via DocumentBuilder)', () => {
+  let doc: DocumentBuilder;
+
+  before(() => {
+    doc = new DocumentBuilder({ binaryPath: BINARY });
+  });
+
+  after(() => {
+    doc.dispose();
+  });
+
+  it('inspects template placeholders', async () => {
+    // Create a document with placeholders
+    const result = await doc
+      .addParagraph('Hello {{Name}}, welcome to {{Company}}!')
+      .addParagraph('Your role is {{Role}} at {{Company}}.')
+      .create();
+    doc.reset();
+
+    await doc.openFromBase64(result.data);
+
+    const inspection = await doc.inspectTemplate();
+    assert.ok(inspection.placeholders.length >= 2);
+    assert.ok(inspection.count >= 2);
+    assert.ok(inspection.occurrences >= 3); // Company appears twice
+    assert.ok(inspection.details.length >= 3);
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+
+  it('renders template placeholders', async () => {
+    // Create a document with placeholders
+    const result = await doc
+      .addParagraph('Hello {{Name}}, welcome!')
+      .create();
+    doc.reset();
+
+    await doc.openFromBase64(result.data);
+
+    const renderResult = await doc.renderTemplate({
+      Name: 'Alice',
+    });
+    assert.equal(renderResult.ok, true);
+
+    // Verify the text was replaced
+    const inspection = await doc.inspect();
+    const allText = inspection.text.join(' ');
+    assert.ok(allText.includes('Alice'));
+    assert.ok(!allText.includes('{{Name}}'));
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+
+  it('template.render with strict mode rejects on missing keys', async () => {
+    const result = await doc
+      .addParagraph('Dear {{Name}}, your code is {{Code}}.')
+      .create();
+    doc.reset();
+
+    await doc.openFromBase64(result.data);
+
+    // Strict mode should reject when keys are missing
+    await assert.rejects(
+      () => doc.renderTemplate(
+        { Name: 'Bob' },
+        { strictMode: true },
+      ),
+      (err: unknown) => {
+        assert.ok(err instanceof DocxgoError);
+        assert.equal(err.code, 'TEMPLATE_ERROR');
+        assert.ok(err.data);
+        assert.equal(err.data!.category, 'merge');
+        return true;
+      },
+    );
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+});
+
+// ─── ApplyPatch Methods ──────────────────────────────────────────────────────
+
+describe('document.applyPatch (via DocumentBuilder)', () => {
+  let doc: DocumentBuilder;
+
+  before(() => {
+    doc = new DocumentBuilder({ binaryPath: BINARY });
+  });
+
+  after(() => {
+    doc.dispose();
+  });
+
+  it('applies multiple patch operations', async () => {
+    const result = await doc
+      .addParagraph('Initial content')
+      .create();
+    doc.reset();
+
+    await doc.openFromBase64(result.data);
+
+    const patchResult = await doc.applyPatch([
+      { op: 'appendParagraph', runs: [{ text: 'Patched paragraph' }] },
+      { op: 'appendPageBreak' },
+      { op: 'appendParagraph', style: 'Heading1', runs: [{ text: 'New Section' }] },
+    ]);
+
+    assert.equal(patchResult.ok, true);
+    assert.equal(patchResult.applied, 3);
+
+    // Verify content was added
+    const inspection = await doc.inspect();
+    assert.ok(inspection.paragraphCount >= 3);
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+
+  it('applies setMetadata operation', async () => {
+    const result = await doc
+      .addParagraph('Doc with metadata')
+      .create();
+    doc.reset();
+
+    await doc.openFromBase64(result.data);
+
+    const patchResult = await doc.applyPatch([
+      { op: 'setMetadata', title: 'Patched Title', creator: 'Patch Author' },
+    ]);
+
+    assert.equal(patchResult.ok, true);
+    assert.equal(patchResult.applied, 1);
+
+    const inspection = await doc.inspect();
+    assert.equal(inspection.metadata?.title, 'Patched Title');
+    assert.equal(inspection.metadata?.creator, 'Patch Author');
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+
+  it('reports error with index for unknown operation', async () => {
+    const result = await doc
+      .addParagraph('Test')
+      .create();
+    doc.reset();
+
+    await doc.openFromBase64(result.data);
+
+    await assert.rejects(
+      () => doc.applyPatch([
+        { op: 'appendParagraph', runs: [{ text: 'OK' }] },
+        { op: 'unknownOp' as any },
+      ]),
+      (err: unknown) => {
+        assert.ok(err instanceof DocxgoError);
+        assert.equal(err.code, 'VALIDATION_ERROR');
+        assert.ok(err.data);
+        assert.equal(err.data!.index, 1);
+        return true;
+      },
+    );
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+});
+
+// ─── Integration: Template + Patch + Batch ───────────────────────────────────
+
+describe('Integration: Template + Patch + Batch workflow', () => {
+  let doc: DocumentBuilder;
+
+  before(() => {
+    doc = new DocumentBuilder({ binaryPath: BINARY });
+  });
+
+  after(() => {
+    doc.dispose();
+  });
+
+  it('creates template, inspects, renders, patches, and saves', async () => {
+    // 1. Create a template document
+    const createResult = await doc
+      .addHeading('Invoice for {{CustomerName}}')
+      .addParagraph('Date: {{Date}}')
+      .addParagraph('Amount: {{Amount}}')
+      .create();
+    doc.reset();
+
+    // 2. Open it
+    await doc.openFromBase64(createResult.data);
+
+    // 3. Inspect placeholders
+    const inspection = await doc.inspectTemplate();
+    assert.ok(inspection.placeholders.includes('CustomerName'));
+    assert.ok(inspection.placeholders.includes('Date'));
+    assert.ok(inspection.placeholders.includes('Amount'));
+
+    // 4. Render template
+    const renderResult = await doc.renderTemplate({
+      CustomerName: 'Acme Corp',
+      Date: '2025-01-15',
+      Amount: '$1,234.56',
+    });
+    assert.equal(renderResult.ok, true);
+
+    // 5. Apply patch to add more content
+    const patchResult = await doc.applyPatch([
+      { op: 'appendParagraph', runs: [{ text: 'Thank you for your business!' }] },
+      { op: 'setMetadata', title: 'Invoice #1234' },
+    ]);
+    assert.equal(patchResult.ok, true);
+    assert.equal(patchResult.applied, 2);
+
+    // 6. Verify final content
+    const finalInspection = await doc.inspect();
+    const allText = finalInspection.text.join(' ');
+    assert.ok(allText.includes('Acme Corp'));
+    assert.ok(allText.includes('Thank you'));
+    assert.equal(finalInspection.metadata?.title, 'Invoice #1234');
+
+    // 7. Save
+    const tmpDir = mkdtempSync(join(tmpdir(), 'docxgo-integration-'));
+    const filePath = join(tmpDir, 'invoice.docx');
+    await doc.saveToFile(filePath);
+    assert.ok(existsSync(filePath));
+
+    await doc.closeDocument();
+    doc.reset();
+    rmSync(tmpDir, { recursive: true });
   });
 });

@@ -19,6 +19,8 @@ export interface RPCError {
   code: string;
   message: string;
   operation?: string;
+  /** Additional structured data (e.g. { index, category, retryable }). */
+  data?: Record<string, unknown>;
 }
 
 // ─── Document Options ────────────────────────────────────────────────────────
@@ -389,4 +391,181 @@ export interface TableInfo {
 export interface TableListResult {
   count: number;
   tables: TableInfo[];
+}
+
+// ─── System Types ────────────────────────────────────────────────────────────
+
+/** Result of system.ping. */
+export interface PingResult {
+  status: 'ok';
+}
+
+/** Result of system.version. */
+export interface SystemVersionResult {
+  name: string;
+  version: string;
+  protocolVersion: string;
+  goVersion: string;
+  platform: string;
+  arch: string;
+}
+
+/** Result of system.capabilities — flat map of feature → enabled. */
+export type SystemCapabilitiesResult = Record<string, boolean>;
+
+/** A single request within a system.batch call. */
+export interface BatchRequest {
+  method: string;
+  params?: Record<string, unknown>;
+}
+
+/** Params for system.batch. */
+export interface BatchParams {
+  requests: BatchRequest[];
+}
+
+/** A single response in a batch result. */
+export interface BatchResponseEntry {
+  result?: unknown;
+  error?: RPCError;
+}
+
+/** Result of system.batch. */
+export interface BatchResult {
+  responses: BatchResponseEntry[];
+}
+
+// ─── Template Types ──────────────────────────────────────────────────────────
+
+/** Params for template.inspect. */
+export interface TemplateInspectParams {
+  documentId: string;
+  openDelimiter?: string;
+  closeDelimiter?: string;
+}
+
+/** A placeholder location detail. */
+export interface PlaceholderDetail {
+  name: string;
+  fullMatch: string;
+  location: string;
+  paragraph: number;
+  run: number;
+  table?: number;
+  row?: number;
+  cell?: number;
+}
+
+/** Result of template.inspect. */
+export interface TemplateInspectResult {
+  placeholders: string[];
+  count: number;
+  occurrences: number;
+  details: PlaceholderDetail[];
+}
+
+/** Params for template.render. */
+export interface TemplateRenderParams {
+  documentId: string;
+  data: Record<string, string>;
+  strictMode?: boolean;
+  openDelimiter?: string;
+  closeDelimiter?: string;
+}
+
+/** A validation warning from template.render. */
+export interface TemplateWarning {
+  severity: 'error' | 'warning';
+  key: string;
+  message: string;
+}
+
+/** Result of template.render. */
+export interface TemplateRenderResult {
+  ok: boolean;
+  warnings?: TemplateWarning[];
+}
+
+// ─── ApplyPatch Types ────────────────────────────────────────────────────────
+
+/** Base patch operation. */
+export interface PatchOperationBase {
+  op: string;
+}
+
+/** Append a paragraph. */
+export interface AppendParagraphOp extends PatchOperationBase {
+  op: 'appendParagraph';
+  style?: string;
+  alignment?: Alignment;
+  spacingBefore?: number;
+  spacingAfter?: number;
+  lineSpacing?: LineSpacingDef;
+  indent?: IndentDef;
+  numbering?: NumberingDef;
+  borders?: ParagraphBordersDef;
+  runs?: RunDef[];
+}
+
+/** Append a table. */
+export interface AppendTableOp extends PatchOperationBase {
+  op: 'appendTable';
+  rows?: TableRowDef[];
+  alignment?: Alignment;
+  style?: string;
+  width?: TableWidthDef;
+}
+
+/** Append a section. */
+export interface AppendSectionOp extends PatchOperationBase {
+  op: 'appendSection';
+  breakType?: SectionBreakType;
+  pageSize?: PageSize;
+  margins?: Margins;
+  orientation?: Orientation;
+  columns?: number;
+}
+
+/** Append a page break. */
+export interface AppendPageBreakOp extends PatchOperationBase {
+  op: 'appendPageBreak';
+}
+
+/** Set document metadata. */
+export interface SetMetadataOp extends PatchOperationBase {
+  op: 'setMetadata';
+  title?: string;
+  subject?: string;
+  creator?: string;
+  description?: string;
+  keywords?: string[];
+  created?: string;
+  modified?: string;
+}
+
+/** Set document background color. */
+export interface SetBackgroundColorOp extends PatchOperationBase {
+  op: 'setBackgroundColor';
+  color: string;
+}
+
+/** Union of all patch operations. */
+export type PatchOperation =
+  | AppendParagraphOp
+  | AppendTableOp
+  | AppendSectionOp
+  | AppendPageBreakOp
+  | SetMetadataOp
+  | SetBackgroundColorOp;
+
+/** Params for document.applyPatch. */
+export interface ApplyPatchParams {
+  documentId: string;
+  operations: PatchOperation[];
+}
+
+/** Result of document.applyPatch. */
+export interface ApplyPatchResult {
+  ok: boolean;
+  applied: number;
 }

@@ -17,11 +17,15 @@ type Response struct {
 	Error  *RPCError   `json:"error,omitempty"`
 }
 
+// ProtocolVersion is the JSON-RPC protocol version for feature negotiation.
+const ProtocolVersion = "1.0"
+
 // RPCError represents an error in a JSON-RPC response.
 type RPCError struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Operation string `json:"operation,omitempty"`
+	Code      string                 `json:"code"`
+	Message   string                 `json:"message"`
+	Operation string                 `json:"operation,omitempty"`
+	Data      map[string]interface{} `json:"data,omitempty"`
 }
 
 // errorResponse is a convenience helper that builds an error Response.
@@ -32,6 +36,19 @@ func errorResponse(id interface{}, code, message, operation string) Response {
 			Code:      code,
 			Message:   message,
 			Operation: operation,
+		},
+	}
+}
+
+// errorResponseWithData builds an error Response with extra data.
+func errorResponseWithData(id interface{}, code, message, operation string, data map[string]interface{}) Response {
+	return Response{
+		ID: id,
+		Error: &RPCError{
+			Code:      code,
+			Message:   message,
+			Operation: operation,
+			Data:      data,
 		},
 	}
 }

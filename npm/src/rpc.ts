@@ -9,12 +9,14 @@ import type { RPCRequest, RPCResponse, RPCError } from './types';
 export class DocxgoError extends Error {
   readonly code: string;
   readonly operation?: string;
+  readonly data?: Record<string, unknown>;
 
   constructor(err: RPCError) {
     super(err.message);
     this.name = 'DocxgoError';
     this.code = err.code;
     this.operation = err.operation;
+    this.data = err.data;
   }
 }
 

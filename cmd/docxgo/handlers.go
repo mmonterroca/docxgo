@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	docx "github.com/mmonterroca/docxgo/v2"
 	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/pkg/errors"
+	"github.com/mmonterroca/docxgo/v2/pkg/template"
 	"github.com/mmonterroca/docxgo/v2/themes"
 )
 
@@ -69,6 +71,16 @@ func (s *server) removeDoc(id string) bool {
 // dispatch routes a request to the appropriate handler.
 func (s *server) dispatch(req *Request) Response {
 	switch req.Method {
+	// system.*
+	case "system.ping":
+		return s.handleSystemPing(req)
+	case "system.version":
+		return s.handleSystemVersion(req)
+	case "system.capabilities":
+		return s.handleSystemCapabilities(req)
+	case "system.batch":
+		return s.handleSystemBatch(req)
+	// document.*
 	case "document.create":
 		return s.handleCreate(req)
 	case "document.open":
@@ -87,18 +99,28 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleAddContent(req)
 	case "document.addPageBreak":
 		return s.handleAddPageBreak(req)
+	case "document.applyPatch":
+		return s.handleApplyPatch(req)
+	case "document.close":
+		return s.handleClose(req)
+	// paragraph.*
 	case "paragraph.add":
 		return s.handleParagraphAdd(req)
 	case "paragraph.list":
 		return s.handleParagraphList(req)
+	// table.*
 	case "table.add":
 		return s.handleTableAdd(req)
 	case "table.list":
 		return s.handleTableList(req)
+	// section.*
 	case "section.add":
 		return s.handleSectionAdd(req)
-	case "document.close":
-		return s.handleClose(req)
+	// template.*
+	case "template.inspect":
+		return s.handleTemplateInspect(req)
+	case "template.render":
+		return s.handleTemplateRender(req)
 	default:
 		return errorResponse(req.ID, "METHOD_NOT_FOUND",
 			fmt.Sprintf("unknown method: %s", req.Method), req.Method)
@@ -208,6 +230,44 @@ type tableListParams struct {
 type sectionAddParams struct {
 	DocumentID string `json:"documentId"`
 	sectionItem
+}
+
+// applyPatchParams are the parameters for document.applyPatch.
+type applyPatchParams struct {
+	DocumentID string            `json:"documentId"`
+	Operations []json.RawMessage `json:"operations"`
+}
+
+// patchOperation represents a single operation within document.applyPatch.
+type patchOperation struct {
+	Op string `json:"op"`
+}
+
+// templateInspectParams are the parameters for template.inspect.
+type templateInspectParams struct {
+	DocumentID     string `json:"documentId"`
+	OpenDelimiter  string `json:"openDelimiter,omitempty"`
+	CloseDelimiter string `json:"closeDelimiter,omitempty"`
+}
+
+// templateRenderParams are the parameters for template.render.
+type templateRenderParams struct {
+	DocumentID     string            `json:"documentId"`
+	Data           map[string]string `json:"data"`
+	StrictMode     bool              `json:"strictMode,omitempty"`
+	OpenDelimiter  string            `json:"openDelimiter,omitempty"`
+	CloseDelimiter string            `json:"closeDelimiter,omitempty"`
+}
+
+// batchRequest is a single request inside a system.batch call.
+type batchRequest struct {
+	Method string          `json:"method"`
+	Params json.RawMessage `json:"params,omitempty"`
+}
+
+// batchParams are the parameters for system.batch.
+type batchParams struct {
+	Requests []batchRequest `json:"requests"`
 }
 
 // ─── Content item types ──────────────────────────────────────────────────────
@@ -820,6 +880,335 @@ func (s *server) handleClose(req *Request) Response {
 	}
 
 	return Response{ID: req.ID, Result: map[string]interface{}{"ok": true}}
+}
+
+// ─── System handlers ──────────────────────────────────────────────────────────
+
+func (s *server) handleSystemPing(req *Request) Response {
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"status": "ok",
+	}}
+}
+
+func (s *server) handleSystemVersion(req *Request) Response {
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"name":            "docxgo",
+		"version":         docx.Version,
+		"protocolVersion": ProtocolVersion,
+		"goVersion":       runtime.Version(),
+		"platform":        runtime.GOOS,
+		"arch":            runtime.GOARCH,
+	}}
+}
+
+func (s *server) handleSystemCapabilities(req *Request) Response {
+	return Response{ID: req.ID, Result: capabilitiesMap()}
+}
+
+func (s *server) handleSystemBatch(req *Request) Response {
+	const op = "system.batch"
+
+	var params batchParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	if len(params.Requests) == 0 {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "requests array is required and must not be empty", op)
+	}
+
+	results := make([]interface{}, 0, len(params.Requests))
+	for i, br := range params.Requests {
+		if br.Method == "system.batch" {
+			results = append(results, map[string]interface{}{
+				"error": map[string]interface{}{
+					"code":    errors.ErrCodeValidation,
+					"message": "system.batch cannot be nested",
+				},
+			})
+			continue
+		}
+
+		subReq := &Request{
+			ID:     i + 1,
+			Method: br.Method,
+			Params: br.Params,
+		}
+		resp := s.dispatch(subReq)
+
+		if resp.Error != nil {
+			results = append(results, map[string]interface{}{
+				"error": resp.Error,
+			})
+		} else {
+			results = append(results, map[string]interface{}{
+				"result": resp.Result,
+			})
+		}
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"responses": results,
+	}}
+}
+
+// ─── Template handlers ───────────────────────────────────────────────────────
+
+func (s *server) handleTemplateInspect(req *Request) Response {
+	const op = "template.inspect"
+
+	var params templateInspectParams
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	placeholders := template.FindPlaceholders(doc)
+
+	// Build unique names list (preserving first-seen order)
+	seen := make(map[string]struct{})
+	var names []string
+	for _, p := range placeholders {
+		if _, ok := seen[p.Name]; !ok {
+			seen[p.Name] = struct{}{}
+			names = append(names, p.Name)
+		}
+	}
+
+	// Build detailed locations
+	locations := make([]map[string]interface{}, 0, len(placeholders))
+	for _, p := range placeholders {
+		loc := map[string]interface{}{
+			"name":      p.Name,
+			"fullMatch": p.FullMatch,
+			"location":  locationTypeName(p.Location.Type),
+			"paragraph": p.Location.ParagraphIndex,
+			"run":       p.Location.RunIndex,
+		}
+		if p.Location.TableIndex >= 0 {
+			loc["table"] = p.Location.TableIndex
+			loc["row"] = p.Location.RowIndex
+			loc["cell"] = p.Location.CellIndex
+		}
+		locations = append(locations, loc)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"placeholders": names,
+		"count":        len(names),
+		"occurrences":  len(placeholders),
+		"details":      locations,
+	}}
+}
+
+func (s *server) handleTemplateRender(req *Request) Response {
+	const op = "template.render"
+
+	var params templateRenderParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if len(params.Data) == 0 {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "data map is required and must not be empty", op)
+	}
+
+	opts := template.DefaultMergeOptions()
+	opts.StrictMode = params.StrictMode
+	if params.OpenDelimiter != "" {
+		opts.OpenDelimiter = params.OpenDelimiter
+	}
+	if params.CloseDelimiter != "" {
+		opts.CloseDelimiter = params.CloseDelimiter
+	}
+
+	// Validate first
+	validationErrors := template.ValidateTemplate(doc, template.MergeData(params.Data), opts)
+	var warnings []map[string]interface{}
+	for _, ve := range validationErrors {
+		sev := "error"
+		if ve.Severity == template.SeverityWarning {
+			sev = "warning"
+		}
+		warnings = append(warnings, map[string]interface{}{
+			"severity": sev,
+			"key":      ve.Key,
+			"message":  ve.Message,
+		})
+	}
+
+	// Perform the merge
+	if err := template.MergeTemplate(doc, template.MergeData(params.Data), opts); err != nil {
+		return errorResponseWithData(req.ID, "TEMPLATE_ERROR", err.Error(), op, map[string]interface{}{
+			"category":  "merge",
+			"retryable": false,
+		})
+	}
+
+	result := map[string]interface{}{
+		"ok": true,
+	}
+	if len(warnings) > 0 {
+		result["warnings"] = warnings
+	}
+
+	return Response{ID: req.ID, Result: result}
+}
+
+// ─── ApplyPatch handler ──────────────────────────────────────────────────────
+
+func (s *server) handleApplyPatch(req *Request) Response {
+	const op = "document.applyPatch"
+
+	var params applyPatchParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if len(params.Operations) == 0 {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "operations array is required and must not be empty", op)
+	}
+
+	applied := 0
+	for i, raw := range params.Operations {
+		var pOp patchOperation
+		if err := json.Unmarshal(raw, &pOp); err != nil {
+			return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+				fmt.Sprintf("invalid operation at index %d: %v", i, err), op,
+				map[string]interface{}{"index": i})
+		}
+
+		switch pOp.Op {
+		case "appendParagraph":
+			var pItem paragraphItem
+			if err := json.Unmarshal(raw, &pItem); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("invalid appendParagraph at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+			para, err := doc.AddParagraph()
+			if err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeInternal,
+					fmt.Sprintf("failed to add paragraph at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+			if err := applyParagraph(para, pItem); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("failed to apply paragraph at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+
+		case "appendTable":
+			var tItem tableItem
+			if err := json.Unmarshal(raw, &tItem); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("invalid appendTable at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+			if err := applyTable(doc, tItem); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("failed to apply table at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+
+		case "appendSection":
+			var sItem sectionItem
+			if err := json.Unmarshal(raw, &sItem); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("invalid appendSection at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+			if err := applySection(doc, sItem); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("failed to apply section at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+
+		case "appendPageBreak":
+			if err := doc.AddPageBreak(); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeInternal,
+					fmt.Sprintf("failed to add page break at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+
+		case "setMetadata":
+			var mp setMetadataParams
+			if err := json.Unmarshal(raw, &mp); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("invalid setMetadata at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+			meta := &domain.Metadata{
+				Title:       mp.Title,
+				Subject:     mp.Subject,
+				Creator:     mp.Creator,
+				Description: mp.Description,
+				Keywords:    mp.Keywords,
+				Created:     mp.Created,
+				Modified:    mp.Modified,
+			}
+			if err := doc.SetMetadata(meta); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("failed to set metadata at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+
+		case "setBackgroundColor":
+			var bcp struct {
+				Op    string `json:"op"`
+				Color string `json:"color"`
+			}
+			if err := json.Unmarshal(raw, &bcp); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("invalid setBackgroundColor at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+			color, err := parseHexColor(bcp.Color)
+			if err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("invalid color at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+			if err := doc.SetBackgroundColor(color); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("failed to set background color at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i})
+			}
+
+		default:
+			return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+				fmt.Sprintf("unknown operation %q at index %d", pOp.Op, i), op,
+				map[string]interface{}{"index": i, "op": pOp.Op})
+		}
+
+		applied++
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":      true,
+		"applied": applied,
+	}}
 }
 
 // ─── Options application ──────────────────────────────────────────────────────
@@ -1630,4 +2019,20 @@ func toInt(v interface{}) (int, bool) {
 		return i, err == nil
 	}
 	return 0, false
+}
+
+// locationTypeName returns a human-readable name for a template.LocationType.
+func locationTypeName(lt template.LocationType) string {
+	switch lt {
+	case template.LocationParagraph:
+		return "paragraph"
+	case template.LocationTableCell:
+		return "tableCell"
+	case template.LocationHeader:
+		return "header"
+	case template.LocationFooter:
+		return "footer"
+	default:
+		return "unknown"
+	}
 }
