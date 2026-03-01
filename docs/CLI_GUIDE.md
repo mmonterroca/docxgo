@@ -8,6 +8,10 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
 - [Execution Modes](#execution-modes)
 - [JSON-RPC Protocol](#json-rpc-protocol)
 - [Methods Reference](#methods-reference)
+  - [system.ping](#systemping)
+  - [system.version](#systemversion)
+  - [system.capabilities](#systemcapabilities)
+  - [system.batch](#systembatch)
   - [document.create](#documentcreate)
   - [document.open](#documentopen)
   - [document.save](#documentsave)
@@ -17,11 +21,14 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
   - [document.setBackgroundColor](#documentsetbackgroundcolor)
   - [document.addContent](#documentaddcontent)
   - [document.addPageBreak](#documentaddpagebreak)
+  - [document.applyPatch](#documentapplypatch)
   - [paragraph.add](#paragraphadd)
   - [paragraph.list](#paragraphlist)
   - [table.add](#tableadd)
   - [table.list](#tablelist)
   - [section.add](#sectionadd)
+  - [template.inspect](#templateinspect)
+  - [template.render](#templaterender)
   - [document.close](#documentclose)
 - [Content Types](#content-types)
   - [Paragraph](#paragraph)
@@ -133,9 +140,139 @@ Ideal for: high-frequency usage, Lambda warm starts, batch processing via `child
 }
 ```
 
+Some methods return enriched errors with a `data` field containing structured context:
+
+```json
+{
+  "id": 1,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "unknown operation \"deleteAll\" at index 2",
+    "operation": "document.applyPatch",
+    "data": {
+      "index": 2,
+      "op": "deleteAll"
+    }
+  }
+}
+```
+
+| `data` field | Type | Description |
+|--------------|------|-------------|
+| `index` | Number | Index of the failing operation (in batch/patch) |
+| `category` | String | Error category (e.g. `"merge"`) |
+| `retryable` | Boolean | Whether the error is retryable |
+| `op` | String | The operation that failed |
+
 ---
 
 ## Methods Reference
+
+### system.ping
+
+Health check — verifies the RPC process is alive and responsive.
+
+**Params:** None (or `{}`).
+
+**Success result:**
+
+```json
+{ "status": "ok" }
+```
+
+---
+
+### system.version
+
+Returns version, protocol version, and platform information.
+
+**Params:** None (or `{}`).
+
+**Success result:**
+
+```json
+{
+  "name": "docxgo",
+  "version": "2.0.0-beta",
+  "protocolVersion": "1.0",
+  "goVersion": "go1.23.0",
+  "platform": "darwin",
+  "arch": "arm64"
+}
+```
+
+---
+
+### system.capabilities
+
+Returns a map of supported features for the current binary.
+
+**Params:** None (or `{}`).
+
+**Success result:**
+
+```json
+{
+  "rpc": true,
+  "template": true,
+  "mailMerge": true,
+  "inspect": true,
+  "validate": true,
+  "batch": true,
+  "applyPatch": true,
+  "streaming": false,
+  "partialUpdate": false
+}
+```
+
+Use this for feature detection before calling advanced methods.
+
+---
+
+### system.batch
+
+Executes multiple RPC requests in a single roundtrip. Each sub-request is processed sequentially. Nested `system.batch` calls are rejected.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `requests` | Array | Yes | Array of `{ method, params? }` objects |
+
+**Success result:**
+
+```json
+{
+  "responses": [
+    { "result": { "status": "ok" } },
+    { "result": { "name": "docxgo", "version": "2.0.0-beta", ... } },
+    { "error": { "code": "NOT_FOUND", "message": "..." } }
+  ]
+}
+```
+
+Each entry in `responses` contains either `result` or `error`, matching the order of the input `requests` array.
+
+**Example:**
+
+```json
+{
+  "id": 1,
+  "method": "system.batch",
+  "params": {
+    "requests": [
+      { "method": "system.ping" },
+      { "method": "document.create", "params": {
+        "content": [{ "type": "paragraph", "runs": [{ "text": "Hello" }] }],
+        "output": "buffer"
+      }},
+      { "method": "document.inspect", "params": { "documentId": "doc-1" } }
+    ]
+  }
+}
+```
+
+---
 
 ### document.create
 
@@ -400,6 +537,75 @@ Adds a page break to an existing document.
 
 ---
 
+### document.applyPatch
+
+Applies a sequence of patch operations to an existing document atomically. If any operation fails, subsequent operations are not applied and the error includes the failing index.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `operations` | Array | Yes | Array of patch operation objects |
+
+**Supported operations:**
+
+| `op` value | Description | Additional fields |
+|------------|-------------|-------------------|
+| `appendParagraph` | Append a paragraph | Same fields as `paragraph.add` (style, alignment, runs, etc.) |
+| `appendTable` | Append a table | Same fields as `table.add` (rows, style, alignment, width) |
+| `appendSection` | Append a section break | Same fields as `section.add` (breakType, pageSize, orientation, etc.) |
+| `appendPageBreak` | Append a page break | None |
+| `setMetadata` | Set document metadata | Same fields as `document.setMetadata` (title, creator, etc.) |
+| `setBackgroundColor` | Set background color | `color` (hex string) |
+
+**Success result:**
+
+```json
+{ "ok": true, "applied": 3 }
+```
+
+**Error result (with enriched `data`):**
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "unknown operation \"deleteAll\" at index 2",
+  "operation": "document.applyPatch",
+  "data": { "index": 2, "op": "deleteAll" }
+}
+```
+
+**Example:**
+
+```json
+{
+  "id": 10,
+  "method": "document.applyPatch",
+  "params": {
+    "documentId": "doc-1",
+    "operations": [
+      {
+        "op": "appendParagraph",
+        "style": "Heading1",
+        "runs": [{ "text": "New Section" }]
+      },
+      { "op": "appendPageBreak" },
+      {
+        "op": "appendTable",
+        "rows": [
+          { "cells": [{ "paragraphs": [{ "runs": [{ "text": "A1" }] }] }] }
+        ]
+      },
+      { "op": "setMetadata", "title": "Updated Title" },
+      { "op": "setBackgroundColor", "color": "#F0F8FF" }
+    ]
+  }
+}
+```
+
+---
+
 ### paragraph.add
 
 Adds a single paragraph to an existing document. Supports the same paragraph properties as the content array (style, alignment, spacing, runs, etc.).
@@ -583,6 +789,132 @@ Adds a new section to an existing document. Supports page size, margins, orienta
     "pageSize": "A4",
     "orientation": "landscape",
     "columns": 2
+  }
+}
+```
+
+---
+
+### template.inspect
+
+Scans a document for template placeholders (default: `{{key}}`) and returns detailed information about each occurrence.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `openDelimiter` | String | No | Custom open delimiter (default: `"{{"`) |
+| `closeDelimiter` | String | No | Custom close delimiter (default: `"}}"`) |
+
+**Success result:**
+
+```json
+{
+  "placeholders": ["Name", "Company", "Role"],
+  "count": 3,
+  "occurrences": 4,
+  "details": [
+    {
+      "name": "Name",
+      "fullMatch": "{{Name}}",
+      "location": "paragraph",
+      "paragraph": 0,
+      "run": 0
+    },
+    {
+      "name": "Company",
+      "fullMatch": "{{Company}}",
+      "location": "tableCell",
+      "paragraph": 0,
+      "run": 0,
+      "table": 0,
+      "row": 1,
+      "cell": 0
+    }
+  ]
+}
+```
+
+| Result field | Type | Description |
+|--------------|------|-------------|
+| `placeholders` | Array\<String\> | Unique placeholder names (first-seen order) |
+| `count` | Number | Number of unique placeholders |
+| `occurrences` | Number | Total number of placeholder instances |
+| `details` | Array | Per-occurrence location details |
+
+**Location types:** `paragraph`, `tableCell`, `header`, `footer`
+
+**Example:**
+
+```json
+{
+  "id": 11,
+  "method": "template.inspect",
+  "params": {
+    "documentId": "doc-1"
+  }
+}
+```
+
+---
+
+### template.render
+
+Replaces template placeholders in the document with the provided data values. Optionally validates all placeholders are covered (strict mode).
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `data` | Object | Yes | Key-value map of replacements (`{ "Name": "Alice" }`) |
+| `strictMode` | Boolean | No | If `true`, fail on missing keys (default: `false`) |
+| `openDelimiter` | String | No | Custom open delimiter (default: `"{{"`) |
+| `closeDelimiter` | String | No | Custom close delimiter (default: `"}}"`) |
+
+**Success result:**
+
+```json
+{ "ok": true }
+```
+
+With validation warnings:
+
+```json
+{
+  "ok": true,
+  "warnings": [
+    { "severity": "warning", "key": "OptionalField", "message": "key OptionalField not found in data" }
+  ]
+}
+```
+
+**Error (strict mode, missing key):**
+
+```json
+{
+  "code": "TEMPLATE_ERROR",
+  "message": "template: missing keys: Code",
+  "operation": "template.render",
+  "data": { "category": "merge", "retryable": false }
+}
+```
+
+**Example:**
+
+```json
+{
+  "id": 12,
+  "method": "template.render",
+  "params": {
+    "documentId": "doc-1",
+    "data": {
+      "Name": "Alice Johnson",
+      "Company": "Acme Corp",
+      "Date": "2025-01-15"
+    },
+    "strictMode": true
   }
 }
 ```
@@ -948,3 +1280,4 @@ main().catch(console.error);
 | `INTERNAL_ERROR` | Unexpected internal error |
 | `METHOD_NOT_FOUND` | Unknown RPC method |
 | `PARSE_ERROR` | Malformed JSON in the request |
+| `TEMPLATE_ERROR` | Template merge/validation failure |

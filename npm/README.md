@@ -5,6 +5,9 @@ Node.js wrapper for [docxgo](https://github.com/mmonterroca/docxgo) — create a
 ## Features
 
 - **Three client modes**: Sync one-shot (`DocxgoExec`), async persistent (`DocxgoRPC`), and fluent builder (`DocumentBuilder`)
+- **Template engine**: Inspect and render `{{placeholder}}` templates with strict mode validation
+- **Patch operations**: Apply atomic multi-operation patches (`appendParagraph`, `setMetadata`, etc.)
+- **Batch requests**: Execute multiple RPC calls in a single roundtrip
 - **Full TypeScript support**: Complete type definitions for all RPC methods, options, and content types
 - **Cross-platform binaries**: Automatic binary resolution for macOS, Linux, and Windows (x64 & arm64)
 - **CJS + ESM**: Dual module output — works with `require()` and `import`
@@ -93,6 +96,66 @@ await doc.closeDocument();
 doc.dispose();
 ```
 
+### Template rendering (mail merge)
+
+```ts
+import { DocumentBuilder } from '@mmonterroca/docxgo';
+
+const doc = new DocumentBuilder();
+
+// Create a template document
+await doc
+  .addHeading('Invoice for {{CustomerName}}')
+  .addParagraph('Date: {{Date}}')
+  .addParagraph('Total: {{Amount}}')
+  .createToFile('/tmp/template.docx');
+doc.reset();
+
+// Open the template and inspect placeholders
+await doc.open('/tmp/template.docx');
+
+const placeholders = await doc.inspectTemplate();
+console.log(placeholders.placeholders); // ['CustomerName', 'Date', 'Amount']
+console.log(`${placeholders.count} unique, ${placeholders.occurrences} total`);
+
+// Render with data
+const result = await doc.renderTemplate({
+  CustomerName: 'Acme Corp',
+  Date: '2025-01-15',
+  Amount: '$1,234.56',
+});
+console.log(result.ok); // true
+
+await doc.saveToFile('/tmp/invoice.docx');
+await doc.closeDocument();
+doc.dispose();
+```
+
+### Patch operations
+
+```ts
+import { DocumentBuilder } from '@mmonterroca/docxgo';
+
+const doc = new DocumentBuilder();
+await doc.open('/path/to/existing.docx');
+
+// Apply multiple atomic operations
+const result = await doc.applyPatch([
+  { op: 'appendParagraph', style: 'Heading1', runs: [{ text: 'New Section' }] },
+  { op: 'appendPageBreak' },
+  { op: 'appendTable', rows: [
+    { cells: [{ paragraphs: [{ runs: [{ text: 'A' }] }] }] }
+  ]},
+  { op: 'setMetadata', title: 'Updated Title' },
+  { op: 'setBackgroundColor', color: '#F0F8FF' },
+]);
+console.log(`Applied ${result.applied} operations`);
+
+await doc.saveToFile('/path/to/patched.docx');
+await doc.closeDocument();
+doc.dispose();
+```
+
 ### Get the document as a Buffer
 
 ```ts
@@ -175,6 +238,30 @@ new DocumentBuilder(options?: DocumentBuilderOptions)
 | `listTables()` | `TableListResult` | List all tables |
 | `closeDocument()` | `void` | Close and free document resources |
 
+#### System & Discovery
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `ping()` | `PingResult` | Health check — verify RPC process is alive |
+| `version()` | `SystemVersionResult` | Get binary version, protocol version, platform info |
+| `capabilities()` | `SystemCapabilitiesResult` | Get map of supported features |
+| `batch(requests)` | `BatchResult` | Execute multiple RPC calls in one roundtrip |
+
+#### Template Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `inspectTemplate(options?)` | `TemplateInspectResult` | Find `{{placeholders}}` with location details |
+| `renderTemplate(data, options?)` | `TemplateRenderResult` | Replace placeholders with data values |
+
+#### Patch Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `applyPatch(operations)` | `ApplyPatchResult` | Apply atomic multi-operation patches |
+
+Available patch operations: `appendParagraph`, `appendTable`, `appendSection`, `appendPageBreak`, `setMetadata`, `setBackgroundColor`.
+
 #### Lifecycle
 
 | Method | Description |
@@ -256,12 +343,47 @@ try {
 }
 ```
 
+Some methods return enriched errors with a `data` field:
+
+```ts
+try {
+  await doc.applyPatch([
+    { op: 'appendParagraph', runs: [{ text: 'OK' }] },
+    { op: 'unknownOp' as any },
+  ]);
+} catch (err) {
+  if (err instanceof DocxgoError) {
+    console.error(err.code);       // 'VALIDATION_ERROR'
+    console.error(err.data?.index); // 1 — the failing operation index
+    console.error(err.data?.op);    // 'unknownOp'
+  }
+}
+```
+
+Template errors include category info:
+
+```ts
+try {
+  await doc.renderTemplate({ Name: 'Alice' }, { strictMode: true });
+} catch (err) {
+  if (err instanceof DocxgoError) {
+    console.error(err.code);            // 'TEMPLATE_ERROR'
+    console.error(err.data?.category);  // 'merge'
+    console.error(err.data?.retryable); // false
+  }
+}
+```
+
 ## RPC Methods
 
 The following JSON-RPC methods are available:
 
 | Method | Description |
 |--------|-------------|
+| `system.ping` | Health check |
+| `system.version` | Get version and platform info |
+| `system.capabilities` | Get supported features map |
+| `system.batch` | Execute multiple requests in one call |
 | `document.create` | Create a new document with content |
 | `document.open` | Open an existing .docx file |
 | `document.save` | Save an opened document |
@@ -272,11 +394,14 @@ The following JSON-RPC methods are available:
 | `document.setBackgroundColor` | Set document background color |
 | `document.addContent` | Append content items to an opened document |
 | `document.addPageBreak` | Append a page break |
+| `document.applyPatch` | Apply atomic multi-operation patches |
 | `paragraph.add` | Add a single paragraph |
 | `paragraph.list` | List all paragraphs |
 | `table.add` | Add a single table |
 | `table.list` | List all tables |
 | `section.add` | Add a section break |
+| `template.inspect` | Find template placeholders |
+| `template.render` | Render template with data |
 
 See the full [CLI Guide](../docs/CLI_GUIDE.md) for detailed parameter schemas.
 
