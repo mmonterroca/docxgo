@@ -1,0 +1,127 @@
+name: npm Publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish-platform-packages:
+    name: Publish ${{ matrix.suffix }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - suffix: darwin-arm64
+            goos: darwin
+            goarch: arm64
+          - suffix: darwin-x64
+            goos: darwin
+            goarch: amd64
+          - suffix: linux-x64
+            goos: linux
+            goarch: amd64
+          - suffix: linux-arm64
+            goos: linux
+            goarch: arm64
+          - suffix: win32-x64
+            goos: windows
+            goarch: amd64
+            ext: .exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.23.x'
+          cache: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p npm/platforms/${{ matrix.suffix }}/bin
+          go build -ldflags="-s -w" -o npm/platforms/${{ matrix.suffix }}/bin/docxgo${{ matrix.ext }} ./cmd/docxgo/
+
+      - name: Generate platform package.json
+        run: |
+          cat > npm/platforms/${{ matrix.suffix }}/package.json << EOF
+          {
+            "name": "@mmonterroca/docxgo-${{ matrix.suffix }}",
+            "version": "${{ steps.version.outputs.version }}",
+            "description": "docxgo binary for ${{ matrix.suffix }}",
+            "os": ["${{ matrix.goos }}"],
+            "cpu": ["${{ matrix.goarch == 'amd64' && 'x64' || matrix.goarch }}"],
+            "main": "",
+            "files": ["bin/"],
+            "license": "MIT",
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/mmonterroca/docxgo.git",
+              "directory": "npm/platforms/${{ matrix.suffix }}"
+            }
+          }
+          EOF
+
+      - name: Publish platform package
+        run: |
+          cd npm/platforms/${{ matrix.suffix }}
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-main-package:
+    name: Publish @mmonterroca/docxgo
+    needs: publish-platform-packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: cd npm && npm ci
+
+      - name: Build
+        run: cd npm && npm run build
+
+      - name: Set version
+        run: cd npm && npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+
+      - name: Update optionalDependencies versions
+        run: |
+          cd npm
+          node -e "
+            const pkg = require('./package.json');
+            const v = '${{ steps.version.outputs.version }}';
+            for (const key in pkg.optionalDependencies) {
+              pkg.optionalDependencies[key] = v;
+            }
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Publish
+        run: cd npm && npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
