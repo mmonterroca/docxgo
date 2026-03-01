@@ -3,6 +3,8 @@ docxlib
 *.docx
 /*.xml
 .DS_Store
+docxlib/
+docxgo
 docx_debug/
 DocxValidator/bin/
 DocxValidator/obj/
