@@ -15,6 +15,13 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
   - [document.inspect](#documentinspect)
   - [document.setMetadata](#documentsetmetadata)
   - [document.setBackgroundColor](#documentsetbackgroundcolor)
+  - [document.addContent](#documentaddcontent)
+  - [document.addPageBreak](#documentaddpagebreak)
+  - [paragraph.add](#paragraphadd)
+  - [paragraph.list](#paragraphlist)
+  - [table.add](#tableadd)
+  - [table.list](#tablelist)
+  - [section.add](#sectionadd)
   - [document.close](#documentclose)
 - [Content Types](#content-types)
   - [Paragraph](#paragraph)
@@ -339,6 +346,249 @@ Sets the page background color for the entire document.
 
 ---
 
+### document.addContent
+
+Appends content to an existing document session. Accepts the same content array format as `document.create`. This is the primary method for mutating documents that were opened via `document.open`.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `content` | Array | Yes | Ordered list of content items (same format as `document.create`) |
+
+**Success result:** `{ "ok": true }`
+
+**Example:**
+
+```json
+{
+  "id": 5,
+  "method": "document.addContent",
+  "params": {
+    "documentId": "doc-1",
+    "content": [
+      {
+        "type": "paragraph",
+        "runs": [{ "text": "Appended paragraph", "bold": true }]
+      },
+      { "type": "pageBreak" },
+      {
+        "type": "table",
+        "rows": [
+          { "cells": [{ "paragraphs": [{ "runs": [{ "text": "A1" }] }] }] }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+### document.addPageBreak
+
+Adds a page break to an existing document.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+
+**Success result:** `{ "ok": true }`
+
+---
+
+### paragraph.add
+
+Adds a single paragraph to an existing document. Supports the same paragraph properties as the content array (style, alignment, spacing, runs, etc.).
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `style` | String | No | Paragraph style name |
+| `alignment` | String | No | `left`, `center`, `right`, `justify`, `distribute` |
+| `spacingBefore` | Number | No | Spacing before (twips) |
+| `spacingAfter` | Number | No | Spacing after (twips) |
+| `lineSpacing` | Object | No | `{ "rule": "auto", "value": 360 }` |
+| `indent` | Object | No | `{ "left", "right", "firstLine", "hanging" }` |
+| `numbering` | Object | No | `{ "id": 1, "level": 0 }` |
+| `borders` | Object | No | Paragraph borders |
+| `runs` | Array | No | Text runs (same format as content paragraphs) |
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 3 }
+```
+
+`index` is the zero-based position of the new paragraph.
+
+**Example:**
+
+```json
+{
+  "id": 6,
+  "method": "paragraph.add",
+  "params": {
+    "documentId": "doc-1",
+    "style": "Heading1",
+    "alignment": "center",
+    "runs": [
+      { "text": "New Section Title", "bold": true, "fontSize": 18 }
+    ]
+  }
+}
+```
+
+---
+
+### paragraph.list
+
+Lists all paragraphs in a document with their text and style.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+
+**Success result:**
+
+```json
+{
+  "count": 3,
+  "paragraphs": [
+    { "index": 0, "text": "Introduction", "style": "Heading1" },
+    { "index": 1, "text": "Some body text." },
+    { "index": 2, "text": "" }
+  ]
+}
+```
+
+---
+
+### table.add
+
+Adds a table to an existing document. Uses the same table format as the content array.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `rows` | Array | Yes | Table rows (same format as content tables) |
+| `style` | String | No | Table style name |
+| `alignment` | String | No | Table alignment |
+| `width` | Object | No | `{ "type": "dxa", "value": 9000 }` |
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 0 }
+```
+
+`index` is the zero-based position of the new table.
+
+**Example:**
+
+```json
+{
+  "id": 7,
+  "method": "table.add",
+  "params": {
+    "documentId": "doc-1",
+    "style": "TableGrid",
+    "rows": [
+      {
+        "cells": [
+          { "paragraphs": [{ "runs": [{ "text": "Name", "bold": true }] }] },
+          { "paragraphs": [{ "runs": [{ "text": "Value", "bold": true }] }] }
+        ]
+      },
+      {
+        "cells": [
+          { "paragraphs": [{ "runs": [{ "text": "Score" }] }] },
+          { "paragraphs": [{ "runs": [{ "text": "95" }] }] }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+### table.list
+
+Lists all tables in a document with their dimensions.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+
+**Success result:**
+
+```json
+{
+  "count": 2,
+  "tables": [
+    { "index": 0, "rows": 3, "columns": 2 },
+    { "index": 1, "rows": 5, "columns": 4 }
+  ]
+}
+```
+
+---
+
+### section.add
+
+Adds a new section to an existing document. Supports page size, margins, orientation, columns, and headers/footers.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `breakType` | String | No | `nextPage` (default), `continuous`, `evenPage`, `oddPage` |
+| `pageSize` | String/Object | No | Page size preset or `{width, height}` |
+| `margins` | String/Object | No | Margins preset or `{top, bottom, left, right}` |
+| `orientation` | String | No | `portrait` or `landscape` |
+| `columns` | Number | No | Number of text columns |
+| `headers` | Object | No | Headers by type (`default`, `first`, `even`) |
+| `footers` | Object | No | Footers by type (`default`, `first`, `even`) |
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 1 }
+```
+
+`index` is the zero-based position of the new section.
+
+**Example:**
+
+```json
+{
+  "id": 8,
+  "method": "section.add",
+  "params": {
+    "documentId": "doc-1",
+    "breakType": "nextPage",
+    "pageSize": "A4",
+    "orientation": "landscape",
+    "columns": 2
+  }
+}
+```
+
+---
+
 ### document.close
 
 Removes a document from the session, freeing associated memory. Should be called when a document is no longer needed in RPC mode.
@@ -355,7 +605,7 @@ Removes a document from the session, freeing associated memory. Should be called
 
 ## Content Types
 
-Content items are passed as an array in `document.create` params. Each item has a `type` field.
+Content items are passed as an array in `document.create` and `document.addContent` params. Each item has a `type` field.
 
 ### Paragraph
 

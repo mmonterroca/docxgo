@@ -83,6 +83,20 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleSetMetadata(req)
 	case "document.setBackgroundColor":
 		return s.handleSetBackgroundColor(req)
+	case "document.addContent":
+		return s.handleAddContent(req)
+	case "document.addPageBreak":
+		return s.handleAddPageBreak(req)
+	case "paragraph.add":
+		return s.handleParagraphAdd(req)
+	case "paragraph.list":
+		return s.handleParagraphList(req)
+	case "table.add":
+		return s.handleTableAdd(req)
+	case "table.list":
+		return s.handleTableList(req)
+	case "section.add":
+		return s.handleSectionAdd(req)
 	case "document.close":
 		return s.handleClose(req)
 	default:
@@ -155,6 +169,45 @@ type setBackgroundColorParams struct {
 // closeParams are the parameters for document.close.
 type closeParams struct {
 	DocumentID string `json:"documentId"`
+}
+
+// addContentParams are the parameters for document.addContent.
+type addContentParams struct {
+	DocumentID string            `json:"documentId"`
+	Content    []json.RawMessage `json:"content"`
+}
+
+// addPageBreakParams are the parameters for document.addPageBreak.
+type addPageBreakParams struct {
+	DocumentID string `json:"documentId"`
+}
+
+// paragraphAddParams are the parameters for paragraph.add.
+type paragraphAddParams struct {
+	DocumentID string `json:"documentId"`
+	paragraphItem
+}
+
+// paragraphListParams are the parameters for paragraph.list.
+type paragraphListParams struct {
+	DocumentID string `json:"documentId"`
+}
+
+// tableAddParams are the parameters for table.add.
+type tableAddParams struct {
+	DocumentID string `json:"documentId"`
+	tableItem
+}
+
+// tableListParams are the parameters for table.list.
+type tableListParams struct {
+	DocumentID string `json:"documentId"`
+}
+
+// sectionAddParams are the parameters for section.add.
+type sectionAddParams struct {
+	DocumentID string `json:"documentId"`
+	sectionItem
 }
 
 // ─── Content item types ──────────────────────────────────────────────────────
@@ -552,6 +605,197 @@ func (s *server) handleSetBackgroundColor(req *Request) Response {
 	}
 
 	return Response{ID: req.ID, Result: map[string]interface{}{"ok": true}}
+}
+
+// ─── Mutation handlers ────────────────────────────────────────────────────────
+
+func (s *server) handleAddContent(req *Request) Response {
+	const op = "document.addContent"
+
+	var params addContentParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if len(params.Content) == 0 {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "content array is required and must not be empty", op)
+	}
+
+	if err := applyContent(doc, params.Content); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{"ok": true}}
+}
+
+func (s *server) handleAddPageBreak(req *Request) Response {
+	const op = "document.addPageBreak"
+
+	var params addPageBreakParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if err := doc.AddPageBreak(); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeInternal, err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{"ok": true}}
+}
+
+func (s *server) handleParagraphAdd(req *Request) Response {
+	const op = "paragraph.add"
+
+	var params paragraphAddParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	para, err := doc.AddParagraph()
+	if err != nil {
+		return errorResponse(req.ID, errors.ErrCodeInternal, "failed to add paragraph: "+err.Error(), op)
+	}
+
+	if err := applyParagraph(para, params.paragraphItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	index := len(doc.Paragraphs()) - 1
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":    true,
+		"index": index,
+	}}
+}
+
+func (s *server) handleParagraphList(req *Request) Response {
+	const op = "paragraph.list"
+
+	var params paragraphListParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	paragraphs := doc.Paragraphs()
+	items := make([]map[string]interface{}, 0, len(paragraphs))
+	for i, p := range paragraphs {
+		item := map[string]interface{}{
+			"index": i,
+			"text":  p.Text(),
+		}
+		if s := p.Style(); s != nil && s.Name() != "" {
+			item["style"] = s.Name()
+		}
+		items = append(items, item)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"paragraphs": items,
+		"count":      len(items),
+	}}
+}
+
+func (s *server) handleTableAdd(req *Request) Response {
+	const op = "table.add"
+
+	var params tableAddParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if err := applyTable(doc, params.tableItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	index := len(doc.Tables()) - 1
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":    true,
+		"index": index,
+	}}
+}
+
+func (s *server) handleTableList(req *Request) Response {
+	const op = "table.list"
+
+	var params tableListParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	tables := doc.Tables()
+	items := make([]map[string]interface{}, 0, len(tables))
+	for i, t := range tables {
+		items = append(items, map[string]interface{}{
+			"index":    i,
+			"rows":     t.RowCount(),
+			"columns":  t.ColumnCount(),
+		})
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"tables": items,
+		"count":  len(items),
+	}}
+}
+
+func (s *server) handleSectionAdd(req *Request) Response {
+	const op = "section.add"
+
+	var params sectionAddParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if err := applySection(doc, params.sectionItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	index := len(doc.Sections()) - 1
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":    true,
+		"index": index,
+	}}
 }
 
 func (s *server) handleClose(req *Request) Response {

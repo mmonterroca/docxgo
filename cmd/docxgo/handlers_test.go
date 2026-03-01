@@ -799,3 +799,568 @@ func TestHandleCreate_NilParams(t *testing.T) {
 		t.Fatalf("unexpected error for nil params: %+v", resp.Error)
 	}
 }
+
+// ─── document.addContent tests ───────────────────────────────────────────────
+
+func TestHandleAddContent(t *testing.T) {
+	s := newServer()
+
+	// Create and store a document
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "First"}},
+			},
+		},
+		"output": "buffer",
+	}))
+	if createResp.Error != nil {
+		t.Fatalf("create failed: %+v", createResp.Error)
+	}
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	// Now add more content
+	resp := s.dispatch(makeRequest(2, "document.addContent", map[string]interface{}{
+		"documentId": docID,
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "Second"}},
+			},
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "Third"}},
+			},
+		},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("addContent failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["ok"] != true {
+		t.Error("expected ok=true")
+	}
+
+	// Verify via inspect
+	inspResp := s.dispatch(makeRequest(3, "document.inspect", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if inspResp.Error != nil {
+		t.Fatalf("inspect failed: %+v", inspResp.Error)
+	}
+	inspResult := inspResp.Result.(map[string]interface{})
+	count := inspResult["paragraphCount"]
+	// We should have at least 3 paragraphs
+	if c, ok := count.(int); ok && c < 3 {
+		t.Errorf("expected at least 3 paragraphs, got %d", c)
+	}
+}
+
+func TestHandleAddContent_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "document.addContent", map[string]interface{}{
+		"documentId": "nonexistent",
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "x"}},
+			},
+		},
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for nonexistent document")
+	}
+	if resp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND, got %s", resp.Error.Code)
+	}
+}
+
+func TestHandleAddContent_EmptyContent(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "document.addContent", map[string]interface{}{
+		"documentId": docID,
+		"content":    []interface{}{},
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for empty content")
+	}
+	if resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Error.Code)
+	}
+}
+
+// ─── document.addPageBreak tests ─────────────────────────────────────────────
+
+func TestHandleAddPageBreak(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "document.addPageBreak", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("addPageBreak failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["ok"] != true {
+		t.Error("expected ok=true")
+	}
+}
+
+func TestHandleAddPageBreak_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "document.addPageBreak", map[string]interface{}{
+		"documentId": "nonexistent",
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for nonexistent document")
+	}
+	if resp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND, got %s", resp.Error.Code)
+	}
+}
+
+// ─── paragraph.add tests ────────────────────────────────────────────────────
+
+func TestHandleParagraphAdd(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.add", map[string]interface{}{
+		"documentId": docID,
+		"style":      "Heading1",
+		"alignment":  "center",
+		"runs": []interface{}{
+			map[string]interface{}{"text": "My Heading", "bold": true},
+		},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("paragraph.add failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["ok"] != true {
+		t.Error("expected ok=true")
+	}
+	if _, ok := result["index"]; !ok {
+		t.Error("expected index in result")
+	}
+}
+
+func TestHandleParagraphAdd_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "paragraph.add", map[string]interface{}{
+		"documentId": "nonexistent",
+		"runs":       []interface{}{map[string]interface{}{"text": "x"}},
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for nonexistent document")
+	}
+	if resp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND, got %s", resp.Error.Code)
+	}
+}
+
+func TestHandleParagraphAdd_WithFormatting(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.add", map[string]interface{}{
+		"documentId":    docID,
+		"spacingBefore": 240,
+		"spacingAfter":  120,
+		"runs": []interface{}{
+			map[string]interface{}{
+				"text":      "Formatted",
+				"bold":      true,
+				"italic":    true,
+				"underline": "single",
+				"color":     "#FF0000",
+				"fontSize":  14,
+				"font":      "Arial",
+			},
+		},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("paragraph.add with formatting failed: %+v", resp.Error)
+	}
+}
+
+// ─── paragraph.list tests ───────────────────────────────────────────────────
+
+func TestHandleParagraphList(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "Alpha"}},
+			},
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "Beta"}},
+			},
+		},
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("paragraph.list failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	count, _ := result["count"].(int)
+	if count < 2 {
+		t.Errorf("expected at least 2 paragraphs, got %d", count)
+	}
+	paragraphs, ok := result["paragraphs"].([]map[string]interface{})
+	if !ok {
+		// try type assertion for []interface{}
+		pList, ok2 := result["paragraphs"].([]interface{})
+		if !ok2 {
+			t.Fatalf("expected paragraphs array, got %T", result["paragraphs"])
+		}
+		if len(pList) < 2 {
+			t.Errorf("expected at least 2 paragraphs, got %d", len(pList))
+		}
+		// Check first paragraph has text
+		first, _ := pList[0].(map[string]interface{})
+		if first["text"] != "Alpha" {
+			t.Errorf("expected first paragraph text 'Alpha', got %v", first["text"])
+		}
+	} else {
+		if paragraphs[0]["text"] != "Alpha" {
+			t.Errorf("expected first paragraph text 'Alpha', got %v", paragraphs[0]["text"])
+		}
+	}
+}
+
+func TestHandleParagraphList_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "paragraph.list", map[string]interface{}{
+		"documentId": "nonexistent",
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for nonexistent document")
+	}
+}
+
+// ─── table.add tests ────────────────────────────────────────────────────────
+
+func TestHandleTableAdd(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "table.add", map[string]interface{}{
+		"documentId": docID,
+		"rows": []interface{}{
+			map[string]interface{}{
+				"cells": []interface{}{
+					map[string]interface{}{
+						"paragraphs": []interface{}{
+							map[string]interface{}{
+								"runs": []interface{}{map[string]interface{}{"text": "A1"}},
+							},
+						},
+					},
+					map[string]interface{}{
+						"paragraphs": []interface{}{
+							map[string]interface{}{
+								"runs": []interface{}{map[string]interface{}{"text": "B1"}},
+							},
+						},
+					},
+				},
+			},
+			map[string]interface{}{
+				"cells": []interface{}{
+					map[string]interface{}{
+						"paragraphs": []interface{}{
+							map[string]interface{}{
+								"runs": []interface{}{map[string]interface{}{"text": "A2"}},
+							},
+						},
+					},
+					map[string]interface{}{
+						"paragraphs": []interface{}{
+							map[string]interface{}{
+								"runs": []interface{}{map[string]interface{}{"text": "B2"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("table.add failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["ok"] != true {
+		t.Error("expected ok=true")
+	}
+	if _, ok := result["index"]; !ok {
+		t.Error("expected index in result")
+	}
+}
+
+func TestHandleTableAdd_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "table.add", map[string]interface{}{
+		"documentId": "nonexistent",
+		"rows": []interface{}{
+			map[string]interface{}{
+				"cells": []interface{}{
+					map[string]interface{}{
+						"paragraphs": []interface{}{
+							map[string]interface{}{
+								"runs": []interface{}{map[string]interface{}{"text": "x"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for nonexistent document")
+	}
+}
+
+// ─── table.list tests ───────────────────────────────────────────────────────
+
+func TestHandleTableList(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "table",
+				"rows": []interface{}{
+					map[string]interface{}{
+						"cells": []interface{}{
+							map[string]interface{}{
+								"paragraphs": []interface{}{
+									map[string]interface{}{
+										"runs": []interface{}{map[string]interface{}{"text": "Cell"}},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "table.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("table.list failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	count, _ := result["count"].(int)
+	if count < 1 {
+		t.Errorf("expected at least 1 table, got %d", count)
+	}
+}
+
+func TestHandleTableList_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "table.list", map[string]interface{}{
+		"documentId": "nonexistent",
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for nonexistent document")
+	}
+}
+
+// ─── section.add tests ──────────────────────────────────────────────────────
+
+func TestHandleSectionAdd(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "section.add", map[string]interface{}{
+		"documentId":  docID,
+		"breakType":   "nextPage",
+		"pageSize":    "A4",
+		"orientation": "landscape",
+		"columns":     2,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("section.add failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["ok"] != true {
+		t.Error("expected ok=true")
+	}
+	if _, ok := result["index"]; !ok {
+		t.Error("expected index in result")
+	}
+}
+
+func TestHandleSectionAdd_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "section.add", map[string]interface{}{
+		"documentId": "nonexistent",
+		"breakType":  "nextPage",
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for nonexistent document")
+	}
+}
+
+// ─── Integration: open → add content → save ─────────────────────────────────
+
+func TestIntegration_OpenAddContentSave(t *testing.T) {
+	s := newServer()
+
+	// Create initial document to file
+	tmpDir := t.TempDir()
+	filePath := tmpDir + "/test_add_content.docx"
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "Original"}},
+			},
+		},
+		"output":   "file",
+		"filePath": filePath,
+	}))
+	if createResp.Error != nil {
+		t.Fatalf("create failed: %+v", createResp.Error)
+	}
+
+	// Re-open the file
+	openResp := s.dispatch(makeRequest(2, "document.open", map[string]interface{}{
+		"filePath": filePath,
+	}))
+	if openResp.Error != nil {
+		t.Fatalf("open failed: %+v", openResp.Error)
+	}
+	docID := openResp.Result.(map[string]interface{})["documentId"].(string)
+
+	// Add content to the opened document
+	addResp := s.dispatch(makeRequest(3, "document.addContent", map[string]interface{}{
+		"documentId": docID,
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "Appended via RPC"}},
+			},
+		},
+	}))
+	if addResp.Error != nil {
+		t.Fatalf("addContent failed: %+v", addResp.Error)
+	}
+
+	// Add a paragraph directly
+	paraResp := s.dispatch(makeRequest(4, "paragraph.add", map[string]interface{}{
+		"documentId": docID,
+		"runs":       []interface{}{map[string]interface{}{"text": "Direct paragraph"}},
+	}))
+	if paraResp.Error != nil {
+		t.Fatalf("paragraph.add failed: %+v", paraResp.Error)
+	}
+
+	// Add a table
+	tableResp := s.dispatch(makeRequest(5, "table.add", map[string]interface{}{
+		"documentId": docID,
+		"rows": []interface{}{
+			map[string]interface{}{
+				"cells": []interface{}{
+					map[string]interface{}{
+						"paragraphs": []interface{}{
+							map[string]interface{}{
+								"runs": []interface{}{map[string]interface{}{"text": "Cell"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}))
+	if tableResp.Error != nil {
+		t.Fatalf("table.add failed: %+v", tableResp.Error)
+	}
+
+	// List paragraphs
+	listResp := s.dispatch(makeRequest(6, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if listResp.Error != nil {
+		t.Fatalf("paragraph.list failed: %+v", listResp.Error)
+	}
+
+	// List tables
+	tListResp := s.dispatch(makeRequest(7, "table.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if tListResp.Error != nil {
+		t.Fatalf("table.list failed: %+v", tListResp.Error)
+	}
+
+	// Save to a new file
+	outPath := tmpDir + "/test_modified.docx"
+	saveResp := s.dispatch(makeRequest(8, "document.save", map[string]interface{}{
+		"documentId": docID,
+		"output":     "file",
+		"filePath":   outPath,
+	}))
+	if saveResp.Error != nil {
+		t.Fatalf("save failed: %+v", saveResp.Error)
+	}
+
+	// Verify file exists and is non-empty
+	info, err := os.Stat(outPath)
+	if err != nil {
+		t.Fatalf("output file not found: %v", err)
+	}
+	if info.Size() < 100 {
+		t.Errorf("output file too small: %d bytes", info.Size())
+	}
+
+	// Close
+	closeResp := s.dispatch(makeRequest(9, "document.close", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if closeResp.Error != nil {
+		t.Fatalf("close failed: %+v", closeResp.Error)
+	}
+}
