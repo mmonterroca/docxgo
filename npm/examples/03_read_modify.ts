@@ -32,7 +32,7 @@ async function main() {
     await doc.open('/tmp/node_03_original.docx');
 
     const info = await doc.inspect();
-    console.log(`  Title: ${info.metadata.title}`);
+    console.log(`  Title: ${info.metadata?.title ?? '(none)'}`);
     console.log(`  Paragraphs: ${info.paragraphCount}`);
     console.log(`  Tables: ${info.tableCount}`);
 

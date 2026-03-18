@@ -60,8 +60,8 @@ async function main() {
     doc.reset();
     await doc.open('/tmp/node_05_patched.docx');
     const info = await doc.inspect();
-    console.log(`  Title: "${info.metadata.title}"`);
-    console.log(`  Creator: "${info.metadata.creator}"`);
+    console.log(`  Title: "${info.metadata?.title ?? ''}"`);  
+    console.log(`  Creator: "${info.metadata?.creator ?? ''}"`);
     console.log(`  Paragraphs: ${info.paragraphCount}`);
 
     const valid = await doc.validate();

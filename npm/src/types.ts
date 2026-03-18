@@ -342,6 +342,7 @@ export interface OpenResult {
 export interface ValidateResult {
   valid: boolean;
   message?: string;
+  errors?: Array<{ message: string }>;
 }
 
 export interface InspectMetadata {
@@ -475,7 +476,7 @@ export interface TemplateRenderParams {
 
 /** A validation warning from template.render. */
 export interface TemplateWarning {
-  severity: 'error' | 'warning';
+  severity: 'warning' | 'info';
   key: string;
   message: string;
 }
@@ -496,6 +497,7 @@ export interface PatchOperationBase {
 /** Append a paragraph. */
 export interface AppendParagraphOp extends PatchOperationBase {
   op: 'appendParagraph';
+  text?: string;
   style?: string;
   alignment?: Alignment;
   spacingBefore?: number;
