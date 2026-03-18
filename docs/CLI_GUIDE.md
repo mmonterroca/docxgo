@@ -539,7 +539,7 @@ Adds a page break to an existing document.
 
 ### document.applyPatch
 
-Applies a sequence of patch operations to an existing document atomically. If any operation fails, subsequent operations are not applied and the error includes the failing index.
+Applies a sequence of patch operations to an existing document sequentially. If any operation fails, subsequent operations are **not** applied and the error includes the failing index. Operations applied before the failure remain in effect (no rollback).
 
 **Params:**
 

@@ -54,7 +54,11 @@ func main() {
 				"arch":            runtime.GOARCH,
 				"features":        capabilitiesMap(),
 			}
-			out, _ := json.MarshalIndent(info, "", "  ")
+			out, err := json.MarshalIndent(info, "", "  ")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "docxgo: failed to marshal version info: %v\n", err)
+				os.Exit(1)
+			}
 			fmt.Println(string(out))
 		} else {
 			fmt.Println(docx.Version)

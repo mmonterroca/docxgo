@@ -141,7 +141,13 @@ export class DocxgoRPC {
       });
 
       const req: RPCRequest = { id, method, params };
-      this.proc.stdin!.write(JSON.stringify(req) + '\n');
+      try {
+        this.proc.stdin!.write(JSON.stringify(req) + '\n');
+      } catch (err) {
+        this.pending.delete(id);
+        if (timer) clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
     });
   }
 

@@ -972,7 +972,15 @@ func (s *server) handleTemplateInspect(req *Request) Response {
 			fmt.Sprintf("document %q not found", params.DocumentID), op)
 	}
 
-	placeholders := template.FindPlaceholders(doc)
+	opts := template.DefaultMergeOptions()
+	if params.OpenDelimiter != "" {
+		opts.OpenDelimiter = params.OpenDelimiter
+	}
+	if params.CloseDelimiter != "" {
+		opts.CloseDelimiter = params.CloseDelimiter
+	}
+	pattern := template.BuildPattern(opts)
+	placeholders := template.FindPlaceholdersCustom(doc, pattern)
 
 	// Build unique names list (preserving first-seen order)
 	seen := make(map[string]struct{})
@@ -1153,7 +1161,16 @@ func (s *server) handleApplyPatch(req *Request) Response {
 			}
 
 		case "setMetadata":
-			var mp setMetadataParams
+			var mp struct {
+				Op          string   `json:"op"`
+				Title       string   `json:"title,omitempty"`
+				Subject     string   `json:"subject,omitempty"`
+				Creator     string   `json:"creator,omitempty"`
+				Description string   `json:"description,omitempty"`
+				Keywords    []string `json:"keywords,omitempty"`
+				Created     string   `json:"created,omitempty"`
+				Modified    string   `json:"modified,omitempty"`
+			}
 			if err := json.Unmarshal(raw, &mp); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid setMetadata at index %d: %v", i, err), op,

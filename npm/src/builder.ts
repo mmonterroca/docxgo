@@ -493,8 +493,9 @@ export class DocumentBuilder {
   /**
    * Apply a sequence of patch operations to the currently opened document.
    *
-   * Operations are applied atomically — if any fails, subsequent ones
+   * Operations are applied sequentially — if any fails, subsequent ones
    * are not applied and the error includes the failing index.
+   * Operations applied before the failure remain in effect (no rollback).
    *
    * @param operations Array of patch operations.
    * @returns Result with count of applied operations.

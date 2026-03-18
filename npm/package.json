@@ -18,8 +18,7 @@
   ],
   "scripts": {
     "build": "tsc && node scripts/build-esm.js",
-    "test": "node --test dist/__tests__/*.test.js",
-    "test:src": "tsx --test src/__tests__/*.test.ts",
+    "test": "tsx --test src/__tests__/*.test.ts",
     "lint": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },

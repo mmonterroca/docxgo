@@ -66,7 +66,7 @@ jobs:
             "name": "@mmonterroca/docxgo-${{ matrix.suffix }}",
             "version": "${{ steps.version.outputs.version }}",
             "description": "docxgo binary for ${{ matrix.suffix }}",
-            "os": ["${{ matrix.goos }}"],
+            "os": ["${{ matrix.goos == 'windows' && 'win32' || matrix.goos }}"],
             "cpu": ["${{ matrix.goarch == 'amd64' && 'x64' || matrix.goarch }}"],
             "main": "",
             "files": ["bin/"],

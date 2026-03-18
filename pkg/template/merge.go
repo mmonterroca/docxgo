@@ -19,7 +19,7 @@ func MergeTemplate(doc domain.Document, data MergeData, opts ...MergeOptions) er
 		opt = opts[0]
 	}
 
-	pattern := buildPattern(opt)
+	pattern := BuildPattern(opt)
 	var missingKeys []string
 
 	err := walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
@@ -130,8 +130,8 @@ func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Reg
 	return missing
 }
 
-// buildPattern creates a regex pattern from the configured delimiters.
-func buildPattern(opt MergeOptions) *regexp.Regexp {
+// BuildPattern creates a regex pattern from the configured delimiters.
+func BuildPattern(opt MergeOptions) *regexp.Regexp {
 	open := regexp.QuoteMeta(opt.OpenDelimiter)
 	close := regexp.QuoteMeta(opt.CloseDelimiter)
 	return regexp.MustCompile(open + `\.?(\w+(?:\.\w+)*)` + close)
@@ -150,7 +150,7 @@ func extractKey(match string, opt MergeOptions) string {
 
 // placeholderNamesWithOptions returns deduplicated placeholder names using custom options.
 func placeholderNamesWithOptions(doc domain.Document, opt MergeOptions) []string {
-	pattern := buildPattern(opt)
+	pattern := BuildPattern(opt)
 	placeholders := findPlaceholdersWithPattern(doc, pattern)
 
 	seen := make(map[string]struct{})
