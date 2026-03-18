@@ -138,7 +138,9 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 	// Hydrate metadata from docProps/core.xml so it survives round-trip.
 	if parsed.Package != nil && len(parsed.Package.CoreProperties) > 0 {
 		if meta, err := parseCoreProperties(parsed.Package.CoreProperties); err == nil && meta != nil {
-			_ = doc.SetMetadata(meta)
+			if err := doc.SetMetadata(meta); err != nil {
+				return nil, errors.Wrap(err, opReconstructDocument)
+			}
 		}
 	}
 
@@ -2130,9 +2132,12 @@ func parseCoreProperties(data []byte) (*domain.Metadata, error) {
 	}
 
 	if cp.Keywords != "" {
-		meta.Keywords = strings.Split(cp.Keywords, ",")
-		for i := range meta.Keywords {
-			meta.Keywords[i] = strings.TrimSpace(meta.Keywords[i])
+		parts := strings.Split(cp.Keywords, ",")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				meta.Keywords = append(meta.Keywords, p)
+			}
 		}
 	}
 

@@ -476,7 +476,7 @@ See the full [CLI Guide](../docs/CLI_GUIDE.md) for detailed parameter schemas.
 cd npm && npm install
 
 # Run tests (TypeScript, no build needed)
-npm run test:src
+npm test
 
 # Build (CJS + ESM)
 npm run build

@@ -1050,9 +1050,11 @@ func (s *server) handleTemplateRender(req *Request) Response {
 	validationErrors := template.ValidateTemplate(doc, template.MergeData(params.Data), opts)
 	var warnings []map[string]interface{}
 	for _, ve := range validationErrors {
-		sev := "error"
+		sev := "warning"
 		if ve.Severity == template.SeverityWarning {
 			sev = "warning"
+		} else {
+			sev = "info"
 		}
 		warnings = append(warnings, map[string]interface{}{
 			"severity": sev,

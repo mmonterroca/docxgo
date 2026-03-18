@@ -51,6 +51,7 @@ export class DocxgoExec {
     try {
       stdout = execFileSync(this.binPath, ['exec', '--request', requestJSON], {
         timeout: timeout ?? this.defaultTimeout,
+        maxBuffer: 50 * 1024 * 1024, // 50MB to support large base64 documents
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
       });
