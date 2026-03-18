@@ -280,6 +280,7 @@ type contentItem struct {
 // paragraphItem represents a paragraph content item.
 type paragraphItem struct {
 	Type          string          `json:"type"`
+	Text          string          `json:"text,omitempty"`
 	Runs          []runItem       `json:"runs,omitempty"`
 	Style         string          `json:"style,omitempty"`
 	Alignment     string          `json:"alignment,omitempty"`
@@ -1384,6 +1385,18 @@ func applyParagraph(para domain.Paragraph, item paragraphItem) error {
 	}
 	if item.Borders != nil {
 		_ = para.SetBorders(parseParagraphBorders(item.Borders))
+	}
+
+	// If top-level "text" shortcut is provided and no explicit runs,
+	// create a single run with that text.
+	if item.Text != "" && len(item.Runs) == 0 {
+		run, err := para.AddRun()
+		if err != nil {
+			return err
+		}
+		if err := run.SetText(item.Text); err != nil {
+			return err
+		}
 	}
 
 	for _, r := range item.Runs {
