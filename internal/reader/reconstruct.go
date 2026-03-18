@@ -23,6 +23,7 @@
 package reader
 
 import (
+	"encoding/xml"
 	"fmt"
 	"strconv"
 	"strings"
@@ -132,6 +133,13 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 	// Preserve all original parts for complete round-trip fidelity.
 	if parsed.Package != nil {
 		preserveOriginalParts(doc, parsed.Package)
+	}
+
+	// Hydrate metadata from docProps/core.xml so it survives round-trip.
+	if parsed.Package != nil && len(parsed.Package.CoreProperties) > 0 {
+		if meta, err := parseCoreProperties(parsed.Package.CoreProperties); err == nil && meta != nil {
+			_ = doc.SetMetadata(meta)
+		}
 	}
 
 	for _, child := range body.Children {
@@ -2088,4 +2096,52 @@ func preserveOriginalParts(doc domain.Document, pkg *Package) {
 	}
 
 	setter.SetPreservedParts(parts)
+}
+
+// corePropsRead is an unmarshal-friendly representation of docProps/core.xml.
+// Go's encoding/xml resolves namespace prefixes to their URIs during decode,
+// so the struct tags must use "namespace-URI element" format.
+type corePropsRead struct {
+	Title       string       `xml:"http://purl.org/dc/elements/1.1/ title"`
+	Subject     string       `xml:"http://purl.org/dc/elements/1.1/ subject"`
+	Creator     string       `xml:"http://purl.org/dc/elements/1.1/ creator"`
+	Description string       `xml:"http://purl.org/dc/elements/1.1/ description"`
+	Keywords    string       `xml:"http://schemas.openxmlformats.org/package/2006/metadata/core-properties keywords"`
+	Created     *dcDateRead  `xml:"http://purl.org/dc/terms/ created"`
+	Modified    *dcDateRead  `xml:"http://purl.org/dc/terms/ modified"`
+}
+
+type dcDateRead struct {
+	Value string `xml:",chardata"`
+}
+
+// parseCoreProperties unmarshals docProps/core.xml bytes into domain.Metadata.
+func parseCoreProperties(data []byte) (*domain.Metadata, error) {
+	var cp corePropsRead
+	if err := xml.Unmarshal(data, &cp); err != nil {
+		return nil, err
+	}
+
+	meta := &domain.Metadata{
+		Title:       cp.Title,
+		Subject:     cp.Subject,
+		Creator:     cp.Creator,
+		Description: cp.Description,
+	}
+
+	if cp.Keywords != "" {
+		meta.Keywords = strings.Split(cp.Keywords, ",")
+		for i := range meta.Keywords {
+			meta.Keywords[i] = strings.TrimSpace(meta.Keywords[i])
+		}
+	}
+
+	if cp.Created != nil {
+		meta.Created = cp.Created.Value
+	}
+	if cp.Modified != nil {
+		meta.Modified = cp.Modified.Value
+	}
+
+	return meta, nil
 }
