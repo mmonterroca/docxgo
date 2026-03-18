@@ -110,7 +110,7 @@ func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Reg
 		})
 
 		if newText != text {
-			run.SetText(newText)
+			_ = run.SetText(newText)
 			// Clear fields on this run if it has any.
 			if len(run.Fields()) > 0 {
 				run.ClearFields()

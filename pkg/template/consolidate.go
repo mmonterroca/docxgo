@@ -55,22 +55,22 @@ func ConsolidateRuns(para domain.Paragraph) {
 			continue // should not happen in practice
 		}
 		// Copy formatting from the source run
-		r.SetText(m.text)
-		r.SetFont(m.src.Font())
-		r.SetColor(m.src.Color())
-		r.SetSize(m.src.Size())
-		r.SetBold(m.src.Bold())
-		r.SetItalic(m.src.Italic())
-		r.SetUnderline(m.src.Underline())
-		r.SetStrike(m.src.Strike())
-		r.SetHighlight(m.src.Highlight())
+		_ = r.SetText(m.text)
+		_ = r.SetFont(m.src.Font())
+		_ = r.SetColor(m.src.Color())
+		_ = r.SetSize(m.src.Size())
+		_ = r.SetBold(m.src.Bold())
+		_ = r.SetItalic(m.src.Italic())
+		_ = r.SetUnderline(m.src.Underline())
+		_ = r.SetStrike(m.src.Strike())
+		_ = r.SetHighlight(m.src.Highlight())
 
 		// Re-add fields, breaks from the source run (for non-text runs)
 		for _, f := range m.src.Fields() {
-			r.AddField(f)
+			_ = r.AddField(f)
 		}
 		for _, b := range m.src.Breaks() {
-			r.AddBreak(b)
+			_ = r.AddBreak(b)
 		}
 	}
 }

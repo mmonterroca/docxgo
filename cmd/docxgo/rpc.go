@@ -12,7 +12,7 @@ import (
 // runRPC starts a persistent JSON-RPC server that reads newline-delimited JSON
 // requests from stdin and writes newline-delimited JSON responses to stdout.
 // It runs until stdin is closed (EOF) or a SIGTERM/SIGINT signal is received.
-func runRPC() int {
+func runRPC() {
 	s := newServer()
 
 	sigCh := make(chan os.Signal, 1)
@@ -38,7 +38,7 @@ func runRPC() int {
 		case line, ok := <-lineCh:
 			if !ok {
 				// EOF: stdin closed, graceful shutdown
-				return 0
+				return
 			}
 			if line == "" {
 				continue
@@ -58,7 +58,7 @@ func runRPC() int {
 			writeResponse(resp)
 		case <-sigCh:
 			// Graceful shutdown on signal
-			return 0
+			return
 		}
 	}
 }

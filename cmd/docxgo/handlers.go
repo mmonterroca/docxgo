@@ -1490,7 +1490,7 @@ func applyImage(para domain.Paragraph, img *imageDef) error {
 		}
 		_ = tmp.Close()
 		path = tmp.Name()
-		defer os.Remove(path)
+		defer func() { _ = os.Remove(path) }()
 	}
 
 	if path == "" {
@@ -1607,11 +1607,12 @@ func applySection(doc domain.Document, item sectionItem) error {
 			return fmt.Errorf("failed to set margins: %w", err)
 		}
 	}
-	if item.Orientation == "landscape" {
+	switch item.Orientation {
+	case "landscape":
 		if err := sec.SetOrientation(domain.OrientationLandscape); err != nil {
 			return fmt.Errorf("failed to set orientation: %w", err)
 		}
-	} else if item.Orientation == "portrait" {
+	case "portrait":
 		if err := sec.SetOrientation(domain.OrientationPortrait); err != nil {
 			return fmt.Errorf("failed to set orientation: %w", err)
 		}

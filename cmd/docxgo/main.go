@@ -35,7 +35,7 @@ func main() {
 		os.Exit(runExec(requestFlag))
 
 	case "rpc":
-		os.Exit(runRPC())
+		runRPC()
 
 	case "version":
 		jsonFlag := false

@@ -16,8 +16,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"regexp"
 	"time"
 
@@ -260,22 +258,4 @@ func sanitizeFilename(name string) string {
 	return string(result)
 }
 
-// cleanup removes generated .docx files to keep the example directory clean.
-// It preserves the original template file (reminder_letter.docx).
-func cleanup(singleOutput string, contacts []template.MergeData) {
-	os.Remove(singleOutput)
-	for _, c := range contacts {
-		name := c["Contact_FullName"]
-		os.Remove(fmt.Sprintf("reminder_%s.docx", sanitizeFilename(name)))
-	}
 
-	// Also remove any other generated files, but preserve the template
-	matches, _ := filepath.Glob("reminder_*.docx")
-	for _, m := range matches {
-		base := filepath.Base(m)
-		if base == "reminder_letter.docx" {
-			continue // preserve the original template
-		}
-		os.Remove(m)
-	}
-}
