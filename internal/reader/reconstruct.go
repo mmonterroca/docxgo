@@ -1994,6 +1994,35 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 		return nil
 	}
 
+	// Parse cell properties (w:tcPr) for merge info.
+	if tcPr := findChild(elem, "tcPr"); tcPr != nil {
+		if gs := findChild(tcPr, "gridSpan"); gs != nil {
+			if val, ok := getAttr(gs, "val"); ok && val != "" {
+				span, err := strconv.Atoi(val)
+				if err != nil {
+					return errors.Wrap(err, opHydrateTableCell)
+				}
+				if err := cell.SetGridSpan(span); err != nil {
+					return errors.Wrap(err, opHydrateTableCell)
+				}
+			}
+		}
+		if vm := findChild(tcPr, "vMerge"); vm != nil {
+			val, _ := getAttr(vm, "val")
+			switch val {
+			case "restart":
+				if err := cell.SetVMerge(domain.VMergeRestart); err != nil {
+					return errors.Wrap(err, opHydrateTableCell)
+				}
+			default:
+				// Empty or absent val means "continue"
+				if err := cell.SetVMerge(domain.VMergeContinue); err != nil {
+					return errors.Wrap(err, opHydrateTableCell)
+				}
+			}
+		}
+	}
+
 	for _, child := range elem.Children {
 		if child == nil || child.Name.Local != "p" {
 			continue
