@@ -1949,8 +1949,13 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 			}
 			cells = append(cells, child)
 		}
-		if len(cells) > maxCols {
-			maxCols = len(cells)
+		// Sum gridSpan values to get the actual grid column count.
+		gridCols := 0
+		for _, c := range cells {
+			gridCols += cellGridSpan(c)
+		}
+		if gridCols > maxCols {
+			maxCols = gridCols
 		}
 		rowCells[idx] = cells
 	}
@@ -1970,12 +1975,13 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 			return errors.Wrap(err, opHydrateTable)
 		}
 
-		for j, cellElem := range cells {
-			if j >= table.ColumnCount() {
-				continue
+		colOffset := 0
+		for _, cellElem := range cells {
+			if colOffset >= table.ColumnCount() {
+				break
 			}
 
-			cell, err := row.Cell(j)
+			cell, err := row.Cell(colOffset)
 			if err != nil {
 				return errors.Wrap(err, opHydrateTable)
 			}
@@ -1983,6 +1989,8 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 			if err := hydrateTableCell(cell, cellElem, ctx); err != nil {
 				return err
 			}
+
+			colOffset += cellGridSpan(cellElem)
 		}
 	}
 
@@ -2000,10 +2008,12 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 			if val, ok := getAttr(gs, "val"); ok && val != "" {
 				span, err := strconv.Atoi(val)
 				if err != nil {
-					return errors.Wrap(err, opHydrateTableCell)
+					return errors.WrapWithContext(err, opHydrateTableCell, map[string]interface{}{"attr": "gridSpan", "value": val})
 				}
-				if err := cell.SetGridSpan(span); err != nil {
-					return errors.Wrap(err, opHydrateTableCell)
+				if span > 1 {
+					if err := cell.Merge(span, 1); err != nil {
+						return errors.Wrap(err, opHydrateTableCell)
+					}
 				}
 			}
 		}
@@ -2039,6 +2049,20 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 	}
 
 	return nil
+}
+
+// cellGridSpan returns the grid column span for a <w:tc> element (defaults to 1).
+func cellGridSpan(tcElem *Element) int {
+	if tcPr := findChild(tcElem, "tcPr"); tcPr != nil {
+		if gs := findChild(tcPr, "gridSpan"); gs != nil {
+			if val, ok := getAttr(gs, "val"); ok {
+				if n, err := strconv.Atoi(val); err == nil && n > 1 {
+					return n
+				}
+			}
+		}
+	}
+	return 1
 }
 
 // preserveOriginalParts stores all original document parts for round-trip operations.

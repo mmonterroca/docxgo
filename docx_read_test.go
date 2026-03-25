@@ -127,4 +127,99 @@ func TestGridSpanPreservedAfterRoundTrip(t *testing.T) {
 	if got := cell.GridSpan(); got != 3 {
 		t.Errorf("after reopen: GridSpan = %d, want 3", got)
 	}
+
+	// Verify continuation cells are marked so the serializer skips them.
+	cell1, err := row0.Cell(1)
+	if err != nil {
+		t.Fatalf("Cell(1) after reopen: %v", err)
+	}
+	if !cell1.IsHorizontallyMergedContinuation() {
+		t.Errorf("Cell(1) should be a horizontal merge continuation")
+	}
+	cell2, err := row0.Cell(2)
+	if err != nil {
+		t.Fatalf("Cell(2) after reopen: %v", err)
+	}
+	if !cell2.IsHorizontallyMergedContinuation() {
+		t.Errorf("Cell(2) should be a horizontal merge continuation")
+	}
+}
+
+// TestVMergePreservedAfterRoundTrip verifies vertical cell merges survive save+reopen.
+func TestVMergePreservedAfterRoundTrip(t *testing.T) {
+	doc := NewDocument()
+	table, err := doc.AddTable(3, 2)
+	if err != nil {
+		t.Fatalf("AddTable: %v", err)
+	}
+	table.SetStyle(domain.TableStyleGrid)
+
+	// Merge rows 0-2 in column 0 vertically (3 rows, 1 col).
+	row0, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	cell, err := row0.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	if err := cell.Merge(1, 3); err != nil {
+		t.Fatalf("Merge: %v", err)
+	}
+	p, err := cell.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	r, err := p.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := r.AddText("Vertical span"); err != nil {
+		t.Fatalf("AddText: %v", err)
+	}
+
+	if got := cell.VMerge(); got != domain.VMergeRestart {
+		t.Fatalf("before save: VMerge = %v, want VMergeRestart", got)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	doc2, err := OpenDocumentFromBytes(buf.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	tables := doc2.Tables()
+	if len(tables) == 0 {
+		t.Fatal("expected at least one table after reopen")
+	}
+
+	// Row 0, Cell 0: should be VMergeRestart
+	r0, err := tables[0].Row(0)
+	if err != nil {
+		t.Fatalf("Row(0) after reopen: %v", err)
+	}
+	c0, err := r0.Cell(0)
+	if err != nil {
+		t.Fatalf("Row(0).Cell(0) after reopen: %v", err)
+	}
+	if got := c0.VMerge(); got != domain.VMergeRestart {
+		t.Errorf("Row(0).Cell(0) VMerge = %v, want VMergeRestart", got)
+	}
+
+	// Row 1, Cell 0: should be VMergeContinue
+	r1, err := tables[0].Row(1)
+	if err != nil {
+		t.Fatalf("Row(1) after reopen: %v", err)
+	}
+	c1, err := r1.Cell(0)
+	if err != nil {
+		t.Fatalf("Row(1).Cell(0) after reopen: %v", err)
+	}
+	if got := c1.VMerge(); got != domain.VMergeContinue {
+		t.Errorf("Row(1).Cell(0) VMerge = %v, want VMergeContinue", got)
+	}
 }
