@@ -25,6 +25,7 @@ SOFTWARE.
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	_ "image/gif"  // Register GIF format decoder
@@ -312,6 +313,8 @@ func formatFromContentType(contentType string) domain.ImageFormat {
 		return domain.ImageFormatEMF
 	case constants.ContentTypeWMF:
 		return domain.ImageFormatWMF
+	case constants.ContentTypeICO:
+		return domain.ImageFormatICO
 	default:
 		return ""
 	}
@@ -322,7 +325,7 @@ func formatFromContentType(contentType string) domain.ImageFormat {
 // a zero-size placeholder instead of failing, since these formats are still
 // valid embedded media in DOCX documents.
 func getImageDimensions(data []byte) (domain.ImageSize, error) {
-	img, _, err := image.DecodeConfig(strings.NewReader(string(data)))
+	img, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		// No registered decoder for this format (EMF, WMF, ICO, SVG, etc.)
 		// Return zero size; callers can set explicit dimensions if needed.
