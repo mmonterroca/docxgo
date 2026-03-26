@@ -38,6 +38,7 @@ import (
 
 	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/pkg/constants"
+	"github.com/mmonterroca/docxgo/v2/pkg/emf"
 	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
 
@@ -158,6 +159,14 @@ func NewImageFromPackage(target string, data []byte, contentType string) (domain
 		return nil, errors.InvalidArgument("NewImageFromPackage", "target", target, "unsupported or unknown image format")
 	}
 
+	if format == domain.ImageFormatEMF {
+		if converted, ok := tryConvertEMFToPNG(data); ok {
+			data = converted
+			format = domain.ImageFormatPNG
+			relative = strings.TrimSuffix(relative, filepath.Ext(relative)) + ".png"
+		}
+	}
+
 	size, err := getImageDimensions(data)
 	if err != nil {
 		return nil, errors.Wrap(err, "NewImageFromPackage")
@@ -264,6 +273,18 @@ func (img *docxImage) Position() domain.ImagePosition {
 func (img *docxImage) SetPosition(pos domain.ImagePosition) error {
 	img.position = pos
 	return nil
+}
+
+// tryConvertEMFToPNG attempts to convert EMF data to PNG.
+// Returns the PNG bytes and true on success, or nil and false if the EMF
+// cannot be converted (e.g. complex vector content). Callers should keep
+// the original EMF when this returns false.
+func tryConvertEMFToPNG(data []byte) ([]byte, bool) {
+	var buf bytes.Buffer
+	if err := emf.ConvertToPNG(data, &buf); err != nil {
+		return nil, false
+	}
+	return buf.Bytes(), true
 }
 
 // detectImageFormat detects the image format from file extension.
