@@ -145,6 +145,7 @@ const (
 	ContentTypeTIFF               = "image/tiff"
 	ContentTypeWMF                = "image/x-wmf"
 	ContentTypeEMF                = "image/x-emf"
+	ContentTypeICO                = "image/x-icon"
 )
 
 // File paths within .docx archive

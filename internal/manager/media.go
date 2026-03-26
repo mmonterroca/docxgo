@@ -235,6 +235,8 @@ func (mm *MediaManager) detectContentType(ext string) string {
 		return constants.ContentTypeWMF
 	case ".emf":
 		return constants.ContentTypeEMF
+	case ".ico":
+		return constants.ContentTypeICO
 	default:
 		return "application/octet-stream"
 	}
