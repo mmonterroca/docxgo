@@ -285,6 +285,12 @@ func detectImageFormat(path string) domain.ImageFormat {
 		return domain.ImageFormatSVG
 	case "webp":
 		return domain.ImageFormatWEBP
+	case "emf":
+		return domain.ImageFormatEMF
+	case "wmf":
+		return domain.ImageFormatWMF
+	case "ico":
+		return domain.ImageFormatICO
 	default:
 		return ""
 	}
@@ -302,25 +308,26 @@ func formatFromContentType(contentType string) domain.ImageFormat {
 		return domain.ImageFormatBMP
 	case constants.ContentTypeTIFF:
 		return domain.ImageFormatTIFF
+	case constants.ContentTypeEMF:
+		return domain.ImageFormatEMF
+	case constants.ContentTypeWMF:
+		return domain.ImageFormatWMF
 	default:
 		return ""
 	}
 }
 
 // getImageDimensions reads image dimensions from image data.
+// For formats without a Go stdlib decoder (EMF, WMF, ICO, SVG) it returns
+// a zero-size placeholder instead of failing, since these formats are still
+// valid embedded media in DOCX documents.
 func getImageDimensions(data []byte) (domain.ImageSize, error) {
-	// Decode image to get dimensions
-	img, format, err := image.DecodeConfig(strings.NewReader(string(data)))
+	img, _, err := image.DecodeConfig(strings.NewReader(string(data)))
 	if err != nil {
-		// If decode fails, try reading as binary
-		reader := strings.NewReader(string(data))
-		img, format, err = image.DecodeConfig(reader)
-		if err != nil {
-			return domain.ImageSize{}, errors.Wrap(err, "getImageDimensions")
-		}
+		// No registered decoder for this format (EMF, WMF, ICO, SVG, etc.)
+		// Return zero size; callers can set explicit dimensions if needed.
+		return domain.ImageSize{}, nil
 	}
-
-	_ = format // format string is for logging if needed
 
 	return domain.NewImageSize(img.Width, img.Height), nil
 }

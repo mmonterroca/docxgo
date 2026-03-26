@@ -38,6 +38,9 @@ const (
 	ImageFormatTIF  ImageFormat = "tif"  // TIFF format (short name)
 	ImageFormatSVG  ImageFormat = "svg"  // SVG format
 	ImageFormatWEBP ImageFormat = "webp" // WebP format
+	ImageFormatEMF  ImageFormat = "emf"  // EMF (Enhanced Metafile) format
+	ImageFormatWMF  ImageFormat = "wmf"  // WMF (Windows Metafile) format
+	ImageFormatICO  ImageFormat = "ico"  // ICO (Windows Icon) format
 )
 
 // ImageSize represents image dimensions.
