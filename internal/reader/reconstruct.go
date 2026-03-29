@@ -779,7 +779,7 @@ func hydrateDrawing(para domain.Paragraph, run domain.Run, elem *Element, ctx *r
 
 	mediaPart, mediaPath, found := ctx.mediaPartFor(target)
 	if !found || mediaPart == nil {
-		return errors.Errorf(errors.ErrCodeInvalidState, opHydrateDrawing, "unable to resolve media part for %s", mediaPath)
+		return nil
 	}
 
 	registerPath := mediaPart.Path
@@ -857,6 +857,10 @@ func extractDrawingRelationshipID(elem *Element) string {
 
 	data := findChild(graphic, "graphicData")
 	if data == nil {
+		return ""
+	}
+
+	if uri, ok := getAttr(data, "uri"); ok && uri != "http://schemas.openxmlformats.org/drawingml/2006/picture" {
 		return ""
 	}
 
