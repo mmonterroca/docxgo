@@ -215,7 +215,7 @@ func (p *paragraph) AddImageFromBytesWithPosition(data []byte, format domain.Ima
 		return nil, errors.Wrap(err, "Paragraph.AddImageFromBytesWithPosition")
 	}
 
-	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, format)); err != nil {
+	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, img.Format())); err != nil {
 		return nil, err
 	}
 

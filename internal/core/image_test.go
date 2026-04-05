@@ -28,6 +28,7 @@ import (
 	"bytes"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -491,9 +492,19 @@ func TestNewImageFromBytes(t *testing.T) {
 	})
 
 	t.Run("normalizes jpg to jpeg", func(t *testing.T) {
-		// Use PNG data but verify format normalization logic
-		data := createTestImageBytes(t, 50, 50)
-		img, err := NewImageFromBytes("img12d", data, "JPG")
+		// Generate actual JPEG bytes
+		rawImg := image.NewRGBA(image.Rect(0, 0, 50, 50))
+		for y := 0; y < 50; y++ {
+			for x := 0; x < 50; x++ {
+				rawImg.Set(x, y, color.RGBA{R: 0, G: 128, B: 255, A: 255})
+			}
+		}
+		var jpegBuf bytes.Buffer
+		if err := jpeg.Encode(&jpegBuf, rawImg, nil); err != nil {
+			t.Fatalf("Failed to encode JPEG: %v", err)
+		}
+
+		img, err := NewImageFromBytes("img12d", jpegBuf.Bytes(), "JPG")
 		if err != nil {
 			t.Fatalf("NewImageFromBytes() error = %v", err)
 		}

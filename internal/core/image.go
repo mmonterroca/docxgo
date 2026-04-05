@@ -344,6 +344,9 @@ func NewImageFromBytes(id string, data []byte, format domain.ImageFormat) (domai
 		return nil, errors.Wrap(err, "NewImageFromBytes")
 	}
 
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+
 	target := fmt.Sprintf("media/image%s.%s", id, normalized)
 
 	return &docxImage{
@@ -351,7 +354,7 @@ func NewImageFromBytes(id string, data []byte, format domain.ImageFormat) (domai
 		format:       normalized,
 		size:         size,
 		originalSize: size,
-		data:         data,
+		data:         copyData,
 		target:       target,
 		description:  "",
 		position:     domain.DefaultImagePosition(),
