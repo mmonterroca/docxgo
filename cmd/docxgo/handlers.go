@@ -835,31 +835,26 @@ func applyField(para domain.Paragraph, f *fieldDef) error {
 
 // applyImage adds an image to a paragraph.
 func applyImage(para domain.Paragraph, img *imageDef) error {
-	path := img.Path
-
+	// If base64 data is provided, use AddImageFromBytes directly (no temp file needed).
 	if img.Base64 != "" {
 		data, err := base64.StdEncoding.DecodeString(img.Base64)
 		if err != nil {
 			return fmt.Errorf("invalid image base64: %w", err)
 		}
-		ext := img.Format
-		if ext == "" {
-			ext = "png"
+		format := domain.ImageFormat(img.Format)
+		if format == "" {
+			format = domain.ImageFormatPNG
 		}
-		tmp, err := os.CreateTemp("", "docxgo-img-*."+ext)
-		if err != nil {
-			return fmt.Errorf("failed to create temp image: %w", err)
+		if img.WidthPx > 0 || img.HeightPx > 0 {
+			size := domain.NewImageSize(img.WidthPx, img.HeightPx)
+			_, err = para.AddImageFromBytesWithSize(data, format, size)
+			return err
 		}
-		if _, err := tmp.Write(data); err != nil {
-			_ = tmp.Close()
-			_ = os.Remove(tmp.Name())
-			return fmt.Errorf("failed to write temp image: %w", err)
-		}
-		_ = tmp.Close()
-		path = tmp.Name()
-		defer os.Remove(path)
+		_, err = para.AddImageFromBytes(data, format)
+		return err
 	}
 
+	path := img.Path
 	if path == "" {
 		return fmt.Errorf("image requires path or base64")
 	}
