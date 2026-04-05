@@ -48,6 +48,16 @@ type Paragraph interface {
 	// AddImageWithPosition adds an image with custom positioning.
 	AddImageWithPosition(path string, size ImageSize, pos ImagePosition) (Image, error)
 
+	// AddImageFromBytes adds an image from raw byte data.
+	// The format parameter specifies the image type (e.g., ImageFormatPNG).
+	AddImageFromBytes(data []byte, format ImageFormat) (Image, error)
+
+	// AddImageFromBytesWithSize adds an image from byte data with custom dimensions.
+	AddImageFromBytesWithSize(data []byte, format ImageFormat, size ImageSize) (Image, error)
+
+	// AddImageFromBytesWithPosition adds an image from byte data with custom positioning.
+	AddImageFromBytesWithPosition(data []byte, format ImageFormat, size ImageSize, pos ImagePosition) (Image, error)
+
 	// Images returns all images in this paragraph.
 	Images() []Image
 

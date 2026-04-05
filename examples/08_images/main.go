@@ -15,6 +15,7 @@ This example demonstrates:
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
@@ -245,6 +246,49 @@ func main() {
 		Text(" <- Three inline images").
 		End()
 
+	builder.AddParagraph().Text("").End()
+
+	// Example 8: Image from bytes (no file system required)
+	builder.AddParagraph().
+		Text("8. Image from Byte Data (AddImageFromBytes)").
+		Bold().
+		FontSize(16).
+		End()
+
+	builder.AddParagraph().
+		Text("This image was created entirely in memory, without writing to disk:").
+		End()
+
+	// Create an image in memory
+	memImg := image.NewRGBA(image.Rect(0, 0, 300, 200))
+	for y := 0; y < 200; y++ {
+		for x := 0; x < 300; x++ {
+			memImg.Set(x, y, color.RGBA{
+				R: uint8(x * 255 / 300),
+				G: uint8(y * 255 / 200),
+				B: 180,
+				A: 255,
+			})
+		}
+	}
+	var imgBuf bytes.Buffer
+	if err := png.Encode(&imgBuf, memImg); err != nil {
+		log.Fatalf("Failed to encode in-memory image: %v", err)
+	}
+	imgBytes := imgBuf.Bytes()
+
+	builder.AddParagraph().
+		AddImageFromBytes(imgBytes, domain.ImageFormatPNG).
+		End()
+
+	builder.AddParagraph().
+		Text("You can also use AddImageFromBytesWithSize to control dimensions:").
+		End()
+
+	builder.AddParagraph().
+		AddImageFromBytesWithSize(imgBytes, domain.ImageFormatPNG, domain.NewImageSize(150, 100)).
+		End()
+
 	// Save document
 	doc, err := builder.Build()
 	if err != nil {
@@ -264,4 +308,5 @@ func main() {
 	fmt.Println("  - Floating images (center, left, right)")
 	fmt.Println("  - Text wrapping (square, tight)")
 	fmt.Println("  - Multiple images in one paragraph")
+	fmt.Println("  - Images from byte data (no file system)")
 }

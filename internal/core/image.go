@@ -325,6 +325,64 @@ func getImageDimensions(data []byte) (domain.ImageSize, error) {
 	return domain.NewImageSize(img.Width, img.Height), nil
 }
 
+// NewImageFromBytes creates a new image from raw byte data.
+func NewImageFromBytes(id string, data []byte, format domain.ImageFormat) (domain.Image, error) {
+	if len(data) == 0 {
+		return nil, errors.InvalidArgument("NewImageFromBytes", "data", nil, "image data cannot be empty")
+	}
+	if format == "" {
+		return nil, errors.InvalidArgument("NewImageFromBytes", "format", format, "image format is required")
+	}
+
+	size, err := getImageDimensions(data)
+	if err != nil {
+		return nil, errors.Wrap(err, "NewImageFromBytes")
+	}
+
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+
+	target := fmt.Sprintf("media/image%s.%s", id, format)
+
+	return &docxImage{
+		id:           id,
+		format:       format,
+		size:         size,
+		originalSize: size,
+		data:         copyData,
+		target:       target,
+		description:  "",
+		position:     domain.DefaultImagePosition(),
+	}, nil
+}
+
+// NewImageFromBytesWithSize creates a new image from byte data with custom dimensions.
+func NewImageFromBytesWithSize(id string, data []byte, format domain.ImageFormat, size domain.ImageSize) (domain.Image, error) {
+	img, err := NewImageFromBytes(id, data, format)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := img.SetSize(size); err != nil {
+		return nil, err
+	}
+
+	return img, nil
+}
+
+// NewImageFromBytesWithPosition creates a new image from byte data with custom positioning.
+func NewImageFromBytesWithPosition(id string, data []byte, format domain.ImageFormat, size domain.ImageSize, pos domain.ImagePosition) (domain.Image, error) {
+	img, err := NewImageFromBytesWithSize(id, data, format, size)
+	if err != nil {
+		return nil, err
+	}
+
+	docxImg := img.(*docxImage)
+	docxImg.position = pos
+
+	return img, nil
+}
+
 // ReadImageFromReader creates an image from an io.Reader.
 func ReadImageFromReader(id string, reader io.Reader, format domain.ImageFormat) (domain.Image, error) {
 	// Read all data

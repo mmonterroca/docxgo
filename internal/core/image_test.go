@@ -415,3 +415,94 @@ func TestDefaultImagePosition(t *testing.T) {
 		t.Errorf("WrapText = %v, want %v", pos.WrapText, domain.WrapNone)
 	}
 }
+
+func createTestImageBytes(t *testing.T, width, height int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{R: 255, G: 0, B: 0, A: 255})
+		}
+	}
+	buf := new(bytes.Buffer)
+	if err := png.Encode(buf, img); err != nil {
+		t.Fatalf("Failed to encode PNG: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func TestNewImageFromBytes(t *testing.T) {
+	t.Run("valid PNG bytes", func(t *testing.T) {
+		data := createTestImageBytes(t, 200, 150)
+		img, err := NewImageFromBytes("img10", data, domain.ImageFormatPNG)
+		if err != nil {
+			t.Fatalf("NewImageFromBytes() error = %v", err)
+		}
+		if img.ID() != "img10" {
+			t.Errorf("ID() = %v, want img10", img.ID())
+		}
+		if img.Format() != domain.ImageFormatPNG {
+			t.Errorf("Format() = %v, want png", img.Format())
+		}
+		size := img.Size()
+		if size.WidthPx != 200 || size.HeightPx != 150 {
+			t.Errorf("Size() = %dx%d, want 200x150", size.WidthPx, size.HeightPx)
+		}
+		if len(img.Data()) == 0 {
+			t.Error("Data() returned empty slice")
+		}
+		if !strings.Contains(img.Target(), "media/image") {
+			t.Errorf("Target() = %v, expected to contain media/image", img.Target())
+		}
+	})
+
+	t.Run("empty data returns error", func(t *testing.T) {
+		_, err := NewImageFromBytes("img11", nil, domain.ImageFormatPNG)
+		if err == nil {
+			t.Fatal("Expected error for empty data, got nil")
+		}
+	})
+
+	t.Run("empty format returns error", func(t *testing.T) {
+		data := createTestImageBytes(t, 100, 100)
+		_, err := NewImageFromBytes("img12", data, "")
+		if err == nil {
+			t.Fatal("Expected error for empty format, got nil")
+		}
+	})
+}
+
+func TestNewImageFromBytesWithSize(t *testing.T) {
+	data := createTestImageBytes(t, 200, 150)
+	size := domain.NewImageSize(100, 75)
+	img, err := NewImageFromBytesWithSize("img13", data, domain.ImageFormatPNG, size)
+	if err != nil {
+		t.Fatalf("NewImageFromBytesWithSize() error = %v", err)
+	}
+	result := img.Size()
+	if result.WidthPx != 100 || result.HeightPx != 75 {
+		t.Errorf("Size() = %dx%d, want 100x75", result.WidthPx, result.HeightPx)
+	}
+}
+
+func TestNewImageFromBytesWithPosition(t *testing.T) {
+	data := createTestImageBytes(t, 200, 150)
+	size := domain.NewImageSize(100, 75)
+	pos := domain.ImagePosition{
+		Type:     domain.ImagePositionFloating,
+		HAlign:   domain.HAlignCenter,
+		VAlign:   domain.VAlignTop,
+		WrapText: domain.WrapSquare,
+	}
+	img, err := NewImageFromBytesWithPosition("img14", data, domain.ImageFormatPNG, size, pos)
+	if err != nil {
+		t.Fatalf("NewImageFromBytesWithPosition() error = %v", err)
+	}
+	imgPos := img.Position()
+	if imgPos.Type != domain.ImagePositionFloating {
+		t.Errorf("Position().Type = %v, want floating", imgPos.Type)
+	}
+	if imgPos.HAlign != domain.HAlignCenter {
+		t.Errorf("Position().HAlign = %v, want center", imgPos.HAlign)
+	}
+}

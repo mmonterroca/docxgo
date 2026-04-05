@@ -26,6 +26,7 @@ SOFTWARE.
 package core
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -170,6 +171,51 @@ func (p *paragraph) AddImageWithPosition(path string, size domain.ImageSize, pos
 	}
 
 	if err := p.attachImage(img, filepath.Base(path)); err != nil {
+		return nil, err
+	}
+
+	return img, nil
+}
+
+// AddImageFromBytes adds an image from raw byte data.
+func (p *paragraph) AddImageFromBytes(data []byte, format domain.ImageFormat) (domain.Image, error) {
+	id := p.idGen.NextImageID()
+	img, err := NewImageFromBytes(id, data, format)
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImageFromBytes")
+	}
+
+	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, format)); err != nil {
+		return nil, err
+	}
+
+	return img, nil
+}
+
+// AddImageFromBytesWithSize adds an image from byte data with custom dimensions.
+func (p *paragraph) AddImageFromBytesWithSize(data []byte, format domain.ImageFormat, size domain.ImageSize) (domain.Image, error) {
+	id := p.idGen.NextImageID()
+	img, err := NewImageFromBytesWithSize(id, data, format, size)
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImageFromBytesWithSize")
+	}
+
+	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, format)); err != nil {
+		return nil, err
+	}
+
+	return img, nil
+}
+
+// AddImageFromBytesWithPosition adds an image from byte data with custom positioning.
+func (p *paragraph) AddImageFromBytesWithPosition(data []byte, format domain.ImageFormat, size domain.ImageSize, pos domain.ImagePosition) (domain.Image, error) {
+	id := p.idGen.NextImageID()
+	img, err := NewImageFromBytesWithPosition(id, data, format, size, pos)
+	if err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddImageFromBytesWithPosition")
+	}
+
+	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, format)); err != nil {
 		return nil, err
 	}
 

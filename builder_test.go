@@ -1033,4 +1033,46 @@ func TestParagraphBuilder_AddImage(t *testing.T) {
 			t.Fatal("expected error for empty image path, got nil")
 		}
 	})
+
+	t.Run("AddImageFromBytes fails with empty data", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddParagraph().
+			Text("Before image").
+			AddImageFromBytes(nil, domain.ImageFormatPNG).
+			End()
+
+		_, err := builder.Build()
+		if err == nil {
+			t.Fatal("expected error for nil image data, got nil")
+		}
+	})
+
+	t.Run("AddImageFromBytesWithSize fails with empty data", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		size := domain.NewImageSize(100, 100)
+		builder.AddParagraph().
+			Text("Before image").
+			AddImageFromBytesWithSize(nil, domain.ImageFormatPNG, size).
+			End()
+
+		_, err := builder.Build()
+		if err == nil {
+			t.Fatal("expected error for nil image data, got nil")
+		}
+	})
+
+	t.Run("AddImageFromBytesWithPosition fails with empty data", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		size := domain.NewImageSize(100, 100)
+		pos := domain.DefaultImagePosition()
+		builder.AddParagraph().
+			Text("Before image").
+			AddImageFromBytesWithPosition(nil, domain.ImageFormatPNG, size, pos).
+			End()
+
+		_, err := builder.Build()
+		if err == nil {
+			t.Fatal("expected error for nil image data, got nil")
+		}
+	})
 }
