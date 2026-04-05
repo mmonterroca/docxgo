@@ -470,6 +470,37 @@ func TestNewImageFromBytes(t *testing.T) {
 			t.Fatal("Expected error for empty format, got nil")
 		}
 	})
+
+	t.Run("invalid format returns error", func(t *testing.T) {
+		data := createTestImageBytes(t, 100, 100)
+		_, err := NewImageFromBytes("img12b", data, "xyz")
+		if err == nil {
+			t.Fatal("Expected error for unsupported format, got nil")
+		}
+	})
+
+	t.Run("normalizes uppercase format", func(t *testing.T) {
+		data := createTestImageBytes(t, 100, 100)
+		img, err := NewImageFromBytes("img12c", data, "PNG")
+		if err != nil {
+			t.Fatalf("NewImageFromBytes() error = %v", err)
+		}
+		if img.Format() != domain.ImageFormatPNG {
+			t.Errorf("Format() = %v, want png", img.Format())
+		}
+	})
+
+	t.Run("normalizes jpg to jpeg", func(t *testing.T) {
+		// Use PNG data but verify format normalization logic
+		data := createTestImageBytes(t, 50, 50)
+		img, err := NewImageFromBytes("img12d", data, "JPG")
+		if err != nil {
+			t.Fatalf("NewImageFromBytes() error = %v", err)
+		}
+		if img.Format() != domain.ImageFormatJPEG {
+			t.Errorf("Format() = %v, want jpeg", img.Format())
+		}
+	})
 }
 
 func TestNewImageFromBytesWithSize(t *testing.T) {

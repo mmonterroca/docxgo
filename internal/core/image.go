@@ -25,6 +25,7 @@ SOFTWARE.
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	_ "image/gif"  // Register GIF format decoder
@@ -270,7 +271,15 @@ func detectImageFormat(path string) domain.ImageFormat {
 	ext := strings.ToLower(filepath.Ext(path))
 	ext = strings.TrimPrefix(ext, ".")
 
-	switch ext {
+	return normalizeImageFormat(domain.ImageFormat(ext))
+}
+
+// normalizeImageFormat validates and normalizes an ImageFormat value.
+// Returns empty string for unsupported formats.
+func normalizeImageFormat(format domain.ImageFormat) domain.ImageFormat {
+	normalized := strings.ToLower(strings.TrimPrefix(string(format), "."))
+
+	switch normalized {
 	case "png":
 		return domain.ImageFormatPNG
 	case "jpg", "jpeg":
@@ -309,15 +318,9 @@ func formatFromContentType(contentType string) domain.ImageFormat {
 
 // getImageDimensions reads image dimensions from image data.
 func getImageDimensions(data []byte) (domain.ImageSize, error) {
-	// Decode image to get dimensions
-	img, format, err := image.DecodeConfig(strings.NewReader(string(data)))
+	img, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
-		// If decode fails, try reading as binary
-		reader := strings.NewReader(string(data))
-		img, format, err = image.DecodeConfig(reader)
-		if err != nil {
-			return domain.ImageSize{}, errors.Wrap(err, "getImageDimensions")
-		}
+		return domain.ImageSize{}, errors.Wrap(err, "getImageDimensions")
 	}
 
 	_ = format // format string is for logging if needed
@@ -328,10 +331,12 @@ func getImageDimensions(data []byte) (domain.ImageSize, error) {
 // NewImageFromBytes creates a new image from raw byte data.
 func NewImageFromBytes(id string, data []byte, format domain.ImageFormat) (domain.Image, error) {
 	if len(data) == 0 {
-		return nil, errors.InvalidArgument("NewImageFromBytes", "data", nil, "image data cannot be empty")
+		return nil, errors.InvalidArgument("NewImageFromBytes", "data", data, "image data cannot be empty")
 	}
-	if format == "" {
-		return nil, errors.InvalidArgument("NewImageFromBytes", "format", format, "image format is required")
+
+	normalized := normalizeImageFormat(format)
+	if normalized == "" {
+		return nil, errors.InvalidArgument("NewImageFromBytes", "format", format, "unsupported image format")
 	}
 
 	size, err := getImageDimensions(data)
@@ -339,17 +344,14 @@ func NewImageFromBytes(id string, data []byte, format domain.ImageFormat) (domai
 		return nil, errors.Wrap(err, "NewImageFromBytes")
 	}
 
-	copyData := make([]byte, len(data))
-	copy(copyData, data)
-
-	target := fmt.Sprintf("media/image%s.%s", id, format)
+	target := fmt.Sprintf("media/image%s.%s", id, normalized)
 
 	return &docxImage{
 		id:           id,
-		format:       format,
+		format:       normalized,
 		size:         size,
 		originalSize: size,
-		data:         copyData,
+		data:         data,
 		target:       target,
 		description:  "",
 		position:     domain.DefaultImagePosition(),

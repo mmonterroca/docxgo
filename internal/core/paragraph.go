@@ -185,7 +185,7 @@ func (p *paragraph) AddImageFromBytes(data []byte, format domain.ImageFormat) (d
 		return nil, errors.Wrap(err, "Paragraph.AddImageFromBytes")
 	}
 
-	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, format)); err != nil {
+	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, img.Format())); err != nil {
 		return nil, err
 	}
 
@@ -200,7 +200,7 @@ func (p *paragraph) AddImageFromBytesWithSize(data []byte, format domain.ImageFo
 		return nil, errors.Wrap(err, "Paragraph.AddImageFromBytesWithSize")
 	}
 
-	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, format)); err != nil {
+	if err := p.attachImage(img, fmt.Sprintf("image%s.%s", id, img.Format())); err != nil {
 		return nil, err
 	}
 
