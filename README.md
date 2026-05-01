@@ -19,20 +19,21 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 - ✅ **Production Ready** - EXCELLENT error handling, comprehensive validation
 - ✅ **Well Documented** - Complete godoc, examples, and architecture docs
 - ✅ **Template / Mail Merge** - Placeholder detection, data merging, batch document generation
+- ✅ **In-Memory Images** - Insert images from byte slices without touching the file system
 - ✅ **Open Source** - MIT License, use in commercial and private projects
 
 ---
 
 ## Status
 
-**Current Version**: v2.3.0 (Stable)
+**Current Version**: v2.4.0 (Stable)
 **Stability**: Production Ready
-**Released**: February 2026
+**Released**: April 2026
 **Test Coverage**: 50.7%
 
-**Latest Features**: Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
+**Latest Features**: In-memory Image API (v2.4.0), Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
 
-> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, and template/mail merge engine in v2.3.0.
+> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, template/mail merge engine in v2.3.0, and in-memory image insertion plus merged-cell round-trip fixes in v2.4.0.
 
 ---
 
@@ -524,7 +525,18 @@ For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
 ### Release History
 
-- **v2.2.2** (February 2026 - Current Stable)
+- **v2.4.0** (April 2026 - Current Stable)
+  - In-memory image API: `AddImageFromBytes`, `AddImageFromBytesWithSize`, `AddImageFromBytesWithPosition`
+  - Round-trip preservation of `w:gridSpan` and `w:vMerge` for merged table cells
+  - CLI handler now embeds base64 images without temp files
+
+- **v2.3.0** (February 2026)
+  - Template / Mail Merge engine (`pkg/template/`)
+  - MERGEFIELD support with real Word templates and `«»` delimiters
+  - Paragraph mutation APIs (`ClearRuns`, `RemoveRun`, `InsertRunAt`)
+  - Examples 14 and 15 (mail merge + external Word templates)
+
+- **v2.2.2** (February 2026)
   - Table style borders fix (TableGrid, PlainTable1 now render with visible borders)
   - Grid column width calculation from cell widths
   - Comprehensive documentation overhaul
@@ -558,20 +570,14 @@ For complete project genealogy, see [CREDITS.md](CREDITS.md).
 - **v2.0.0-beta** (October 2025)
   - Initial beta release
 
-### Upcoming (dev branch)
-
-- Table style borders (TableGrid, PlainTable1) - fix for [#15](https://github.com/mmonterroca/docxgo/issues/15)
-- Updated examples with table styles
-- Restored example 13 (themes)
-
 ### Planned Features
 
-- Mail merge and templates
 - Comments and change tracking
 - Content controls / form fields
 - Custom XML parts
 - Advanced drawing shapes
 - Document comparison
+- Header/footer reading round-trip
 
 See [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for detailed status.
 
