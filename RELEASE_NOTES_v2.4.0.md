@@ -67,8 +67,10 @@ go get github.com/mmonterroca/docxgo/v2@v2.4.0
 
 ## Compatibility
 
-- Backward compatible with v2.3.x — all additions are new methods on existing interfaces. Custom `domain.Paragraph` implementations outside this module will need to add the three `AddImageFromBytes*` methods.
-- Documents written with earlier versions are unchanged; only round-trip behavior for merged tables improves.
+- **Source-compatible for typical callers** using the built-in implementations from this module — the new image APIs are purely additive.
+- **Breaking for custom `domain.Paragraph` implementations** outside this module: the interface gains three new methods (`AddImageFromBytes`, `AddImageFromBytesWithSize`, `AddImageFromBytesWithPosition`) which custom implementers must add.
+- **Supported in-memory image formats**: PNG, JPEG, and GIF. These are the formats with registered Go decoders for dimension detection and mapped MIME types in the media manager. Use the file-based `AddImage(path)` API for BMP/TIFF/SVG/WEBP.
+- **Documents written with earlier versions are unchanged**; only round-trip behavior for merged tables improves.
 
 ## Acknowledgements
 

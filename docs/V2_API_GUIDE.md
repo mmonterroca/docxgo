@@ -1,7 +1,7 @@
 # go-docx v2 API Guide
 
 **Version**: 2.4.0
-**Last Updated**: February 2026
+**Last Updated**: April 2026
 
 ---
 

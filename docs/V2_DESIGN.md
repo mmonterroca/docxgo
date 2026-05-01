@@ -1339,7 +1339,7 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 
 ---
 
-**Last Updated**: February 2026
+**Last Updated**: April 2026
 **Status**: ✅ v2.4.0 Stable
 **Progress**: Production Ready (all core features complete)
 

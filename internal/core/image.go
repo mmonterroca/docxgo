@@ -328,6 +328,20 @@ func getImageDimensions(data []byte) (domain.ImageSize, error) {
 	return domain.NewImageSize(img.Width, img.Height), nil
 }
 
+// isDecodableInMemoryFormat reports whether a format can be decoded by
+// image.DecodeConfig with the registered Go standard-library decoders
+// AND has a mapped MIME type in MediaManager.detectContentType. Used by
+// NewImageFromBytes* to fail fast for formats that would otherwise produce
+// a decode error or an application/octet-stream content type.
+func isDecodableInMemoryFormat(f domain.ImageFormat) bool {
+	switch f {
+	case domain.ImageFormatPNG, domain.ImageFormatJPEG, domain.ImageFormatGIF:
+		return true
+	default:
+		return false
+	}
+}
+
 // NewImageFromBytes creates a new image from raw byte data.
 func NewImageFromBytes(id string, data []byte, format domain.ImageFormat) (domain.Image, error) {
 	if len(data) == 0 {
@@ -337,6 +351,10 @@ func NewImageFromBytes(id string, data []byte, format domain.ImageFormat) (domai
 	normalized := normalizeImageFormat(format)
 	if normalized == "" {
 		return nil, errors.InvalidArgument("NewImageFromBytes", "format", format, "unsupported image format")
+	}
+	if !isDecodableInMemoryFormat(normalized) {
+		return nil, errors.InvalidArgument("NewImageFromBytes", "format", format,
+			"in-memory image insertion only supports PNG, JPEG, and GIF; use AddImage(path) for other formats")
 	}
 
 	size, err := getImageDimensions(data)
