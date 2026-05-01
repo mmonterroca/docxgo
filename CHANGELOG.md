@@ -1,3 +1,38 @@
+## v2.4.0 — 2026-04-30
+
+### Added
+
+- **In-memory image API** (`pkg/builder` + `domain.Paragraph`) — insert images from byte slices without touching the file system (PR #30, closes #29)
+  - `ParagraphBuilder.AddImageFromBytes(data, format)` — inline image from bytes
+  - `ParagraphBuilder.AddImageFromBytesWithSize(data, format, size)` — with custom dimensions
+  - `ParagraphBuilder.AddImageFromBytesWithPosition(data, format, size, pos)` — floating with positioning
+  - Matching methods on `domain.Paragraph` (`AddImageFromBytes`, `AddImageFromBytesWithSize`, `AddImageFromBytesWithPosition`)
+  - New `internal/core` constructors: `NewImageFromBytes`, `NewImageFromBytesWithSize`, `NewImageFromBytesWithPosition`
+  - Format normalization (`JPG` → `jpeg`, leading `.` trimmed) and validation against the supported set
+  - Defensive copy of the input byte slice so callers can safely reuse buffers
+- `examples/08_images` updated to demonstrate the new in-memory image flow
+
+### Fixed
+
+- **Round-trip preservation of `w:gridSpan` and `w:vMerge`** for merged table cells (PR #26, closes #25)
+  - `hydrateTableCell` now parses `<w:tcPr>` and applies horizontal merges through `cell.Merge(span, 1)` so spanned-over cells are correctly marked as `IsHorizontallyMergedContinuation()`
+  - Restores `w:vMerge` (`restart` / `continue`) onto reconstructed `domain.TableCell`s
+  - `hydrateTable` tracks `colOffset` and recomputes `maxCols` from gridSpan sums so XML cells map to the correct grid columns
+  - Numeric parse errors wrapped with `errors.WrapWithContext` (attribute + raw value) for clearer diagnostics
+
+### Changed
+
+- CLI handler (`cmd/docxgo/handlers.go`) `applyImage()` now uses `AddImageFromBytes*` directly for base64 images, eliminating the temp-file write/read round-trip
+
+### Tests
+
+- `TestGridSpanPreservedAfterRoundTrip` — verifies horizontal merge survives save + reopen and that continuation cells are flagged correctly
+- `TestVMergePreservedAfterRoundTrip` — verifies vertical merge `restart` / `continue` survives save + reopen
+- Unit tests for all three `NewImageFromBytes*` constructors (valid data, empty data, empty/invalid format)
+- Builder tests for all three `AddImageFromBytes*` methods (error path validation)
+
+---
+
 ## v2.3.0 — 2026-02-27
 
 ### Added

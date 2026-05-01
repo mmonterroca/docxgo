@@ -529,6 +529,49 @@ func (pb *ParagraphBuilder) AddImageWithPosition(path string, size domain.ImageS
 	return pb
 }
 
+// AddImageFromBytes adds an image from raw byte data to the paragraph.
+// The format parameter specifies the image type (e.g., domain.ImageFormatPNG).
+func (pb *ParagraphBuilder) AddImageFromBytes(data []byte, format domain.ImageFormat) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImageFromBytes(data, format); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
+// AddImageFromBytesWithSize adds an image from byte data with custom dimensions.
+func (pb *ParagraphBuilder) AddImageFromBytesWithSize(data []byte, format domain.ImageFormat, size domain.ImageSize) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImageFromBytesWithSize(data, format, size); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
+// AddImageFromBytesWithPosition adds a floating image from byte data with custom positioning.
+func (pb *ParagraphBuilder) AddImageFromBytesWithPosition(data []byte, format domain.ImageFormat, size domain.ImageSize, pos domain.ImagePosition) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImageFromBytesWithPosition(data, format, size, pos); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
 // End returns to the DocumentBuilder for further operations.
 func (pb *ParagraphBuilder) End() *DocumentBuilder {
 	return pb.parent

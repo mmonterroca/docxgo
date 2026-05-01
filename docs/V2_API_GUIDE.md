@@ -1,7 +1,7 @@
 # go-docx v2 API Guide
 
-**Version**: 2.3.0
-**Last Updated**: February 2026
+**Version**: 2.4.0
+**Last Updated**: April 2026
 
 ---
 
@@ -973,4 +973,4 @@ See [`examples/14_mail_merge/`](../examples/14_mail_merge/) for a complete worki
 ---
 
 **Last Updated**: February 2026
-**Version**: 2.3.0
+**Version**: 2.4.0
