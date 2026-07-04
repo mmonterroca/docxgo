@@ -1,8 +1,8 @@
 # go-docx v2.0 - Clean Architecture Design
 
-**Status**: ✅ v2.4.0 Stable
+**Status**: ✅ v2.5.0 Stable
 **Progress**: Production Ready (all core features complete)
-**Latest Release**: v2.4.0 (April 2026)
+**Latest Release**: v2.5.0 (July 2026)
 **Breaking Changes**: Yes (major version bump from original fork)
 
 > **Project Note**: This project originated as a fork of `fumiama/go-docx` but has been completely rewritten with a clean architecture design. The current version represents a ground-up rebuild focused on maintainability, type safety, and modern Go practices.
@@ -989,10 +989,10 @@ docs/
 ├── V2_API_GUIDE.md             ⭐ Primary API reference (850 lines)
 ├── IMPLEMENTATION_STATUS.md     📊 Feature tracker (450 lines)
 ├── V2_DESIGN.md                 🏗️ Architecture (this file)
-├── README.md                    📖 Documentation index (350 lines)
-├── ERROR_HANDLING.md            🚨 Error patterns (900 lines)
-├── COVERAGE_ANALYSIS.md         🧪 Test coverage (420 lines)
-└── initial-plan.md              📝 Historical reference
+├── README.md                    📖 Documentation index
+├── ERROR_HANDLING.md            🚨 Error patterns
+├── CLI_GUIDE.md                 🖥️ JSON-RPC CLI usage
+└── PARAGRAPH_BORDERS.md         🧩 Paragraph border API
 ```
 
 **Key Improvements**:
@@ -1340,7 +1340,7 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 ---
 
 **Last Updated**: April 2026
-**Status**: ✅ v2.4.0 Stable
+**Status**: ✅ v2.5.0 Stable
 **Progress**: Production Ready (all core features complete)
 
 **Current State:**

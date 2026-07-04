@@ -107,7 +107,7 @@ cd 06_sections && go run main.go
 ### [07_advanced/](./07_advanced/) - Advanced Integration (NEW!)
 
 **Status**: ✅ Fully functional
-**Demonstrates**: All Phase 6 features combined
+**Demonstrates**: All advanced features combined
 
 - Professional cover page
 - Table of Contents with hyperlinks
@@ -214,7 +214,7 @@ cd 12_read_and_modify && go run main.go
 **Status**: ✅ Fully functional
 **Demonstrates**: Complete theme system
 
-- 7 preset themes (Corporate, Startup, Modern, Fintech, Academic, TechPresentation, TechDarkMode)
+- 5 preset themes (Corporate, Startup, Modern, Fintech, Academic), plus TechPresentation and TechDarkMode available directly
 - Custom colors, fonts, spacing, and heading styles
 - Professional document generation with consistent branding
 - Theme application via `WithTheme()` builder option
@@ -299,15 +299,6 @@ Verify the generated documents are valid:
 - ✅ Required OOXML files present
 - ✅ Valid Office Open XML format
 
-#### 📊 View Validation Results
-
-See detailed validation reports:
-
-- [VALIDATION_COMPLETE.md](./VALIDATION_COMPLETE.md) - Full validation report
-- [VALIDATION_RESULTS.md](./VALIDATION_RESULTS.md) - Detailed feature checklist
-
----
-
 ### Generated Documents
 
 After running `./run_all_examples.sh`, you'll have:
@@ -340,8 +331,7 @@ examples/
 
 ## Documentation
 
-- [V2 Examples README](./v2_README.md) - Detailed v2 example documentation
-- [API Reference](https://pkg.go.dev/github.com/mmonterroca/docxgo)
+- [API Reference](https://pkg.go.dev/github.com/mmonterroca/docxgo/v2)
 - [Design Document](../docs/V2_DESIGN.md)
 - [Migration Guide](../MIGRATION.md) - Converting v1 to v2
 
