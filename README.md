@@ -500,56 +500,7 @@ For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
 ## Roadmap
 
-### Release History
-
-- **v2.5.0** (July 2026 - Current Stable)
-  - Full run-level formatting on the fluent `CellBuilder`: `Italic`, `Color`, `FontSize`, `Underline` (parity with `ParagraphBuilder`) — feature by @SlashLight (#35, #39)
-  - Fix: header/footer drawings now resolve relationship IDs per-part, fixing wrong/missing media when a header's `rId` collides with an unrelated document-level relationship (#37, #40)
-
-- **v2.4.0** (April 2026)
-  - In-memory image API: `AddImageFromBytes`, `AddImageFromBytesWithSize`, `AddImageFromBytesWithPosition`
-  - Round-trip preservation of `w:gridSpan` and `w:vMerge` for merged table cells
-  - CLI handler now embeds base64 images without temp files
-
-- **v2.3.0** (February 2026)
-  - Template / Mail Merge engine (`pkg/template/`)
-  - MERGEFIELD support with real Word templates and `«»` delimiters
-  - Paragraph mutation APIs (`ClearRuns`, `RemoveRun`, `InsertRunAt`)
-  - Examples 14 and 15 (mail merge + external Word templates)
-
-- **v2.2.2** (February 2026)
-  - Table style borders fix (TableGrid, PlainTable1 now render with visible borders)
-  - Grid column width calculation from cell widths
-  - Comprehensive documentation overhaul
-  - Restored 13_themes example
-
-- **v2.2.1** (January 2026)
-  - Hyperlink RelationshipID preservation during round-trip
-  - Drawing position serialization fix
-  - Internal hyperlink anchor support
-  - Custom styles preservation during round-trip
-
-- **v2.2.0** (January 2026)
-  - Table cell border serialization with explicit properties
-
-- **v2.1.1** (November 2025)
-  - Go module path fix (/v2 suffix)
-
-- **v2.1.0** (October 2025)
-  - Complete theme system with 5 preset themes
-  - Custom theme support (Clone, WithColors, WithFonts, WithSpacing)
-
-- **v2.0.1** (November 2025)
-  - Go module path fix (/v2 suffix)
-
-- **v2.0.0** (October 2025)
-  - Production-ready stable release
-  - Clean architecture implementation
-  - Document reading and modification
-  - Comprehensive documentation
-
-- **v2.0.0-beta** (October 2025)
-  - Initial beta release
+See the [GitHub Releases](https://github.com/mmonterroca/docxgo/releases) page for the full version history.
 
 ### Planned Features
 
