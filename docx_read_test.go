@@ -1,7 +1,11 @@
 package docx
 
 import (
+	"archive/zip"
 	"bytes"
+	"image"
+	"image/color"
+	"image/png"
 	"path/filepath"
 	"testing"
 
@@ -222,4 +226,221 @@ func TestVMergePreservedAfterRoundTrip(t *testing.T) {
 	if got := c1.VMerge(); got != domain.VMergeContinue {
 		t.Errorf("Row(1).Cell(0) VMerge = %v, want VMergeContinue", got)
 	}
+}
+
+// TestOpenDocument_CollidingRelationshipIDsAcrossParts reproduces issue #37:
+// relationship IDs are scoped per-part in OOXML, so a header's own
+// "word/_rels/header1.xml.rels" may reuse an ID (e.g. rId1) that also exists
+// in "word/_rels/document.xml.rels" for something unrelated (e.g. a customXml
+// part). Opening such a document must resolve each drawing's r:embed against
+// its own part's relationships, not the document's.
+//
+// No fixture .docx exists in this repo, and the library's own writer cannot
+// produce a cross-part ID collision (relationship IDs are allocated from one
+// shared counter, and header/footer .rels are not even emitted on write), so
+// the minimal colliding package is hand-built here with archive/zip.
+func TestOpenDocument_CollidingRelationshipIDsAcrossParts(t *testing.T) {
+	pngBytes := encodeTestPNG(t)
+	docxBytes := buildCollidingRelationshipDocx(t, pngBytes)
+
+	doc, err := OpenDocumentFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	if err := doc.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+
+	sections := doc.Sections()
+	if len(sections) == 0 {
+		t.Fatal("expected at least one section")
+	}
+
+	header, err := sections[0].Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+
+	var headerImage domain.Image
+	for _, p := range header.Paragraphs() {
+		if images := p.Images(); len(images) > 0 {
+			headerImage = images[0]
+			break
+		}
+	}
+
+	if headerImage == nil {
+		t.Fatal("expected header to contain a hydrated image")
+	}
+
+	if !bytes.Equal(headerImage.Data(), pngBytes) {
+		t.Fatal("header image data does not match the header's own media part; " +
+			"rId1 likely resolved against document.xml.rels instead of header1.xml.rels")
+	}
+
+	// Round-trip guard: the header's own .rels is preserved verbatim as an
+	// opaque part, so saving and reopening must keep working too.
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "colliding-rel-ids.docx")
+	if err := doc.SaveAs(path); err != nil {
+		t.Fatalf("SaveAs: %v", err)
+	}
+
+	reopened, err := OpenDocument(path)
+	if err != nil {
+		t.Fatalf("OpenDocument after round-trip: %v", err)
+	}
+	if err := reopened.Validate(); err != nil {
+		t.Fatalf("Validate after round-trip: %v", err)
+	}
+}
+
+// encodeTestPNG returns the bytes of a tiny valid PNG, used as the header's
+// media part in TestOpenDocument_CollidingRelationshipIDsAcrossParts.
+func encodeTestPNG(t *testing.T) []byte {
+	t.Helper()
+
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			img.Set(x, y, color.RGBA{R: uint8(100 * x), G: uint8(100 * y), B: 50, A: 255})
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("png.Encode: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// buildCollidingRelationshipDocx hand-assembles a minimal but valid .docx
+// package where "rId1" is defined independently in both
+// word/_rels/document.xml.rels (pointing at a customXml part) and
+// word/_rels/header1.xml.rels (pointing at the header's image), mirroring
+// the file attached to GitHub issue #37.
+func buildCollidingRelationshipDocx(t *testing.T, pngBytes []byte) []byte {
+	t.Helper()
+
+	const contentTypesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Default Extension="png" ContentType="image/png"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+</Types>`
+
+	const rootRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	const documentXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>
+<w:p><w:r><w:t>Body paragraph</w:t></w:r></w:p>
+<w:sectPr>
+<w:headerReference w:type="default" r:id="rId7"/>
+<w:pgSz w:w="11906" w:h="16838"/>
+</w:sectPr>
+</w:body>
+</w:document>`
+
+	// The collision: rId1 here targets a customXml part, while rId1 in
+	// header1.xml.rels (below) targets the header's image. Per OOXML both
+	// are valid since relationship IDs are scoped to their owning part.
+	const documentRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/>
+<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+</Relationships>`
+
+	const headerXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+       xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+<w:p>
+<w:r>
+<w:drawing>
+<wp:inline distT="0" distB="0" distL="0" distR="0">
+<wp:extent cx="655320" cy="655320"/>
+<wp:docPr id="1" name="Picture 1"/>
+<a:graphic>
+<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+<pic:pic>
+<pic:nvPicPr>
+<pic:cNvPr id="1" name="Picture 1"/>
+<pic:cNvPicPr>
+<a:picLocks noChangeAspect="1" noChangeArrowheads="1"/>
+</pic:cNvPicPr>
+</pic:nvPicPr>
+<pic:blipFill>
+<a:blip r:embed="rId1"/>
+<a:stretch>
+<a:fillRect/>
+</a:stretch>
+</pic:blipFill>
+<pic:spPr bwMode="auto">
+<a:xfrm>
+<a:off x="0" y="0"/>
+<a:ext cx="655320" cy="655320"/>
+</a:xfrm>
+<a:prstGeom prst="rect">
+<a:avLst/>
+</a:prstGeom>
+</pic:spPr>
+</pic:pic>
+</a:graphicData>
+</a:graphic>
+</wp:inline>
+</w:drawing>
+</w:r>
+</w:p>
+</w:hdr>`
+
+	// header1.xml.rels has its OWN rId1, distinct from document.xml.rels's rId1.
+	const headerRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>
+</Relationships>`
+
+	const customXMLItem = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><root/>`
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+
+	files := []struct {
+		name string
+		data []byte
+	}{
+		{"[Content_Types].xml", []byte(contentTypesXML)},
+		{"_rels/.rels", []byte(rootRelsXML)},
+		{"word/document.xml", []byte(documentXML)},
+		{"word/_rels/document.xml.rels", []byte(documentRelsXML)},
+		{"word/header1.xml", []byte(headerXML)},
+		{"word/_rels/header1.xml.rels", []byte(headerRelsXML)},
+		{"word/media/image1.png", pngBytes},
+		{"customXml/item1.xml", []byte(customXMLItem)},
+	}
+
+	for _, f := range files {
+		w, err := zw.Create(f.name)
+		if err != nil {
+			t.Fatalf("zip.Create(%s): %v", f.name, err)
+		}
+		if _, err := w.Write(f.data); err != nil {
+			t.Fatalf("write %s: %v", f.name, err)
+		}
+	}
+
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip.Close: %v", err)
+	}
+
+	return buf.Bytes()
 }

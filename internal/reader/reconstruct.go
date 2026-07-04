@@ -58,6 +58,7 @@ const (
 
 type reconstructContext struct {
 	relationships            map[string]*xmlstructs.Relationship
+	activeRelationships      map[string]*xmlstructs.Relationship
 	media                    map[string]*MediaPart
 	doc                      domain.Document
 	parsed                   *ParsedPackage
@@ -1173,12 +1174,62 @@ func (ctx *reconstructContext) resolveRelationshipTarget(id string) (string, boo
 		return "", false
 	}
 
+	if ctx.activeRelationships != nil {
+		if rel, ok := ctx.activeRelationships[id]; ok && rel != nil {
+			return rel.Target, true
+		}
+	}
+
 	rel, ok := ctx.relationships[id]
 	if !ok || rel == nil {
 		return "", false
 	}
 
 	return rel.Target, true
+}
+
+// partRelationshipMap builds an ID-keyed relationship map for the part whose
+// archive path matches target, looked up in sets (HeaderRelationships or
+// FooterRelationships). Relationship IDs are scoped per-part in OOXML, so
+// this must be used instead of the document-wide ctx.relationships when
+// hydrating header/footer content.
+func (ctx *reconstructContext) partRelationshipMap(target string, sets map[string]*xmlstructs.Relationships) map[string]*xmlstructs.Relationship {
+	if sets == nil {
+		return nil
+	}
+
+	want := normalizePartName(normalizeMediaPath(target))
+	for name, set := range sets {
+		if set == nil || normalizePartName(name) != want {
+			continue
+		}
+		out := make(map[string]*xmlstructs.Relationship, len(set.Relationships))
+		for _, rel := range set.Relationships {
+			if rel == nil || rel.ID == "" {
+				continue
+			}
+			out[rel.ID] = rel
+		}
+		return out
+	}
+
+	return nil
+}
+
+// withPartRelationships temporarily scopes relationship-ID resolution to
+// rels while fn runs, restoring the previous scope afterward.
+func (ctx *reconstructContext) withPartRelationships(rels map[string]*xmlstructs.Relationship, fn func() error) error {
+	if fn == nil {
+		return nil
+	}
+	if ctx == nil {
+		return fn()
+	}
+
+	prev := ctx.activeRelationships
+	ctx.activeRelationships = rels
+	defer func() { ctx.activeRelationships = prev }()
+	return fn()
 }
 
 func (ctx *reconstructContext) mediaPartFor(target string) (*MediaPart, string, bool) {
@@ -1574,20 +1625,23 @@ func (ctx *reconstructContext) hydrateHeader(section domain.Section, headerType 
 		return nil
 	}
 
+	partRels := ctx.partRelationshipMap(target, ctx.parsed.HeaderRelationships)
 	return ctx.withSectionHydrationDisabled(func() error {
-		for _, child := range tree.Children {
-			if child == nil || child.Name.Local != "p" {
-				continue
+		return ctx.withPartRelationships(partRels, func() error {
+			for _, child := range tree.Children {
+				if child == nil || child.Name.Local != "p" {
+					continue
+				}
+				para, err := header.AddParagraph()
+				if err != nil {
+					return errors.Wrap(err, opHydrateSectionHeader)
+				}
+				if err := populateParagraph(para, child, ctx); err != nil {
+					return err
+				}
 			}
-			para, err := header.AddParagraph()
-			if err != nil {
-				return errors.Wrap(err, opHydrateSectionHeader)
-			}
-			if err := populateParagraph(para, child, ctx); err != nil {
-				return err
-			}
-		}
-		return nil
+			return nil
+		})
 	})
 }
 
@@ -1614,20 +1668,23 @@ func (ctx *reconstructContext) hydrateFooter(section domain.Section, footerType 
 		return nil
 	}
 
+	partRels := ctx.partRelationshipMap(target, ctx.parsed.FooterRelationships)
 	return ctx.withSectionHydrationDisabled(func() error {
-		for _, child := range tree.Children {
-			if child == nil || child.Name.Local != "p" {
-				continue
+		return ctx.withPartRelationships(partRels, func() error {
+			for _, child := range tree.Children {
+				if child == nil || child.Name.Local != "p" {
+					continue
+				}
+				para, err := footer.AddParagraph()
+				if err != nil {
+					return errors.Wrap(err, opHydrateSectionFooter)
+				}
+				if err := populateParagraph(para, child, ctx); err != nil {
+					return err
+				}
 			}
-			para, err := footer.AddParagraph()
-			if err != nil {
-				return errors.Wrap(err, opHydrateSectionFooter)
-			}
-			if err := populateParagraph(para, child, ctx); err != nil {
-				return err
-			}
-		}
-		return nil
+			return nil
+		})
 	})
 }
 

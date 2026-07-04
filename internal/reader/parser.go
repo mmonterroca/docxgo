@@ -26,6 +26,7 @@ package reader
 
 import (
 	"encoding/xml"
+	stdpath "path"
 
 	xmlstructs "github.com/mmonterroca/docxgo/v2/internal/xml"
 	"github.com/mmonterroca/docxgo/v2/pkg/constants"
@@ -47,6 +48,13 @@ type ParsedPackage struct {
 
 	RootRelationships     *xmlstructs.Relationships
 	DocumentRelationships *xmlstructs.Relationships
+
+	// HeaderRelationships and FooterRelationships hold each header/footer
+	// part's own relationships, keyed the same way as HeaderTrees/FooterTrees
+	// (e.g. "word/header1.xml"). Relationship IDs are scoped per-part in
+	// OOXML, so these must not be merged into DocumentRelationships.
+	HeaderRelationships map[string]*xmlstructs.Relationships
+	FooterRelationships map[string]*xmlstructs.Relationships
 
 	CorePropertiesTree *Element
 	AppPropertiesTree  *Element
@@ -149,6 +157,15 @@ func ParsePackage(pkg *Package) (*ParsedPackage, error) {
 		parsed.FooterTrees[name] = tree
 	}
 
+	parsed.HeaderRelationships, err = partRelationships(pkg, pkg.Headers)
+	if err != nil {
+		return nil, err
+	}
+	parsed.FooterRelationships, err = partRelationships(pkg, pkg.Footers)
+	if err != nil {
+		return nil, err
+	}
+
 	for name, data := range pkg.ThemeParts {
 		if len(data) == 0 {
 			continue
@@ -169,6 +186,35 @@ func decodeXML(data []byte, dest interface{}, part string) error {
 	}
 
 	return nil
+}
+
+// relsPathFor returns the archive path of a part's relationships file,
+// e.g. "word/header1.xml" -> "word/_rels/header1.xml.rels".
+func relsPathFor(partPath string) string {
+	return stdpath.Join(stdpath.Dir(partPath), "_rels", stdpath.Base(partPath)+".rels")
+}
+
+// partRelationships parses the per-part .rels file for each entry in parts
+// (header or footer bodies keyed by archive path) and returns them keyed the
+// same way. Parts without a .rels file are simply omitted.
+func partRelationships(pkg *Package, parts map[string][]byte) (map[string]*xmlstructs.Relationships, error) {
+	out := make(map[string]*xmlstructs.Relationships, len(parts))
+	for name := range parts {
+		relsName, ok := pkg.lookupPart(relsPathFor(name))
+		if !ok {
+			continue
+		}
+		data := pkg.RawParts[relsName]
+		if len(data) == 0 {
+			continue
+		}
+		var rels xmlstructs.Relationships
+		if err := decodeXML(data, &rels, relsName); err != nil {
+			return nil, err
+		}
+		out[name] = &rels
+	}
+	return out, nil
 }
 
 func xmlPartError(part string, err error) error {
