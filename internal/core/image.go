@@ -337,9 +337,11 @@ func isDecodableInMemoryFormat(f domain.ImageFormat) bool {
 	switch f {
 	case domain.ImageFormatPNG, domain.ImageFormatJPEG, domain.ImageFormatGIF:
 		return true
-	default:
+	case domain.ImageFormatJPG, domain.ImageFormatBMP, domain.ImageFormatTIFF,
+		domain.ImageFormatTIF, domain.ImageFormatSVG, domain.ImageFormatWEBP:
 		return false
 	}
+	return false
 }
 
 // NewImageFromBytes creates a new image from raw byte data.
