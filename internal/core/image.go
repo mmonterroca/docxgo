@@ -25,6 +25,7 @@ SOFTWARE.
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	_ "image/gif"  // Register GIF format decoder
@@ -270,7 +271,15 @@ func detectImageFormat(path string) domain.ImageFormat {
 	ext := strings.ToLower(filepath.Ext(path))
 	ext = strings.TrimPrefix(ext, ".")
 
-	switch ext {
+	return normalizeImageFormat(domain.ImageFormat(ext))
+}
+
+// normalizeImageFormat validates and normalizes an ImageFormat value.
+// Returns empty string for unsupported formats.
+func normalizeImageFormat(format domain.ImageFormat) domain.ImageFormat {
+	normalized := strings.ToLower(strings.TrimPrefix(string(format), "."))
+
+	switch normalized {
 	case "png":
 		return domain.ImageFormatPNG
 	case "jpg", "jpeg":
@@ -309,20 +318,94 @@ func formatFromContentType(contentType string) domain.ImageFormat {
 
 // getImageDimensions reads image dimensions from image data.
 func getImageDimensions(data []byte) (domain.ImageSize, error) {
-	// Decode image to get dimensions
-	img, format, err := image.DecodeConfig(strings.NewReader(string(data)))
+	img, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
-		// If decode fails, try reading as binary
-		reader := strings.NewReader(string(data))
-		img, format, err = image.DecodeConfig(reader)
-		if err != nil {
-			return domain.ImageSize{}, errors.Wrap(err, "getImageDimensions")
-		}
+		return domain.ImageSize{}, errors.Wrap(err, "getImageDimensions")
 	}
 
 	_ = format // format string is for logging if needed
 
 	return domain.NewImageSize(img.Width, img.Height), nil
+}
+
+// isDecodableInMemoryFormat reports whether a format can be decoded by
+// image.DecodeConfig with the registered Go standard-library decoders
+// AND has a mapped MIME type in MediaManager.detectContentType. Used by
+// NewImageFromBytes* to fail fast for formats that would otherwise produce
+// a decode error or an application/octet-stream content type.
+func isDecodableInMemoryFormat(f domain.ImageFormat) bool {
+	switch f {
+	case domain.ImageFormatPNG, domain.ImageFormatJPEG, domain.ImageFormatGIF:
+		return true
+	case domain.ImageFormatJPG, domain.ImageFormatBMP, domain.ImageFormatTIFF,
+		domain.ImageFormatTIF, domain.ImageFormatSVG, domain.ImageFormatWEBP:
+		return false
+	}
+	return false
+}
+
+// NewImageFromBytes creates a new image from raw byte data.
+func NewImageFromBytes(id string, data []byte, format domain.ImageFormat) (domain.Image, error) {
+	if len(data) == 0 {
+		return nil, errors.InvalidArgument("NewImageFromBytes", "data", data, "image data cannot be empty")
+	}
+
+	normalized := normalizeImageFormat(format)
+	if normalized == "" {
+		return nil, errors.InvalidArgument("NewImageFromBytes", "format", format, "unsupported image format")
+	}
+	if !isDecodableInMemoryFormat(normalized) {
+		return nil, errors.InvalidArgument("NewImageFromBytes", "format", format,
+			"in-memory image insertion only supports PNG, JPEG, and GIF; use AddImage(path) for other formats")
+	}
+
+	size, err := getImageDimensions(data)
+	if err != nil {
+		return nil, errors.Wrap(err, "NewImageFromBytes")
+	}
+
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+
+	target := fmt.Sprintf("media/image%s.%s", id, normalized)
+
+	return &docxImage{
+		id:           id,
+		format:       normalized,
+		size:         size,
+		originalSize: size,
+		data:         copyData,
+		target:       target,
+		description:  "",
+		position:     domain.DefaultImagePosition(),
+	}, nil
+}
+
+// NewImageFromBytesWithSize creates a new image from byte data with custom dimensions.
+func NewImageFromBytesWithSize(id string, data []byte, format domain.ImageFormat, size domain.ImageSize) (domain.Image, error) {
+	img, err := NewImageFromBytes(id, data, format)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := img.SetSize(size); err != nil {
+		return nil, err
+	}
+
+	return img, nil
+}
+
+// NewImageFromBytesWithPosition creates a new image from byte data with custom positioning.
+func NewImageFromBytesWithPosition(id string, data []byte, format domain.ImageFormat, size domain.ImageSize, pos domain.ImagePosition) (domain.Image, error) {
+	img, err := NewImageFromBytesWithSize(id, data, format, size)
+	if err != nil {
+		return nil, err
+	}
+
+	docxImg := img.(*docxImage)
+	docxImg.position = pos
+
+	return img, nil
 }
 
 // ReadImageFromReader creates an image from an io.Reader.

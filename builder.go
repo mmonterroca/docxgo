@@ -529,6 +529,49 @@ func (pb *ParagraphBuilder) AddImageWithPosition(path string, size domain.ImageS
 	return pb
 }
 
+// AddImageFromBytes adds an image from raw byte data to the paragraph.
+// The format parameter specifies the image type (e.g., domain.ImageFormatPNG).
+func (pb *ParagraphBuilder) AddImageFromBytes(data []byte, format domain.ImageFormat) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImageFromBytes(data, format); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
+// AddImageFromBytesWithSize adds an image from byte data with custom dimensions.
+func (pb *ParagraphBuilder) AddImageFromBytesWithSize(data []byte, format domain.ImageFormat, size domain.ImageSize) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImageFromBytesWithSize(data, format, size); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
+// AddImageFromBytesWithPosition adds a floating image from byte data with custom positioning.
+func (pb *ParagraphBuilder) AddImageFromBytesWithPosition(data []byte, format domain.ImageFormat, size domain.ImageSize, pos domain.ImagePosition) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if _, err := pb.para.AddImageFromBytesWithPosition(data, format, size, pos); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
 // End returns to the DocumentBuilder for further operations.
 func (pb *ParagraphBuilder) End() *DocumentBuilder {
 	return pb.parent
@@ -693,26 +736,118 @@ func (cb *CellBuilder) Bold() *CellBuilder {
 		return cb
 	}
 
-	paragraphs := cb.cell.Paragraphs()
-	if len(paragraphs) == 0 {
-		cb.err = errors.InvalidState("CellBuilder.Bold", "no paragraphs in cell")
+	lastRun, err := cb.lastRun()
+	if err != nil {
+		cb.err = errors.InvalidState("CellBuilder.Bold", err.Error())
 		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
 		return cb
 	}
 
-	runs := paragraphs[len(paragraphs)-1].Runs()
-	if len(runs) == 0 {
-		cb.err = errors.InvalidState("CellBuilder.Bold", "no runs in paragraph")
-		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
-		return cb
-	}
-
-	if err := runs[len(runs)-1].SetBold(true); err != nil {
+	if err := lastRun.SetBold(true); err != nil {
 		cb.err = err
 		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, err)
 	}
 
 	return cb
+}
+
+// Italic makes the last run in the last paragraph italic.
+func (cb *CellBuilder) Italic() *CellBuilder {
+	if cb.err != nil {
+		return cb
+	}
+
+	lastRun, err := cb.lastRun()
+	if err != nil {
+		cb.err = errors.InvalidState("CellBuilder.Italic", err.Error())
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+		return cb
+	}
+
+	if err := lastRun.SetItalic(true); err != nil {
+		cb.err = err
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+	}
+
+	return cb
+}
+
+// Color sets the color of the last run of the last paragraph.
+func (cb *CellBuilder) Color(color domain.Color) *CellBuilder {
+	if cb.err != nil {
+		return cb
+	}
+
+	lastRun, err := cb.lastRun()
+	if err != nil {
+		cb.err = errors.InvalidState("CellBuilder.Color", err.Error())
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+		return cb
+	}
+
+	if err := lastRun.SetColor(color); err != nil {
+		cb.err = err
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+	}
+
+	return cb
+}
+
+// FontSize sets the font size of the last run of the last paragraph.
+func (cb *CellBuilder) FontSize(points int) *CellBuilder {
+	if cb.err != nil {
+		return cb
+	}
+
+	lastRun, err := cb.lastRun()
+	if err != nil {
+		cb.err = errors.InvalidState("CellBuilder.FontSize", err.Error())
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+		return cb
+	}
+
+	// Convert points to half-points
+	halfPoints := points * 2
+	if err := lastRun.SetSize(halfPoints); err != nil {
+		cb.err = err
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+	}
+
+	return cb
+}
+
+// Underline sets the underline style of the last run of the last paragraph.
+func (cb *CellBuilder) Underline(style domain.UnderlineStyle) *CellBuilder {
+	if cb.err != nil {
+		return cb
+	}
+
+	lastRun, err := cb.lastRun()
+	if err != nil {
+		cb.err = errors.InvalidState("CellBuilder.Underline", err.Error())
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+		return cb
+	}
+
+	if err := lastRun.SetUnderline(style); err != nil {
+		cb.err = err
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+	}
+
+	return cb
+}
+
+func (cb *CellBuilder) lastRun() (domain.Run, error) {
+	paras := cb.cell.Paragraphs()
+	if len(paras) == 0 {
+		return nil, fmt.Errorf("no paragraphs in cell")
+	}
+	runs := paras[len(paras)-1].Runs()
+	if len(runs) == 0 {
+		return nil, fmt.Errorf("no runs in paragraph")
+	}
+
+	return runs[len(runs)-1], nil
 }
 
 // Width sets the cell width.

@@ -1,3 +1,27 @@
+/*
+MIT License
+
+Copyright (c) 2025 Misael Monterroca <misael@monterroca.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 package main
 
 import (
@@ -1500,31 +1524,26 @@ func applyField(para domain.Paragraph, f *fieldDef) error {
 
 // applyImage adds an image to a paragraph.
 func applyImage(para domain.Paragraph, img *imageDef) error {
-	path := img.Path
-
+	// If base64 data is provided, use AddImageFromBytes directly (no temp file needed).
 	if img.Base64 != "" {
 		data, err := base64.StdEncoding.DecodeString(img.Base64)
 		if err != nil {
 			return fmt.Errorf("invalid image base64: %w", err)
 		}
-		ext := img.Format
-		if ext == "" {
-			ext = "png"
+		format := domain.ImageFormat(img.Format)
+		if format == "" {
+			format = domain.ImageFormatPNG
 		}
-		tmp, err := os.CreateTemp("", "docxgo-img-*."+ext)
-		if err != nil {
-			return fmt.Errorf("failed to create temp image: %w", err)
+		if img.WidthPx > 0 || img.HeightPx > 0 {
+			size := domain.NewImageSize(img.WidthPx, img.HeightPx)
+			_, err = para.AddImageFromBytesWithSize(data, format, size)
+			return err
 		}
-		if _, err := tmp.Write(data); err != nil {
-			_ = tmp.Close()
-			_ = os.Remove(tmp.Name())
-			return fmt.Errorf("failed to write temp image: %w", err)
-		}
-		_ = tmp.Close()
-		path = tmp.Name()
-		defer func() { _ = os.Remove(path) }()
+		_, err = para.AddImageFromBytes(data, format)
+		return err
 	}
 
+	path := img.Path
 	if path == "" {
 		return fmt.Errorf("image requires path or base64")
 	}

@@ -1,6 +1,6 @@
-# Contributing to go-docx
+# Contributing to docxgo
 
-Thank you for your interest in contributing to go-docx! This document provides guidelines and workflow information for contributors.
+Thank you for your interest in contributing to docxgo! This document provides guidelines and workflow information for contributors.
 
 > **Note**: This project was completely rewritten in 2024-2025 with a clean architecture design. All code follows modern Go practices and comprehensive testing standards.
 
@@ -20,7 +20,7 @@ We use a simplified Git Flow branching strategy to maintain code quality and sta
 
 ### Branch Structure
 
-- **`master`**: Production-ready code only. This branch contains stable releases and is tagged with semantic versions (e.g., `v0.1.0-slidelang`, `v0.2.0-slidelang`).
+- **`master`**: Production-ready code only. This branch contains stable releases and is tagged with semantic versions (e.g., `v2.5.0`).
 - **`dev`**: Integration branch where features are tested before release. All development work merges here first.
 - **Feature branches**: Short-lived branches for specific features, bug fixes, or improvements. Named with prefixes like `feature/`, `fix/`, `docs/`, etc.
 
@@ -33,8 +33,8 @@ Follow these steps to contribute:
 Fork the repository to your GitHub account, then clone your fork:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/go-docx.git
-cd go-docx
+git clone https://github.com/YOUR_USERNAME/docxgo.git
+cd docxgo
 ```
 
 #### 2. Add Upstream Remote
@@ -232,4 +232,4 @@ If you have questions about contributing:
 2. Read the documentation in README.md
 3. Open a discussion or issue
 
-Thank you for contributing to go-docx! 🎉
+Thank you for contributing to docxgo! 🎉
