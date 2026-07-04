@@ -773,6 +773,27 @@ func (cb *CellBuilder) FontSize(points int) *CellBuilder {
 	return cb
 }
 
+// Underline sets the underline style of the last run of the last paragraph.
+func (cb *CellBuilder) Underline(style domain.UnderlineStyle) *CellBuilder {
+	if cb.err != nil {
+		return cb
+	}
+
+	lastRun, err := cb.lastRun()
+	if err != nil {
+		cb.err = errors.InvalidState("CellBuilder.Underline", err.Error())
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+		return cb
+	}
+
+	if err := lastRun.SetUnderline(style); err != nil {
+		cb.err = err
+		cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, cb.err)
+	}
+
+	return cb
+}
+
 func (cb *CellBuilder) lastRun() (domain.Run, error) {
 	paras := cb.cell.Paragraphs()
 	if len(paras) == 0 {

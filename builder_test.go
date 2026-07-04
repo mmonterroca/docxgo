@@ -574,6 +574,7 @@ func TestCellBuilder_RunFormatting(t *testing.T) {
 			Italic().
 			Color(textColor).
 			FontSize(14).
+			Underline(domain.UnderlineSingle).
 			End().
 			End().
 			End()
@@ -602,6 +603,9 @@ func TestCellBuilder_RunFormatting(t *testing.T) {
 		}
 		if run.Size() != 28 {
 			t.Errorf("expected font size 28 half-points, got %d", run.Size())
+		}
+		if run.Underline() != domain.UnderlineSingle {
+			t.Errorf("expected underline %v, got %v", domain.UnderlineSingle, run.Underline())
 		}
 	})
 
@@ -653,6 +657,7 @@ func TestCellBuilder_RunFormattingErrors(t *testing.T) {
 		{"italic before text", func(cb *CellBuilder) *CellBuilder { return cb.Italic() }},
 		{"color before text", func(cb *CellBuilder) *CellBuilder { return cb.Color(domain.Color{R: 255, G: 0, B: 0}) }},
 		{"font size before text", func(cb *CellBuilder) *CellBuilder { return cb.FontSize(14) }},
+		{"underline before text", func(cb *CellBuilder) *CellBuilder { return cb.Underline(domain.UnderlineSingle) }},
 	}
 
 	for _, tt := range tests {
