@@ -16,23 +16,24 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 - ✅ **Type Safety** - No `interface{}`, explicit error handling throughout
 - ✅ **Builder Pattern** - Fluent API for easy document construction
 - ✅ **Thread-Safe** - Concurrent access supported with atomic operations
-- ✅ **Production Ready** - EXCELLENT error handling, comprehensive validation
+- ✅ **Production Ready** - structured error handling, comprehensive validation
 - ✅ **Well Documented** - Complete godoc, examples, and architecture docs
 - ✅ **Template / Mail Merge** - Placeholder detection, data merging, batch document generation
+- ✅ **In-Memory Images** - Insert images from byte slices without touching the file system
 - ✅ **Open Source** - MIT License, use in commercial and private projects
 
 ---
 
 ## Status
 
-**Current Version**: v2.3.0 (Stable)
+**Current Version**: v2.5.0 (Stable)
 **Stability**: Production Ready
-**Released**: February 2026
-**Test Coverage**: 50.7%
+**Released**: July 2026
+**Test Coverage**: ~51% overall (`domain` & `pkg/errors` at 100%)
 
-**Latest Features**: Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
+**Latest Features**: Full run-level formatting on table cells (v2.5.0), In-memory Image API (v2.4.0), Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
 
-> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, and template/mail merge engine in v2.3.0.
+> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, template/mail merge engine in v2.3.0, in-memory image insertion plus merged-cell round-trip fixes in v2.4.0, and full run-level cell formatting plus a per-part header/footer relationship fix in v2.5.0.
 
 ---
 
@@ -44,7 +45,7 @@ go get github.com/mmonterroca/docxgo/v2
 
 ### Requirements
 
-- Go 1.21 or higher
+- Go 1.23 or higher
 - No external C dependencies
 - Works on Linux, macOS, Windows
 
@@ -187,7 +188,7 @@ See the [`examples/`](examples/) directory for 15 comprehensive examples:
 - **[10_paragraph_spacing](examples/10_paragraph_spacing/)** - Line and paragraph spacing
 - **[11_multi_section](examples/11_multi_section/)** - Multi-section layouts
 - **[12_read_and_modify](examples/12_read_and_modify/)** - Read and modify existing documents
-- **[13_themes](examples/13_themes/)** - Theme system with 7 preset themes
+- **[13_themes](examples/13_themes/)** - Theme system with 5 preset themes
 - **[14_mail_merge](examples/14_mail_merge/)** - Template engine with mail merge and batch generation
 - **[15_external_template](examples/15_external_template/)** - Mail merge with external Word template (MERGEFIELD)
 
@@ -221,10 +222,10 @@ github.com/mmonterroca/docxgo/v2/
 │   ├── constants/   # OOXML constants
 │   └── color/       # Color utilities
 │
-├── themes/          # Theme system (7 preset themes)
+├── themes/          # Theme system (5 preset themes)
 │
-└── examples/        # 13 usage examples
-    ├── 01_basic/    ... 13_themes/
+└── examples/        # 15 usage examples
+    ├── 01_basic/    ... 15_external_template/
 ```
 
 ### Design Principles
@@ -260,25 +261,26 @@ github.com/mmonterroca/docxgo/v2/
 - Line spacing (single, 1.5, double, custom)
 - Indentation (left, right, first-line, hanging)
 
-**Advanced Table Features** (Phase 9 - Complete)
+**Advanced Table Features**
 
 - **Cell Merging**: Horizontal (colspan) and vertical (rowspan)
 - **Nested Tables**: Tables within table cells
 - **8 Built-in Styles**: Normal, Grid, Plain, MediumShading, LightShading, Colorful, Accent1, Accent2
+- **Run-level cell formatting**: `Bold`, `Italic`, `Color`, `FontSize`, `Underline` via the fluent `CellBuilder` (full parity with `ParagraphBuilder`)
 - Row height control
 - Cell width and alignment
 - Borders and shading
 
-**Images & Media** (Phase 8 - Complete)
+**Images & Media**
 
-- **9 Image Formats**: PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP, ICO, EMF
+- **7 Image Formats**: PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP
 - Inline and floating images
 - Custom dimensions (pixels, inches, EMUs)
 - Positioning (left, center, right, custom coordinates)
 - Automatic format detection
 - Relationship management
 
-**Fields & Dynamic Content** (Phase 6 - Complete)
+**Fields & Dynamic Content**
 
 - **Table of Contents (TOC)**: Auto-generated with styles
 - **Page Numbers**: Current page, total pages
@@ -287,50 +289,41 @@ github.com/mmonterroca/docxgo/v2/
 - **Date/Time**: Document creation/modification dates
 - **Custom Fields**: Extensible field system
 
-**Headers & Footers** (Phase 6 - Complete)
+**Headers & Footers**
 
 - Default, first page, and even/odd page headers/footers
 - Page numbering in footers
 - Dynamic content with fields
 - Per-section customization
 
-**Styles System** (Phase 6 - Complete)
+**Styles System**
 
 - **40+ Built-in Styles**: All standard Word paragraph styles
 - **Character Styles**: For inline formatting
 - **Custom Styles**: Create and apply user-defined styles
 - Style inheritance and cascading
 
-**Builder Pattern** (Phase 6.5 - Complete)
+**Builder Pattern**
 
 - Fluent API for easy document construction
 - Error accumulation (no intermediate error checking)
 - Chainable methods for all operations
 - Functional options for configuration
 
-**Quality & Reliability** (Phase 11 - Complete)
+**Quality & Reliability**
 
-- **EXCELLENT Error Handling**: Structured errors with rich context
+- **Structured error handling**: errors carry operation context and error codes
 - Comprehensive validation at every layer
 - Thread-safe ID generation (atomic counters)
-- **50.7% Test Coverage** (improvement plan ready: → 95%)
-- **0 Linter Warnings** (golangci-lint with 30+ linters)
+- Broad test coverage — `domain` and `pkg/errors` at 100%, core packages ~50–95%
+- Clean `golangci-lint` run (11 linters enabled)
 - Complete godoc documentation
-
-### Planned Features
-
-- Mail merge and templates
-- Comments and change tracking
-- Custom XML parts
-- Advanced drawing shapes
-- Document comparison
-- Content controls
 
 ---
 
 ## Error Handling
 
-All operations return explicit errors - no silent failures. The error system was rated **EXCELLENT** in Phase 11 review:
+All operations return explicit errors — no silent failures:
 
 ```go
 // Structured errors with full context
@@ -400,9 +393,7 @@ go test -v ./internal/core
 go test -bench=. ./...
 ```
 
-**Current Test Coverage**: 50.7%
-
-See [docs/COVERAGE_ANALYSIS.md](docs/COVERAGE_ANALYSIS.md) for detailed coverage analysis.
+Coverage varies by package — `domain` and `pkg/errors` are at 100%, `internal/xml` ~96%, and the core packages sit around 50–70%. Run `go test -cover ./...` for the current per-package breakdown.
 
 ---
 
@@ -414,15 +405,14 @@ See [docs/COVERAGE_ANALYSIS.md](docs/COVERAGE_ANALYSIS.md) for detailed coverage
 
 - **[V2 API Guide](docs/V2_API_GUIDE.md)** - Complete v2 API reference with examples ⭐ START HERE
 - **[Implementation Status](docs/IMPLEMENTATION_STATUS.md)** - What's implemented, what's planned
-- **[Examples](examples/README.md)** - 13 working code examples
+- **[Examples](examples/README.md)** - 15 working code examples
 - **[Migration Guide](MIGRATION.md)** - Migrating from v1 to v2
 
 **For Developers:**
 
 - **[V2 Design](docs/V2_DESIGN.md)** - Architecture, design decisions, and roadmap
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
-- **[Error Handling](docs/ERROR_HANDLING.md)** - Complete error system review
-- **[Coverage Analysis](docs/COVERAGE_ANALYSIS.md)** - Test coverage report
+- **[Error Handling](docs/ERROR_HANDLING.md)** - Error system guide and patterns
 
 **Quick Links:**
 
@@ -441,12 +431,6 @@ Optimized for real-world usage:
 - **Lazy loading** of relationships and media
 - **Efficient string building** for text extraction
 - **Memory-conscious** defensive copies only when necessary
-
-**Benchmarks** (coming in Phase 11.5):
-
-- Simple document creation: target < 1ms
-- Complex document (100 paragraphs, 10 tables): target < 50ms
-- Image insertion: target < 5ms per image
 
 ---
 
@@ -508,13 +492,7 @@ This project evolved through multiple stages:
 **Current Maintainer**: Misael Monterroca (misael@monterroca.com)
 **GitHub**: [@mmonterroca](https://github.com/mmonterroca)
 
-**V2 Rewrite**:
-
-- All development phases completed
-- 6,646+ lines of production code
-- 1,500+ lines of documentation
-- Clean architecture implementation
-- Production-grade quality
+**V2 Rewrite**: a complete clean-architecture reimplementation with interface-based design, dependency injection, comprehensive tests, and structured error handling.
 
 For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
@@ -522,56 +500,16 @@ For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
 ## Roadmap
 
-### Release History
-
-- **v2.2.2** (February 2026 - Current Stable)
-  - Table style borders fix (TableGrid, PlainTable1 now render with visible borders)
-  - Grid column width calculation from cell widths
-  - Comprehensive documentation overhaul
-  - Restored 13_themes example
-
-- **v2.2.1** (January 2026)
-  - Hyperlink RelationshipID preservation during round-trip
-  - Drawing position serialization fix
-  - Internal hyperlink anchor support
-  - Custom styles preservation during round-trip
-
-- **v2.2.0** (January 2026)
-  - Table cell border serialization with explicit properties
-
-- **v2.1.1** (November 2025)
-  - Go module path fix (/v2 suffix)
-
-- **v2.1.0** (October 2025)
-  - Complete theme system with 7 preset themes
-  - Custom theme support (Clone, WithColors, WithFonts, WithSpacing)
-
-- **v2.0.1** (November 2025)
-  - Go module path fix (/v2 suffix)
-
-- **v2.0.0** (October 2025)
-  - Production-ready stable release
-  - Clean architecture implementation
-  - Document reading and modification
-  - Comprehensive documentation
-
-- **v2.0.0-beta** (October 2025)
-  - Initial beta release
-
-### Upcoming (dev branch)
-
-- Table style borders (TableGrid, PlainTable1) - fix for [#15](https://github.com/mmonterroca/docxgo/issues/15)
-- Updated examples with table styles
-- Restored example 13 (themes)
+See the [GitHub Releases](https://github.com/mmonterroca/docxgo/releases) page for the full version history.
 
 ### Planned Features
 
-- Mail merge and templates
 - Comments and change tracking
 - Content controls / form fields
 - Custom XML parts
 - Advanced drawing shapes
 - Document comparison
+- Full header/footer round-trip editing
 
 See [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for detailed status.
 
@@ -605,11 +543,11 @@ Please include:
 
 - ✅ **Free & Open Source** - MIT License, no restrictions
 - ✅ **Clean Architecture** - Production-grade code quality
-- ✅ **Feature Complete** - 95% of planned features implemented
-- ✅ **EXCELLENT Error Handling** - Structured errors, rich context
+- ✅ **Broad Feature Coverage** - builder, templates, themes, tables, images, read/modify
+- ✅ **Structured Error Handling** - rich context, error codes
 - ✅ **Well Documented** - Complete godoc, examples, architecture docs
 - ✅ **Active Development** - Regular updates, responsive to issues
-- ✅ **Modern Go** - Follows current best practices (Go 1.21+)
+- ✅ **Modern Go** - Follows current best practices (Go 1.23+)
 - ✅ **Builder Pattern** - Fluent API for easy document construction
 
 **Comparison**:

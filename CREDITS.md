@@ -41,7 +41,7 @@ This project has evolved through multiple stages, with each contributor adding s
 - Writer service for .docx file generation
 
 **Testing & Quality**
-- 95%+ test coverage
+- Comprehensive unit and round-trip test suite
 - Integration tests with real document validation
 - Benchmark suite for performance tracking
 - Mock implementations for all interfaces
@@ -228,7 +228,7 @@ We maintain **full transparency** about project history:
 - ✅ **Clean architecture** - testable, maintainable, extensible
 - ✅ **Both read and write** - parse existing + create new documents
 - ✅ **Type safe** - no `interface{}`, proper error handling
-- ✅ **Well tested** - 95%+ coverage, integration tests
+- ✅ **Well tested** - unit + round-trip integration tests
 - ✅ **Active development** - regular updates, responsive maintenance
 - ✅ **Comprehensive docs** - examples, guides, API reference
 
@@ -274,4 +274,4 @@ Copyright (C) 2020-2022 Gonzalo Fernández-Victorio (original library)
 
 ---
 
-*Last Updated: October 25, 2025*
+*Last Updated: July 2026*

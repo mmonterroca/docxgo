@@ -59,6 +59,7 @@ const (
 
 type reconstructContext struct {
 	relationships            map[string]*xmlstructs.Relationship
+	activeRelationships      map[string]*xmlstructs.Relationship
 	media                    map[string]*MediaPart
 	doc                      domain.Document
 	parsed                   *ParsedPackage
@@ -1183,12 +1184,61 @@ func (ctx *reconstructContext) resolveRelationshipTarget(id string) (string, boo
 		return "", false
 	}
 
+	if ctx.activeRelationships != nil {
+		if rel, ok := ctx.activeRelationships[id]; ok && rel != nil {
+			return rel.Target, true
+		}
+	}
+
 	rel, ok := ctx.relationships[id]
 	if !ok || rel == nil {
 		return "", false
 	}
 
 	return rel.Target, true
+}
+
+// partRelationshipMap builds an ID-keyed relationship map for the header/footer
+// part whose archive path matches target, looked up in ctx.parsed.PartRelationships.
+// Relationship IDs are scoped per-part in OOXML, so this must be used instead of
+// the document-wide ctx.relationships when hydrating header/footer content.
+func (ctx *reconstructContext) partRelationshipMap(target string) map[string]*xmlstructs.Relationship {
+	if ctx == nil || ctx.parsed == nil || ctx.parsed.PartRelationships == nil {
+		return nil
+	}
+
+	want := normalizePartName(normalizeMediaPath(target))
+	for name, set := range ctx.parsed.PartRelationships {
+		if set == nil || normalizePartName(name) != want {
+			continue
+		}
+		out := make(map[string]*xmlstructs.Relationship, len(set.Relationships))
+		for _, rel := range set.Relationships {
+			if rel == nil || rel.ID == "" {
+				continue
+			}
+			out[rel.ID] = rel
+		}
+		return out
+	}
+
+	return nil
+}
+
+// withPartRelationships temporarily scopes relationship-ID resolution to
+// rels while fn runs, restoring the previous scope afterward.
+func (ctx *reconstructContext) withPartRelationships(rels map[string]*xmlstructs.Relationship, fn func() error) error {
+	if fn == nil {
+		return nil
+	}
+	if ctx == nil {
+		return fn()
+	}
+
+	prev := ctx.activeRelationships
+	ctx.activeRelationships = rels
+	defer func() { ctx.activeRelationships = prev }()
+	return fn()
 }
 
 func (ctx *reconstructContext) mediaPartFor(target string) (*MediaPart, string, bool) {
@@ -1584,20 +1634,36 @@ func (ctx *reconstructContext) hydrateHeader(section domain.Section, headerType 
 		return nil
 	}
 
+	return ctx.hydratePartParagraphs(header, tree, target, opHydrateSectionHeader)
+}
+
+// partParagraphContainer is satisfied by both domain.Header and domain.Footer,
+// letting hydratePartParagraphs drive either from the same code path.
+type partParagraphContainer interface {
+	AddParagraph() (domain.Paragraph, error)
+}
+
+// hydratePartParagraphs copies the paragraph children of a header/footer part
+// tree into container, resolving relationship IDs against that part's own
+// relationships (per-part scoping) with section hydration suppressed.
+func (ctx *reconstructContext) hydratePartParagraphs(container partParagraphContainer, tree *Element, target, op string) error {
+	partRels := ctx.partRelationshipMap(target)
 	return ctx.withSectionHydrationDisabled(func() error {
-		for _, child := range tree.Children {
-			if child == nil || child.Name.Local != "p" {
-				continue
+		return ctx.withPartRelationships(partRels, func() error {
+			for _, child := range tree.Children {
+				if child == nil || child.Name.Local != "p" {
+					continue
+				}
+				para, err := container.AddParagraph()
+				if err != nil {
+					return errors.Wrap(err, op)
+				}
+				if err := populateParagraph(para, child, ctx); err != nil {
+					return err
+				}
 			}
-			para, err := header.AddParagraph()
-			if err != nil {
-				return errors.Wrap(err, opHydrateSectionHeader)
-			}
-			if err := populateParagraph(para, child, ctx); err != nil {
-				return err
-			}
-		}
-		return nil
+			return nil
+		})
 	})
 }
 
@@ -1624,21 +1690,7 @@ func (ctx *reconstructContext) hydrateFooter(section domain.Section, footerType 
 		return nil
 	}
 
-	return ctx.withSectionHydrationDisabled(func() error {
-		for _, child := range tree.Children {
-			if child == nil || child.Name.Local != "p" {
-				continue
-			}
-			para, err := footer.AddParagraph()
-			if err != nil {
-				return errors.Wrap(err, opHydrateSectionFooter)
-			}
-			if err := populateParagraph(para, child, ctx); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	return ctx.hydratePartParagraphs(footer, tree, target, opHydrateSectionFooter)
 }
 
 func (ctx *reconstructContext) withSectionHydrationDisabled(fn func() error) error {
@@ -1959,8 +2011,13 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 			}
 			cells = append(cells, child)
 		}
-		if len(cells) > maxCols {
-			maxCols = len(cells)
+		// Sum gridSpan values to get the actual grid column count.
+		gridCols := 0
+		for _, c := range cells {
+			gridCols += cellGridSpan(c)
+		}
+		if gridCols > maxCols {
+			maxCols = gridCols
 		}
 		rowCells[idx] = cells
 	}
@@ -1980,12 +2037,13 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 			return errors.Wrap(err, opHydrateTable)
 		}
 
-		for j, cellElem := range cells {
-			if j >= table.ColumnCount() {
-				continue
+		colOffset := 0
+		for _, cellElem := range cells {
+			if colOffset >= table.ColumnCount() {
+				break
 			}
 
-			cell, err := row.Cell(j)
+			cell, err := row.Cell(colOffset)
 			if err != nil {
 				return errors.Wrap(err, opHydrateTable)
 			}
@@ -1993,6 +2051,8 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 			if err := hydrateTableCell(cell, cellElem, ctx); err != nil {
 				return err
 			}
+
+			colOffset += cellGridSpan(cellElem)
 		}
 	}
 
@@ -2002,6 +2062,37 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructContext) error {
 	if cell == nil || elem == nil {
 		return nil
+	}
+
+	// Parse cell properties (w:tcPr) for merge info.
+	if tcPr := findChild(elem, "tcPr"); tcPr != nil {
+		if gs := findChild(tcPr, "gridSpan"); gs != nil {
+			if val, ok := getAttr(gs, "val"); ok && val != "" {
+				span, err := strconv.Atoi(val)
+				if err != nil {
+					return errors.WrapWithContext(err, opHydrateTableCell, map[string]interface{}{"attr": "gridSpan", "value": val})
+				}
+				if span > 1 {
+					if err := cell.Merge(span, 1); err != nil {
+						return errors.Wrap(err, opHydrateTableCell)
+					}
+				}
+			}
+		}
+		if vm := findChild(tcPr, "vMerge"); vm != nil {
+			val, _ := getAttr(vm, "val")
+			switch val {
+			case "restart":
+				if err := cell.SetVMerge(domain.VMergeRestart); err != nil {
+					return errors.Wrap(err, opHydrateTableCell)
+				}
+			default:
+				// Empty or absent val means "continue"
+				if err := cell.SetVMerge(domain.VMergeContinue); err != nil {
+					return errors.Wrap(err, opHydrateTableCell)
+				}
+			}
+		}
 	}
 
 	for _, child := range elem.Children {
@@ -2020,6 +2111,20 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 	}
 
 	return nil
+}
+
+// cellGridSpan returns the grid column span for a <w:tc> element (defaults to 1).
+func cellGridSpan(tcElem *Element) int {
+	if tcPr := findChild(tcElem, "tcPr"); tcPr != nil {
+		if gs := findChild(tcPr, "gridSpan"); gs != nil {
+			if val, ok := getAttr(gs, "val"); ok {
+				if n, err := strconv.Atoi(val); err == nil && n > 1 {
+					return n
+				}
+			}
+		}
+	}
+	return 1
 }
 
 // preserveOriginalParts stores all original document parts for round-trip operations.

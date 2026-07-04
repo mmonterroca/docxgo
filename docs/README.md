@@ -1,6 +1,6 @@
 # Documentation Index
 
-**go-docx v2 - Complete Documentation Guide**
+**docxgo v2 - Complete Documentation Guide**
 
 This index helps you find the right documentation for your needs.
 
@@ -20,19 +20,17 @@ This index helps you find the right documentation for your needs.
 → **[MIGRATION.md](../MIGRATION.md)** - Step-by-step migration from v1 to v2
 
 ### See Working Examples
-→ **[examples/README.md](../examples/README.md)** - 13 working examples (including read/modify and themes)  
-→ **[examples/v2_README.md](../examples/v2_README.md)** - v2-specific examples
+→ **[examples/README.md](../examples/README.md)** - 15 working examples (including read/modify, mail merge, and themes)
 
 ### Understand Error Handling
-→ **[ERROR_HANDLING.md](./ERROR_HANDLING.md)** - Error handling patterns  
-→ **[ERROR_HANDLING_REVIEW.md](./ERROR_HANDLING_REVIEW.md)** - Error handling review
+→ **[ERROR_HANDLING.md](./ERROR_HANDLING.md)** - Error handling patterns
+
+### Use the CLI
+→ **[CLI_GUIDE.md](./CLI_GUIDE.md)** - JSON-RPC CLI binary usage
 
 ### Contribute
 → **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contribution guidelines  
 → **[CREDITS.md](../CREDITS.md)** - Project history and contributors
-
-### Reference Historical Documents
-→ **[initial-plan.md](./initial-plan.md)** - Original project planning
 
 ---
 
@@ -55,6 +53,9 @@ This index helps you find the right documentation for your needs.
 | [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) | Current status | Contributors |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | How to contribute | Contributors |
 | [ERROR_HANDLING.md](./ERROR_HANDLING.md) | Error patterns | Contributors |
+| [CLI_GUIDE.md](./CLI_GUIDE.md) | JSON-RPC CLI binary usage | CLI / integration users |
+| [PARAGRAPH_BORDERS.md](./PARAGRAPH_BORDERS.md) | Paragraph border API | Contributors |
+| [TROUBLESHOOTING_DOCX_VALIDATION.md](./TROUBLESHOOTING_DOCX_VALIDATION.md) | Debugging docx validation | Contributors |
 
 ### Legacy Documentation (Archived - v1 Pre-rewrite)
 
@@ -93,7 +94,9 @@ This index helps you find the right documentation for your needs.
    - 10_paragraph_spacing - Line and paragraph spacing
    - 11_multi_section - Multi-section layouts
    - 12_read_and_modify - Read/modify existing documents
-   - 13_themes - Theme system (7 preset themes)
+   - 13_themes - Theme system (5 preset themes)
+   - 14_mail_merge - Template engine with mail merge
+   - 15_external_template - Mail merge with external Word template
 
 ### Architecture and Design
 1. **[V2_DESIGN.md](./V2_DESIGN.md)** - Architecture overview
@@ -154,9 +157,7 @@ This index helps you find the right documentation for your needs.
 ### Maintainer
 1. [V2_DESIGN.md](./V2_DESIGN.md) - Architecture overview
 2. [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) - Track progress
-3. [COVERAGE_ANALYSIS.md](./COVERAGE_ANALYSIS.md) - Test coverage
-4. [ERROR_HANDLING_REVIEW.md](./ERROR_HANDLING_REVIEW.md) - Error audit
-5. [CHANGELOG.md](../CHANGELOG.md) - Maintain version history
+3. [CHANGELOG.md](../CHANGELOG.md) - Maintain version history
 
 ---
 
@@ -205,21 +206,6 @@ See: IMPLEMENTATION_STATUS.md - Features list
 
 ---
 
-## 📝 Documentation Status
-
-| Document | Status | Last Updated |
-|----------|--------|--------------|
-| V2_API_GUIDE.md | ✅ Complete | Oct 27, 2025 |
-| V2_DESIGN.md | ✅ Complete | Oct 27, 2025 |
-| IMPLEMENTATION_STATUS.md | ✅ Complete | Oct 27, 2025 |
-| README.md | ✅ Complete | Oct 26, 2025 |
-| MIGRATION.md | ✅ Complete | Oct 26, 2025 |
-| examples/README.md | ✅ Complete | Oct 26, 2025 |
-| CONTRIBUTING.md | ✅ Complete | Oct 26, 2025 |
-| ERROR_HANDLING.md | ✅ Complete | Oct 25, 2025 |
-
----
-
 ## 🆘 Need Help?
 
 **Can't find what you're looking for?**
@@ -237,5 +223,5 @@ See: IMPLEMENTATION_STATUS.md - Features list
 
 ---
 
-**Last Updated**: October 27, 2025  
-**Documentation Version**: v2.1.1
+**Last Updated**: July 2026  
+**Documentation Version**: v2.5.0
