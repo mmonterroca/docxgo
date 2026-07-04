@@ -1188,18 +1188,17 @@ func (ctx *reconstructContext) resolveRelationshipTarget(id string) (string, boo
 	return rel.Target, true
 }
 
-// partRelationshipMap builds an ID-keyed relationship map for the part whose
-// archive path matches target, looked up in sets (HeaderRelationships or
-// FooterRelationships). Relationship IDs are scoped per-part in OOXML, so
-// this must be used instead of the document-wide ctx.relationships when
-// hydrating header/footer content.
-func (ctx *reconstructContext) partRelationshipMap(target string, sets map[string]*xmlstructs.Relationships) map[string]*xmlstructs.Relationship {
-	if sets == nil {
+// partRelationshipMap builds an ID-keyed relationship map for the header/footer
+// part whose archive path matches target, looked up in ctx.parsed.PartRelationships.
+// Relationship IDs are scoped per-part in OOXML, so this must be used instead of
+// the document-wide ctx.relationships when hydrating header/footer content.
+func (ctx *reconstructContext) partRelationshipMap(target string) map[string]*xmlstructs.Relationship {
+	if ctx == nil || ctx.parsed == nil || ctx.parsed.PartRelationships == nil {
 		return nil
 	}
 
 	want := normalizePartName(normalizeMediaPath(target))
-	for name, set := range sets {
+	for name, set := range ctx.parsed.PartRelationships {
 		if set == nil || normalizePartName(name) != want {
 			continue
 		}
@@ -1625,16 +1624,29 @@ func (ctx *reconstructContext) hydrateHeader(section domain.Section, headerType 
 		return nil
 	}
 
-	partRels := ctx.partRelationshipMap(target, ctx.parsed.HeaderRelationships)
+	return ctx.hydratePartParagraphs(header, tree, target, opHydrateSectionHeader)
+}
+
+// partParagraphContainer is satisfied by both domain.Header and domain.Footer,
+// letting hydratePartParagraphs drive either from the same code path.
+type partParagraphContainer interface {
+	AddParagraph() (domain.Paragraph, error)
+}
+
+// hydratePartParagraphs copies the paragraph children of a header/footer part
+// tree into container, resolving relationship IDs against that part's own
+// relationships (per-part scoping) with section hydration suppressed.
+func (ctx *reconstructContext) hydratePartParagraphs(container partParagraphContainer, tree *Element, target, op string) error {
+	partRels := ctx.partRelationshipMap(target)
 	return ctx.withSectionHydrationDisabled(func() error {
 		return ctx.withPartRelationships(partRels, func() error {
 			for _, child := range tree.Children {
 				if child == nil || child.Name.Local != "p" {
 					continue
 				}
-				para, err := header.AddParagraph()
+				para, err := container.AddParagraph()
 				if err != nil {
-					return errors.Wrap(err, opHydrateSectionHeader)
+					return errors.Wrap(err, op)
 				}
 				if err := populateParagraph(para, child, ctx); err != nil {
 					return err
@@ -1668,24 +1680,7 @@ func (ctx *reconstructContext) hydrateFooter(section domain.Section, footerType 
 		return nil
 	}
 
-	partRels := ctx.partRelationshipMap(target, ctx.parsed.FooterRelationships)
-	return ctx.withSectionHydrationDisabled(func() error {
-		return ctx.withPartRelationships(partRels, func() error {
-			for _, child := range tree.Children {
-				if child == nil || child.Name.Local != "p" {
-					continue
-				}
-				para, err := footer.AddParagraph()
-				if err != nil {
-					return errors.Wrap(err, opHydrateSectionFooter)
-				}
-				if err := populateParagraph(para, child, ctx); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-	})
+	return ctx.hydratePartParagraphs(footer, tree, target, opHydrateSectionFooter)
 }
 
 func (ctx *reconstructContext) withSectionHydrationDisabled(fn func() error) error {

@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -438,6 +439,87 @@ func buildCollidingRelationshipDocx(t *testing.T, pngBytes []byte) []byte {
 		}
 	}
 
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip.Close: %v", err)
+	}
+
+	return buf.Bytes()
+}
+
+// TestOpenDocument_MalformedHeaderRelsIsTolerated guards against a regression:
+// a header/footer part's own .rels was previously never parsed, so a document
+// with an unparseable "word/_rels/header1.xml.rels" still opened. Parsing those
+// .rels for per-part relationship scoping (issue #37) must not make an
+// otherwise-valid document unreadable just because one part's .rels is corrupt;
+// the corrupt part's rels is skipped and parsing proceeds.
+//
+// The header is rewritten to text-only so the test isolates parse-time
+// tolerance: a header that references media through its own (now unreadable)
+// .rels is a separate, harder concern than "don't abort the whole open".
+func TestOpenDocument_MalformedHeaderRelsIsTolerated(t *testing.T) {
+	const textOnlyHeaderXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:p><w:r><w:t>Header text</w:t></w:r></w:p>
+</w:hdr>`
+
+	docxBytes := buildCollidingRelationshipDocx(t, encodeTestPNG(t))
+	docxBytes = rewriteZipEntry(t, docxBytes, "word/header1.xml", []byte(textOnlyHeaderXML))
+	docxBytes = rewriteZipEntry(t, docxBytes, "word/_rels/header1.xml.rels",
+		[]byte(`<?xml version="1.0"?><Relationships><unclosed`))
+
+	doc, err := OpenDocumentFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes with malformed header .rels: %v", err)
+	}
+	if err := doc.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+}
+
+// rewriteZipEntry returns a copy of the zip archive in docxBytes with the entry
+// named target replaced by newData, leaving every other entry byte-for-byte.
+func rewriteZipEntry(t *testing.T, docxBytes []byte, target string, newData []byte) []byte {
+	t.Helper()
+
+	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
+	if err != nil {
+		t.Fatalf("zip.NewReader: %v", err)
+	}
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+
+	var replaced bool
+	for _, f := range zr.File {
+		w, err := zw.Create(f.Name)
+		if err != nil {
+			t.Fatalf("zip.Create(%s): %v", f.Name, err)
+		}
+
+		data := newData
+		if f.Name != target {
+			rc, err := f.Open()
+			if err != nil {
+				t.Fatalf("open %s: %v", f.Name, err)
+			}
+			original, err := io.ReadAll(rc)
+			rc.Close()
+			if err != nil {
+				t.Fatalf("read %s: %v", f.Name, err)
+			}
+			data = original
+		} else {
+			replaced = true
+		}
+
+		if _, err := w.Write(data); err != nil {
+			t.Fatalf("write %s: %v", f.Name, err)
+		}
+	}
+
+	if !replaced {
+		t.Fatalf("rewriteZipEntry: entry %q not found in archive", target)
+	}
 	if err := zw.Close(); err != nil {
 		t.Fatalf("zip.Close: %v", err)
 	}
