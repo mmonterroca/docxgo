@@ -1,7 +1,7 @@
 # go-docx v2 Implementation Status
 
-**Last Updated**: February 2026
-**Version**: 2.2.2 (Stable)
+**Last Updated**: July 2026
+**Version**: 2.5.0 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -25,11 +25,14 @@ All development phases have been completed. The library has gone through multipl
 | v2.0.0-beta | Oct 2025 | Initial beta                                         |
 | v2.0.0      | Oct 2025 | Stable release, clean architecture, document reading |
 | v2.0.1      | Nov 2025 | Go module path fix                                   |
-| v2.1.0      | Oct 2025 | Theme system (7 preset themes)                       |
+| v2.1.0      | Oct 2025 | Theme system (5 preset themes)                       |
 | v2.1.1      | Nov 2025 | Go module path fix                                   |
 | v2.2.0      | Jan 2026 | Table cell border serialization                      |
 | v2.2.1      | Jan 2026 | Round-trip fixes (hyperlinks, styles, images)        |
 | v2.2.2      | Feb 2026 | Table style borders fix, grid width calc, docs overhaul |
+| v2.3.0      | Feb 2026 | Template / mail-merge engine, paragraph mutation APIs |
+| v2.4.0      | Apr 2026 | In-memory image API, merged-cell round-trip fix      |
+| v2.5.0      | Jul 2026 | Cell run formatting (Italic/Color/FontSize/Underline), per-part header/footer relationship fix |
 
 ---
 
@@ -171,7 +174,7 @@ All development phases have been completed. The library has gone through multipl
 
 ### Testing
 
-- ✅ Unit tests (95%+ coverage)
+- ✅ Unit and round-trip tests (`domain` & `pkg/errors` at 100%; core packages ~50–95%)
 - ✅ Integration tests
 - ✅ Test helpers and fixtures
 - ✅ Coverage reporting
@@ -411,6 +414,6 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 
 ---
 
-**Last Updated**: February 2026
-**Status**: Production Ready (v2.2.2 Stable)
+**Last Updated**: July 2026
+**Status**: Production Ready (v2.5.0 Stable)
 **Maintained by**: Misael Monterroca ([@mmonterroca](https://github.com/mmonterroca))

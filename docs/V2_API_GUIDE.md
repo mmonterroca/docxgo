@@ -1,7 +1,7 @@
 # go-docx v2 API Guide
 
-**Version**: 2.4.0
-**Last Updated**: April 2026
+**Version**: 2.5.0
+**Last Updated**: July 2026
 
 ---
 
@@ -49,7 +49,7 @@
 - Type-safe API (minimal `interface{}`)
 - Comprehensive error handling
 - Thread-safe operations
-- 95%+ test coverage
+- Comprehensive unit and round-trip tests
 
 ---
 
@@ -428,10 +428,14 @@ table.SetStyle(domain.TableStyleGrid)
 
 Predefined table styles:
 
+- `TableStyleNormal`
 - `TableStyleGrid`
-- `TableStyleList`
+- `TableStylePlain`
+- `TableStyleMediumShading`
+- `TableStyleLightShading`
 - `TableStyleColorful`
-- `TableStyleAccent1` through `TableStyleAccent6`
+- `TableStyleAccent1`
+- `TableStyleAccent2`
 
 ---
 
@@ -987,9 +991,9 @@ See [`examples/14_mail_merge/`](../examples/14_mail_merge/) for a complete worki
 - [Examples Directory](../examples/) - Working code examples
 - [V2 Design Document](./V2_DESIGN.md) - Architecture and implementation phases
 - [Migration Guide](../MIGRATION.md) - Detailed v1 to v2 migration
-- [API Reference](https://pkg.go.dev/github.com/mmonterroca/docxgo) - Full API documentation
+- [API Reference](https://pkg.go.dev/github.com/mmonterroca/docxgo/v2) - Full API documentation
 
 ---
 
-**Last Updated**: February 2026
-**Version**: 2.4.0
+**Last Updated**: July 2026
+**Version**: 2.5.0
