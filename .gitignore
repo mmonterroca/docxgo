@@ -6,6 +6,9 @@ docxlib
 docxlib/
 docxgo
 docx_debug/
+bin/
+coverage.out
+coverage.html
 DocxValidator/bin/
 DocxValidator/obj/
 
