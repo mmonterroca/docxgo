@@ -563,6 +563,159 @@ func TestCellBuilder_Formatting(t *testing.T) {
 	})
 }
 
+func TestCellBuilder_RunFormatting(t *testing.T) {
+	t.Run("applies formatting to last run", func(t *testing.T) {
+		textColor := domain.Color{R: 255, G: 0, B: 0}
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Text("Formatted").
+			Italic().
+			Color(textColor).
+			FontSize(14).
+			Underline(domain.UnderlineSingle).
+			End().
+			End().
+			End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		paragraphs := firstTableCellParagraphs(t, doc)
+		if len(paragraphs) != 1 {
+			t.Fatalf("expected 1 paragraph, got %d", len(paragraphs))
+		}
+
+		runs := paragraphs[len(paragraphs)-1].Runs()
+		if len(runs) != 1 {
+			t.Fatalf("expected 1 run, got %d", len(runs))
+		}
+
+		run := runs[len(runs)-1]
+		if !run.Italic() {
+			t.Error("expected run to be italic")
+		}
+		if run.Color() != textColor {
+			t.Errorf("expected color %+v, got %+v", textColor, run.Color())
+		}
+		if run.Size() != 28 {
+			t.Errorf("expected font size 28 half-points, got %d", run.Size())
+		}
+		if run.Underline() != domain.UnderlineSingle {
+			t.Errorf("expected underline %v, got %v", domain.UnderlineSingle, run.Underline())
+		}
+	})
+
+	t.Run("formats only last paragraph run", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Text("Plain").
+			Text("Formatted").
+			Italic().
+			End().
+			End().
+			End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		paragraphs := firstTableCellParagraphs(t, doc)
+		if len(paragraphs) != 2 {
+			t.Fatalf("expected 2 paragraphs, got %d", len(paragraphs))
+		}
+
+		firstRuns := paragraphs[0].Runs()
+		if len(firstRuns) != 1 {
+			t.Fatalf("expected first paragraph to have 1 run, got %d", len(firstRuns))
+		}
+		if firstRuns[0].Italic() {
+			t.Error("expected first paragraph run to stay non-italic")
+		}
+
+		lastRuns := paragraphs[len(paragraphs)-1].Runs()
+		if len(lastRuns) != 1 {
+			t.Fatalf("expected last paragraph to have 1 run, got %d", len(lastRuns))
+		}
+		if !lastRuns[len(lastRuns)-1].Italic() {
+			t.Error("expected last paragraph run to be italic")
+		}
+	})
+}
+
+func TestCellBuilder_RunFormattingErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		apply func(*CellBuilder) *CellBuilder
+	}{
+		{"italic before text", func(cb *CellBuilder) *CellBuilder { return cb.Italic() }},
+		{"color before text", func(cb *CellBuilder) *CellBuilder { return cb.Color(domain.Color{R: 255, G: 0, B: 0}) }},
+		{"font size before text", func(cb *CellBuilder) *CellBuilder { return cb.FontSize(14) }},
+		{"underline before text", func(cb *CellBuilder) *CellBuilder { return cb.Underline(domain.UnderlineSingle) }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := NewDocumentBuilder()
+			tt.apply(builder.AddTable(1, 1).
+				Row(0).
+				Cell(0)).
+				End().
+				End().
+				End()
+
+			_, err := builder.Build()
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
+	}
+
+	t.Run("returns error for invalid font size", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Text("Text").
+			FontSize(0).
+			End().
+			End().
+			End()
+
+		_, err := builder.Build()
+		if err == nil {
+			t.Fatal("expected error for invalid font size, got nil")
+		}
+	})
+}
+
+func firstTableCellParagraphs(t *testing.T, doc domain.Document) []domain.Paragraph {
+	t.Helper()
+
+	tables := doc.Tables()
+	if len(tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(tables))
+	}
+
+	row, err := tables[0].Row(0)
+	if err != nil {
+		t.Fatalf("expected row 0, got %v", err)
+	}
+
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("expected cell 0, got %v", err)
+	}
+
+	return cell.Paragraphs()
+}
+
 func TestTableBuilder_ComplexTable(t *testing.T) {
 	t.Run("creates table with mixed formatting", func(t *testing.T) {
 		builder := NewDocumentBuilder()
