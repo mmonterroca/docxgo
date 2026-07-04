@@ -1,3 +1,29 @@
+## v2.5.0 — 2026-07-04
+
+### Added
+
+- **Run-level formatting on `CellBuilder`** — table cells now support the full fluent formatting set, matching `ParagraphBuilder` (PR #39; `Italic`/`Color`/`FontSize` contributed by @SlashLight in #35)
+  - `CellBuilder.Italic()` — italicize the last run in the last paragraph of the cell
+  - `CellBuilder.Color(color)` — set the last run's text color
+  - `CellBuilder.FontSize(points)` — set the last run's font size (points, converted to half-points internally)
+  - `CellBuilder.Underline(style)` — set the last run's underline style
+  - `lastRun()` helper extracted and reused by `Bold()`; existing `Bold()` behavior and error messages are unchanged (backward-compatible)
+
+### Fixed
+
+- **Per-part relationship ID resolution for headers/footers** (PR #40, closes #37)
+  - Relationship IDs in OOXML are scoped per-part: a header's own `word/_rels/header1.xml.rels` may reuse an ID (e.g. `rId1`) that also exists in `word/_rels/document.xml.rels` for something unrelated. Drawings inside headers/footers now resolve their `r:embed` against that part's own `.rels`, falling back to the document-wide map — fixing wrong or missing media in headers and footers
+  - `internal/reader/parser.go` parses each header/footer part's own `.rels` into a `PartRelationships` map on `ParsedPackage`; an unparseable per-part `.rels` is skipped rather than aborting the whole document open
+  - `internal/reader/reconstruct.go` adds an `activeRelationships` scope to `reconstructContext`; header/footer hydration shares a single `hydratePartParagraphs` helper
+
+### Tests
+
+- `TestCellBuilder_RunFormatting` / `TestCellBuilder_RunFormattingErrors` — happy-path and error coverage for `Italic`/`Color`/`FontSize`/`Underline` on cells
+- `TestOpenDocument_CollidingRelationshipIDsAcrossParts` — a header image whose `rId1` collides with an unrelated document-level `rId1` resolves to the header's own media (plus a save/reopen round-trip guard)
+- `TestOpenDocument_MalformedHeaderRelsIsTolerated` — a corrupt per-part `.rels` no longer fails the open
+
+---
+
 ## v2.4.0 — 2026-04-30
 
 ### Added

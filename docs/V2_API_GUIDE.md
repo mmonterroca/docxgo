@@ -346,6 +346,25 @@ builder.AddTable(3, 3).
     End()
 ```
 
+#### Cell Run Formatting
+
+`CellBuilder` exposes the same run-level formatting as `ParagraphBuilder` — `Bold`, `Italic`, `Color`, `FontSize`, and `Underline` — each applied to the last run in the cell:
+
+```go
+builder.AddTable(1, 1).
+    Row(0).Cell(0).
+        Text("Formatted cell").
+        Bold().
+        Italic().
+        Color(domain.Color{R: 255, G: 0, B: 0}).
+        FontSize(14).                      // points (converted to half-points internally)
+        Underline(domain.UnderlineSingle).
+        End().
+    End()
+```
+
+> Call a formatter only after `Text()` has added a run — calling it on an empty cell records an `InvalidState` error that surfaces at `Build()`.
+
 #### Direct API
 
 ```go

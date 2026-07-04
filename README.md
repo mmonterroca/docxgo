@@ -26,14 +26,14 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 
 ## Status
 
-**Current Version**: v2.4.0 (Stable)
+**Current Version**: v2.5.0 (Stable)
 **Stability**: Production Ready
-**Released**: April 2026
+**Released**: July 2026
 **Test Coverage**: 50.7%
 
-**Latest Features**: In-memory Image API (v2.4.0), Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
+**Latest Features**: Full run-level formatting on table cells (v2.5.0), In-memory Image API (v2.4.0), Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
 
-> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, template/mail merge engine in v2.3.0, and in-memory image insertion plus merged-cell round-trip fixes in v2.4.0.
+> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, template/mail merge engine in v2.3.0, in-memory image insertion plus merged-cell round-trip fixes in v2.4.0, and full run-level cell formatting plus a per-part header/footer relationship fix in v2.5.0.
 
 ---
 
@@ -224,8 +224,8 @@ github.com/mmonterroca/docxgo/v2/
 │
 ├── themes/          # Theme system (7 preset themes)
 │
-└── examples/        # 13 usage examples
-    ├── 01_basic/    ... 13_themes/
+└── examples/        # 15 usage examples
+    ├── 01_basic/    ... 15_external_template/
 ```
 
 ### Design Principles
@@ -266,6 +266,7 @@ github.com/mmonterroca/docxgo/v2/
 - **Cell Merging**: Horizontal (colspan) and vertical (rowspan)
 - **Nested Tables**: Tables within table cells
 - **8 Built-in Styles**: Normal, Grid, Plain, MediumShading, LightShading, Colorful, Accent1, Accent2
+- **Run-level cell formatting**: `Bold`, `Italic`, `Color`, `FontSize`, `Underline` via the fluent `CellBuilder` (full parity with `ParagraphBuilder`)
 - Row height control
 - Cell width and alignment
 - Borders and shading
@@ -320,7 +321,6 @@ github.com/mmonterroca/docxgo/v2/
 
 ### Planned Features
 
-- Mail merge and templates
 - Comments and change tracking
 - Custom XML parts
 - Advanced drawing shapes
@@ -415,7 +415,7 @@ See [docs/COVERAGE_ANALYSIS.md](docs/COVERAGE_ANALYSIS.md) for detailed coverage
 
 - **[V2 API Guide](docs/V2_API_GUIDE.md)** - Complete v2 API reference with examples ⭐ START HERE
 - **[Implementation Status](docs/IMPLEMENTATION_STATUS.md)** - What's implemented, what's planned
-- **[Examples](examples/README.md)** - 13 working code examples
+- **[Examples](examples/README.md)** - 15 working code examples
 - **[Migration Guide](MIGRATION.md)** - Migrating from v1 to v2
 
 **For Developers:**
@@ -525,7 +525,11 @@ For complete project genealogy, see [CREDITS.md](CREDITS.md).
 
 ### Release History
 
-- **v2.4.0** (April 2026 - Current Stable)
+- **v2.5.0** (July 2026 - Current Stable)
+  - Full run-level formatting on the fluent `CellBuilder`: `Italic`, `Color`, `FontSize`, `Underline` (parity with `ParagraphBuilder`) — feature by @SlashLight (#35, #39)
+  - Fix: header/footer drawings now resolve relationship IDs per-part, fixing wrong/missing media when a header's `rId` collides with an unrelated document-level relationship (#37, #40)
+
+- **v2.4.0** (April 2026)
   - In-memory image API: `AddImageFromBytes`, `AddImageFromBytesWithSize`, `AddImageFromBytesWithPosition`
   - Round-trip preservation of `w:gridSpan` and `w:vMerge` for merged table cells
   - CLI handler now embeds base64 images without temp files

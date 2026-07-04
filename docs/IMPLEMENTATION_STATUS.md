@@ -48,7 +48,7 @@ All development phases have been completed. The library has gone through multipl
 
 - ✅ `DocumentBuilder` with fluent API
 - ✅ `ParagraphBuilder` with chaining
-- ✅ `TableBuilder`, `RowBuilder`, `CellBuilder`
+- ✅ `TableBuilder`, `RowBuilder`, `CellBuilder` (cells support `Bold`/`Italic`/`Color`/`FontSize`/`Underline`)
 - ✅ Error accumulation and validation
 - ✅ Functional options pattern (`WithTitle()`, `WithAuthor()`, etc.)
 - ✅ Predefined constants (colors, alignments, underline styles)
