@@ -26,14 +26,14 @@ Production-grade Microsoft Word .docx (OOXML) file manipulation in Go.
 
 ## Status
 
-**Current Version**: v2.5.0 (Stable)
+**Current Version**: v2.6.0 (Stable)
 **Stability**: Production Ready
 **Released**: July 2026
 **Test Coverage**: ~51% overall (`domain` & `pkg/errors` at 100%)
 
-**Latest Features**: Full run-level formatting on table cells (v2.5.0), In-memory Image API (v2.4.0), Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
+**Latest Features**: Default proofing language via `WithLanguage`/`WithLanguageEx` (v2.6.0), Full run-level formatting on table cells (v2.5.0), In-memory Image API (v2.4.0), Template / Mail Merge Engine (v2.3.0), Theme System (v2.1.0+), Round-trip Style Preservation (v2.2.1)
 
-> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, template/mail merge engine in v2.3.0, in-memory image insertion plus merged-cell round-trip fixes in v2.4.0, and full run-level cell formatting plus a per-part header/footer relationship fix in v2.5.0.
+> **Note**: This library underwent a complete architectural rewrite in 2024-2025, implementing clean architecture principles, comprehensive testing, and modern Go practices. Version 2.0.0 released October 2025, with theme system added in v2.1.0, continued improvements through v2.2.x, template/mail merge engine in v2.3.0, in-memory image insertion plus merged-cell round-trip fixes in v2.4.0, full run-level cell formatting plus a per-part header/footer relationship fix in v2.5.0, and a default proofing language option in v2.6.0.
 
 ---
 
@@ -101,6 +101,7 @@ func main() {
         docx.WithDefaultFontSize(22), // 11pt in half-points
         docx.WithPageSize(docx.A4),
         docx.WithMargins(docx.NormalMargins),
+        docx.WithLanguage("en-US"), // spell-check, grammar, hyphenation
     )
 
     // Add content using fluent API
@@ -247,6 +248,7 @@ github.com/mmonterroca/docxgo/v2/
 **Core Document Structure**
 
 - Document creation with metadata (title, author, subject, keywords)
+- Default proofing language (spell-check, grammar, hyphenation) via `WithLanguage` / `WithLanguageEx`
 - Paragraphs with comprehensive formatting
 - Text runs with character-level styling
 - Tables with rows, cells, and styling

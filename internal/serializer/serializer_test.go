@@ -807,7 +807,7 @@ func TestDocumentSerializer_TableStyleBorders(t *testing.T) {
 	sm := doc.StyleManager()
 
 	ser := serializer.NewDocumentSerializer()
-	xmlStyles := ser.SerializeStyles(sm)
+	xmlStyles := ser.SerializeStyles(sm, nil)
 
 	// Find the TableGrid style
 	var tableGridStyle *xmlstructs.Style

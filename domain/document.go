@@ -159,6 +159,20 @@ type Document interface {
 	// BackgroundColor returns the configured page background color.
 	// The boolean result indicates whether a background color is explicitly set.
 	BackgroundColor() (Color, bool)
+
+	// SetLanguage sets the document's default proofing language, used by Word
+	// for spell-checking, grammar-checking, and hyphenation. Pass nil to clear
+	// it. Returns an error if lang is non-nil but has no tag set (Val,
+	// EastAsia, and Bidi all empty), and on a document opened via
+	// OpenDocument/OpenDocumentFromBytes/OpenDocumentFromReader whose
+	// styles.xml or settings.xml were preserved verbatim for round-trip
+	// fidelity — on such a document the language could never actually reach
+	// the saved file, so SetLanguage refuses rather than silently no-op.
+	SetLanguage(lang *Language) error
+
+	// Language returns a copy of the document's default proofing language, or
+	// nil if unset. Mutating the returned value has no effect on the document.
+	Language() *Language
 }
 
 // Metadata contains document properties like title, author, etc.
@@ -170,4 +184,12 @@ type Metadata struct {
 	Description string
 	Created     string // ISO 8601 format
 	Modified    string // ISO 8601 format
+}
+
+// Language represents a document's default proofing language, expressed as
+// BCP 47 language tags (e.g. "es-MX", "en-US").
+type Language struct {
+	Val      string // primary language, applied to Latin-script text
+	EastAsia string // optional, for East Asian scripts (Chinese, Japanese, Korean)
+	Bidi     string // optional, for right-to-left scripts (Arabic, Hebrew)
 }

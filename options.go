@@ -38,8 +38,14 @@ type Config struct {
 	Margins          Margins
 	StrictValidation bool
 	Metadata         *domain.Metadata
+	Language         *Language
 	Theme            interface{} // Theme to apply (using interface{} to avoid import cycle)
 }
+
+// Language represents a document's default proofing language, expressed as
+// BCP 47 language tags (e.g. "es-MX", "en-US"). See docx.WithLanguage and
+// docx.WithLanguageEx.
+type Language = domain.Language
 
 // PageSize represents paper dimensions.
 type PageSize struct {
@@ -226,6 +232,53 @@ func WithSubject(subject string) Option {
 			c.Metadata = &domain.Metadata{}
 		}
 		c.Metadata.Subject = subject
+	}
+}
+
+// WithLanguage sets the document's default proofing language, using a BCP 47
+// language tag. Word uses this to select the spell-checking and grammar
+// dictionaries, and to apply the correct hyphenation rules.
+//
+// NewDocumentBuilder always starts from a new, empty document, so this always
+// takes effect. To change the language of an existing .docx opened via
+// OpenDocument, use its SetLanguage method instead — note that it errors on a
+// document whose styles.xml/settings.xml were preserved for round-trip
+// fidelity, since the language could never actually reach the saved file.
+//
+// Example:
+//
+//	builder := docx.NewDocumentBuilder(
+//	    docx.WithLanguage("es-MX"),
+//	)
+func WithLanguage(lang string) Option {
+	return func(c *Config) {
+		c.Language = &Language{Val: lang}
+	}
+}
+
+// WithLanguageEx sets the document's default proofing language, including
+// optional language tags for East Asian (CJK) and right-to-left (bidi)
+// scripts. Use this over WithLanguage when the document mixes scripts, e.g.
+// Latin text with embedded Japanese or Arabic. At least one of Val, EastAsia,
+// or Bidi must be set.
+//
+// See WithLanguage regarding existing documents opened via OpenDocument.
+//
+// Example:
+//
+//	builder := docx.NewDocumentBuilder(
+//	    docx.WithLanguageEx(docx.Language{
+//	        Val:      "en-US",
+//	        EastAsia: "ja-JP",
+//	        Bidi:     "ar-SA",
+//	    }),
+//	)
+func WithLanguageEx(lang Language) Option {
+	return func(c *Config) {
+		// Copy so that reusing this Option across multiple builders doesn't
+		// leave their Configs aliasing the same *Language.
+		langCopy := lang
+		c.Language = &langCopy
 	}
 }
 
