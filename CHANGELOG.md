@@ -1,4 +1,4 @@
-## [Unreleased]
+## v2.6.0 — 2026-07-17
 
 ### Added
 
@@ -18,6 +18,7 @@
 ### Fixed
 
 - **`word/styles.xml` element order** — `internal/xml.Styles` now marshals `w:docDefaults` before `w:latentStyles`, matching the `CT_Styles` schema. This was previously backwards but unobservable, since `DocDefaults` was never populated before this change.
+- **CI never ran against `master`** — `.github/workflows/ci.yml` triggered on `branches: [ main, dev ]`, but this repo's default/release branch is `master`, not `main`. The Lint/Build/Test job had silently never fired for any push or PR targeting `master` since the workflow was added. Fixed to trigger on `master` and `dev`.
 
 ---
 
