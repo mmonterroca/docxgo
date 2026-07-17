@@ -161,10 +161,17 @@ type Document interface {
 	BackgroundColor() (Color, bool)
 
 	// SetLanguage sets the document's default proofing language, used by Word
-	// for spell-checking, grammar-checking, and hyphenation. Pass nil to clear it.
+	// for spell-checking, grammar-checking, and hyphenation. Pass nil to clear
+	// it. Returns an error if lang is non-nil but has no tag set (Val,
+	// EastAsia, and Bidi all empty), and on a document opened via
+	// OpenDocument/OpenDocumentFromBytes/OpenDocumentFromReader whose
+	// styles.xml or settings.xml were preserved verbatim for round-trip
+	// fidelity — on such a document the language could never actually reach
+	// the saved file, so SetLanguage refuses rather than silently no-op.
 	SetLanguage(lang *Language) error
 
-	// Language returns the document's default proofing language, or nil if unset.
+	// Language returns a copy of the document's default proofing language, or
+	// nil if unset. Mutating the returned value has no effect on the document.
 	Language() *Language
 }
 

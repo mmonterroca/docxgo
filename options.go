@@ -239,9 +239,11 @@ func WithSubject(subject string) Option {
 // language tag. Word uses this to select the spell-checking and grammar
 // dictionaries, and to apply the correct hyphenation rules.
 //
-// This only takes effect when building a new document. When reading and
-// re-saving an existing .docx file, the original styles.xml and settings.xml
-// are preserved verbatim and WithLanguage has no effect.
+// NewDocumentBuilder always starts from a new, empty document, so this always
+// takes effect. To change the language of an existing .docx opened via
+// OpenDocument, use its SetLanguage method instead — note that it errors on a
+// document whose styles.xml/settings.xml were preserved for round-trip
+// fidelity, since the language could never actually reach the saved file.
 //
 // Example:
 //
@@ -257,9 +259,10 @@ func WithLanguage(lang string) Option {
 // WithLanguageEx sets the document's default proofing language, including
 // optional language tags for East Asian (CJK) and right-to-left (bidi)
 // scripts. Use this over WithLanguage when the document mixes scripts, e.g.
-// Latin text with embedded Japanese or Arabic.
+// Latin text with embedded Japanese or Arabic. At least one of Val, EastAsia,
+// or Bidi must be set.
 //
-// See WithLanguage for the same round-trip caveat.
+// See WithLanguage regarding existing documents opened via OpenDocument.
 //
 // Example:
 //
@@ -272,7 +275,10 @@ func WithLanguage(lang string) Option {
 //	)
 func WithLanguageEx(lang Language) Option {
 	return func(c *Config) {
-		c.Language = &lang
+		// Copy so that reusing this Option across multiple builders doesn't
+		// leave their Configs aliasing the same *Language.
+		langCopy := lang
+		c.Language = &langCopy
 	}
 }
 

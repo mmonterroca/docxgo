@@ -542,24 +542,57 @@ func (d *document) BackgroundColor() (domain.Color, bool) {
 	return *d.backgroundColor, true
 }
 
-// SetLanguage sets the document's default proofing language.
+// SetLanguage sets the document's default proofing language. It returns an
+// error on a document opened via OpenDocument/OpenDocumentFromBytes/
+// OpenDocumentFromReader whose styles.xml or settings.xml were preserved for
+// round-trip fidelity: WriteTo writes those parts verbatim, so a language set
+// here would silently never reach the saved file. Only documents created with
+// NewDocument (including via NewDocumentBuilder) support SetLanguage.
 func (d *document) SetLanguage(lang *domain.Language) error {
 	if d == nil {
 		return errors.InvalidState("Document.SetLanguage", "document is nil")
 	}
-	if lang != nil && lang.Val == "" {
-		return errors.InvalidArgument("Document.SetLanguage", "lang.Val", lang.Val, "language tag cannot be empty")
+	if len(d.preservedStylesPart) > 0 || len(d.preservedSettings) > 0 {
+		return errors.InvalidState("Document.SetLanguage",
+			"cannot set the proofing language on a document whose styles.xml/settings.xml are preserved from round-trip; only documents created with NewDocument support SetLanguage")
 	}
-	d.language = lang
+	if lang != nil && lang.Val == "" && lang.EastAsia == "" && lang.Bidi == "" {
+		return errors.InvalidArgument("Document.SetLanguage", "lang", lang, "at least one of Val, EastAsia, or Bidi must be set")
+	}
+	if lang == nil {
+		d.language = nil
+		return nil
+	}
+	langCopy := *lang
+	d.language = &langCopy
 	return nil
 }
 
-// Language returns the document's default proofing language, or nil if unset.
+// Language returns a copy of the document's default proofing language, or
+// nil if unset. Mutating the returned value has no effect on the document.
 func (d *document) Language() *domain.Language {
-	if d == nil {
+	if d == nil || d.language == nil {
 		return nil
 	}
-	return d.language
+	langCopy := *d.language
+	return &langCopy
+}
+
+// SetLanguageRaw hydrates the document's language field directly, bypassing
+// SetLanguage's round-trip guard. Used exclusively by the reader package
+// during OpenDocument to reflect a language already present in the source
+// file's styles.xml — not part of domain.Document, reached only via the
+// reader's own type-assertion (mirrors SetPreservedStylesPart/SetNumberingPart).
+func (d *document) SetLanguageRaw(lang *domain.Language) {
+	if d == nil {
+		return
+	}
+	if lang == nil {
+		d.language = nil
+		return
+	}
+	langCopy := *lang
+	d.language = &langCopy
 }
 
 // StyleManager returns the style manager for this document.

@@ -1396,3 +1396,212 @@ func TestWithoutLanguage_NoRegression(t *testing.T) {
 		t.Errorf("expected no w:themeFontLang without WithLanguage, got: %s", settings)
 	}
 }
+
+// TestWithLanguageEx_SingleScriptTag guards against a real bug found in
+// code review: SetLanguage used to reject any Language whose Val was empty,
+// even when EastAsia or Bidi was set — but <w:lang w:eastAsia="ja-JP"/> with
+// no w:val is valid OOXML, and WithLanguageEx is documented for exactly this
+// mixed-script case.
+func TestWithLanguageEx_SingleScriptTag(t *testing.T) {
+	builder := NewDocumentBuilder(
+		WithLanguageEx(Language{EastAsia: "ja-JP"}),
+	)
+	builder.AddParagraph().Text("Test").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error for EastAsia-only language, got %v", err)
+	}
+
+	styles := readZipPart(t, doc, "word/styles.xml")
+	if !strings.Contains(styles, `w:eastAsia="ja-JP"`) {
+		t.Errorf("expected word/styles.xml to contain w:eastAsia=\"ja-JP\", got: %s", styles)
+	}
+
+	// themeFontLangXML used to gate on Val alone; an EastAsia/Bidi-only
+	// language silently dropped w:themeFontLang from settings.xml entirely.
+	settings := readZipPart(t, doc, "word/settings.xml")
+	if !strings.Contains(settings, `w:eastAsia="ja-JP"`) {
+		t.Errorf("expected word/settings.xml to contain w:eastAsia=\"ja-JP\", got: %s", settings)
+	}
+}
+
+// TestWithLanguageEx_OptionReuseDoesNotAlias guards against a closure bug:
+// WithLanguageEx's returned Option used to capture &lang from its own
+// parameter, so invoking the same Option value against two Configs left both
+// pointing at one shared Language.
+func TestWithLanguageEx_OptionReuseDoesNotAlias(t *testing.T) {
+	opt := WithLanguageEx(Language{Val: "en-US"})
+
+	c1 := &Config{}
+	c2 := &Config{}
+	opt(c1)
+	opt(c2)
+
+	if c1.Language == c2.Language {
+		t.Fatal("expected independent *Language per Config from reusing one Option, got the same pointer")
+	}
+}
+
+// TestLanguage_ReturnsDefensiveCopy guards against Document.Language()
+// handing out its internal pointer: mutating the result must not affect the
+// document's actual state, matching the sibling BackgroundColor() convention.
+func TestLanguage_ReturnsDefensiveCopy(t *testing.T) {
+	builder := NewDocumentBuilder(WithLanguage("es-MX"))
+	builder.AddParagraph().Text("Test").End()
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	got := doc.Language()
+	if got == nil {
+		t.Fatal("expected non-nil language")
+	}
+	got.Val = "MUTATED"
+
+	again := doc.Language()
+	if again.Val != "es-MX" {
+		t.Errorf("expected mutation of returned value not to affect document state, got Val=%q", again.Val)
+	}
+}
+
+// TestOpenDocument_HydratesLanguage guards against the reader silently
+// dropping a language that was actually saved: Document.Language() must
+// reflect what styles.xml's docDefaults declares after a round-trip.
+func TestOpenDocument_HydratesLanguage(t *testing.T) {
+	builder := NewDocumentBuilder(
+		WithLanguageEx(Language{Val: "en-US", EastAsia: "ja-JP"}),
+	)
+	builder.AddParagraph().Text("Test").End()
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	reopened, err := OpenDocumentFromBytes(buf.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes failed: %v", err)
+	}
+
+	lang := reopened.Language()
+	if lang == nil {
+		t.Fatal("expected Language() to reflect the hydrated language, got nil")
+	}
+	if lang.Val != "en-US" || lang.EastAsia != "ja-JP" {
+		t.Errorf("expected hydrated {Val: en-US, EastAsia: ja-JP}, got %+v", *lang)
+	}
+}
+
+// TestSetLanguage_RejectsRoundTrippedDocument guards against the silent
+// no-op found in code review: SetLanguage returning nil on a document opened
+// from an existing .docx, even though styles.xml/settings.xml are written
+// verbatim on save and the language could never actually reach the file.
+func TestSetLanguage_RejectsRoundTrippedDocument(t *testing.T) {
+	builder := NewDocumentBuilder(WithLanguage("en-US"))
+	builder.AddParagraph().Text("Test").End()
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	reopened, err := OpenDocumentFromBytes(buf.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes failed: %v", err)
+	}
+
+	if err := reopened.SetLanguage(&domain.Language{Val: "fr-FR"}); err == nil {
+		t.Fatal("expected SetLanguage to error on a round-tripped document, got nil")
+	}
+
+	// Confirm the rejection is loud, not a silent partial-apply: the
+	// original language must survive a save untouched.
+	var buf2 bytes.Buffer
+	if _, err := reopened.WriteTo(&buf2); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+	reopened2, err := OpenDocumentFromBytes(buf2.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes failed: %v", err)
+	}
+	if lang := reopened2.Language(); lang == nil || lang.Val != "en-US" {
+		t.Errorf("expected original en-US to survive untouched, got %+v", lang)
+	}
+}
+
+// TestSetLanguage_RejectsPartiallyPreservedDocument guards against the
+// mismatched-gate bug found in code review: styles.xml and settings.xml used
+// different preservation checks, so a document with styles.xml preserved but
+// no settings.xml part (settings.xml is optional; non-Word producers omit
+// it) applied a new language to only one of the two parts. SetLanguage must
+// now reject uniformly, regardless of which specific part is preserved.
+func TestSetLanguage_RejectsPartiallyPreservedDocument(t *testing.T) {
+	builder := NewDocumentBuilder(WithLanguage("en-US"))
+	builder.AddParagraph().Text("Test").End()
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	stripped := removeZipEntry(t, buf.Bytes(), "word/settings.xml")
+
+	reopened, err := OpenDocumentFromBytes(stripped)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes failed: %v", err)
+	}
+
+	if err := reopened.SetLanguage(&domain.Language{Val: "fr-FR"}); err == nil {
+		t.Fatal("expected SetLanguage to error when styles.xml is preserved even without settings.xml, got nil")
+	}
+}
+
+// removeZipEntry returns a copy of a ZIP archive's bytes with the named
+// entry removed, for constructing a .docx missing an optional part.
+func removeZipEntry(t *testing.T, data []byte, name string) []byte {
+	t.Helper()
+
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("failed to read source ZIP: %v", err)
+	}
+
+	var out bytes.Buffer
+	zw := zip.NewWriter(&out)
+	for _, f := range zr.File {
+		if f.Name == name {
+			continue
+		}
+		w, err := zw.Create(f.Name)
+		if err != nil {
+			t.Fatalf("failed to create entry %s: %v", f.Name, err)
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("failed to open entry %s: %v", f.Name, err)
+		}
+		if _, err := io.Copy(w, rc); err != nil {
+			rc.Close()
+			t.Fatalf("failed to copy entry %s: %v", f.Name, err)
+		}
+		rc.Close()
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("failed to finalize ZIP: %v", err)
+	}
+	return out.Bytes()
+}

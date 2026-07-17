@@ -23,6 +23,7 @@
 package reader
 
 import (
+	"encoding/xml"
 	"fmt"
 	"strconv"
 	"strings"
@@ -133,6 +134,19 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 	// Preserve all original parts for complete round-trip fidelity.
 	if parsed.Package != nil {
 		preserveOriginalParts(doc, parsed.Package)
+	}
+
+	// Hydrate the default proofing language from styles.xml's docDefaults so
+	// Document.Language() reflects a document opened with one already set.
+	// Uses SetLanguageRaw, not SetLanguage: preserveOriginalParts above has
+	// already given this document preserved styles.xml/settings.xml bytes,
+	// which would trip SetLanguage's round-trip guard.
+	if parsed.Package != nil && len(parsed.Package.Styles) > 0 {
+		if lang, err := parseStylesLanguage(parsed.Package.Styles); err == nil && lang != nil {
+			if setter, ok := doc.(interface{ SetLanguageRaw(*domain.Language) }); ok {
+				setter.SetLanguageRaw(lang)
+			}
+		}
 	}
 
 	for _, child := range body.Children {
@@ -2193,4 +2207,56 @@ func preserveOriginalParts(doc domain.Document, pkg *Package) {
 	}
 
 	setter.SetPreservedParts(parts)
+}
+
+// stylesLanguageRead is a read-only mirror of styles.xml's
+// docDefaults/rPrDefault/rPr/lang path, used only for Unmarshal. It can't
+// reuse internal/xml's Styles/DocDefaults/RunDefaults/RunProperties/Language
+// (marshal-only structs with literal "w:"-prefixed tags): Go's encoding/xml
+// resolves namespace prefixes to their URIs during decode, so a struct meant
+// for Unmarshal needs "namespace-URI element"/"namespace-URI attr,attr" tags
+// instead of the literal "w:"-prefixed ones the write-side structs use.
+type stylesLanguageRead struct {
+	DocDefaults *docDefaultsRead `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main docDefaults"`
+}
+
+type docDefaultsRead struct {
+	RunDefaults *rPrDefaultRead `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main rPrDefault"`
+}
+
+type rPrDefaultRead struct {
+	Properties *rPrLangRead `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main rPr"`
+}
+
+type rPrLangRead struct {
+	Lang *langRead `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main lang"`
+}
+
+type langRead struct {
+	Val      string `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main val,attr"`
+	EastAsia string `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main eastAsia,attr"`
+	Bidi     string `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main bidi,attr"`
+}
+
+// parseStylesLanguage unmarshals word/styles.xml bytes and extracts the
+// document's default proofing language from
+// w:docDefaults/w:rPrDefault/w:rPr/w:lang, if present. Returns nil (with no
+// error) when styles.xml doesn't declare one.
+func parseStylesLanguage(data []byte) (*domain.Language, error) {
+	var styles stylesLanguageRead
+	if err := xml.Unmarshal(data, &styles); err != nil {
+		return nil, err
+	}
+
+	if styles.DocDefaults == nil || styles.DocDefaults.RunDefaults == nil ||
+		styles.DocDefaults.RunDefaults.Properties == nil {
+		return nil, nil
+	}
+
+	lang := styles.DocDefaults.RunDefaults.Properties.Lang
+	if lang == nil || (lang.Val == "" && lang.EastAsia == "" && lang.Bidi == "") {
+		return nil, nil
+	}
+
+	return &domain.Language{Val: lang.Val, EastAsia: lang.EastAsia, Bidi: lang.Bidi}, nil
 }

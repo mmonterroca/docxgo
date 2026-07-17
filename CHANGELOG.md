@@ -4,10 +4,16 @@
 
 - **`WithLanguage` / `WithLanguageEx`** — set the document's default proofing language, used by Word for spell-checking, grammar-checking, and hyphenation (closes #44)
   - `WithLanguage(lang string)` sets the primary language (BCP 47 tag, e.g. `"es-MX"`)
-  - `WithLanguageEx(docx.Language{Val, EastAsia, Bidi})` additionally sets East Asian (CJK) and right-to-left (bidi) script languages
+  - `WithLanguageEx(docx.Language{Val, EastAsia, Bidi})` additionally sets East Asian (CJK) and right-to-left (bidi) script languages; at least one of the three must be non-empty
   - Written as `w:lang` in `word/styles.xml`'s `docDefaults/rPrDefault/rPr` and as `w:themeFontLang` in `word/settings.xml`
-  - Only applies when building a new document; reading and re-saving an existing `.docx` preserves its original `styles.xml`/`settings.xml` verbatim
-  - `domain.Document` gained `SetLanguage`/`Language()`; `domain.Language` is the new public type (aliased as `docx.Language`)
+  - `NewDocumentBuilder` always starts from a new document, so `WithLanguage`/`WithLanguageEx` always take effect
+  - Opening an existing `.docx` via `OpenDocument`/`OpenDocumentFromBytes`/`OpenDocumentFromReader` now hydrates `Language()` from its `styles.xml`, if it declares one
+  - `domain.Document` gained `SetLanguage(*Language) error` and `Language() *Language`; `domain.Language` is the new public type (aliased as `docx.Language`). `Language()` returns a defensive copy — mutating it has no effect on the document
+  - `SetLanguage` returns an error (rather than silently no-op) on a document opened via `OpenDocument` whose `styles.xml`/`settings.xml` were preserved verbatim for round-trip fidelity, since a language set there could never actually reach the saved file. Use `WithLanguage`/`WithLanguageEx` when building a new document instead
+
+### Changed
+
+- **`domain.Document` interface gained two methods** (`SetLanguage`, `Language`, above). If you implement `domain.Document` directly with your own type — most commonly a hand-written test double — you'll need to add both methods; embedding `domain.Document` in your type is unaffected, since the new methods are promoted automatically. No exported docxgo API accepts a `domain.Document` from a caller (only returns one), so this is consistent with `SetBackgroundColor`/`BackgroundColor`, which were added to this same interface in the `v2.0.1` patch release.
 
 ### Fixed
 

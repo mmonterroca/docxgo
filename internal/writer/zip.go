@@ -620,10 +620,14 @@ func (zw *ZipWriter) writeDefaultSettings() error {
 // placed immediately after w:compat, which is schema-valid since no elements
 // between them (w:docVars, w:rsids, m:mathPr, w:attachedSchema) are emitted.
 func (zw *ZipWriter) themeFontLangXML() string {
-	if zw.language == nil || zw.language.Val == "" {
+	if zw.language == nil ||
+		(zw.language.Val == "" && zw.language.EastAsia == "" && zw.language.Bidi == "") {
 		return ""
 	}
-	attrs := ` w:val="` + xmlEscapeAttr(zw.language.Val) + `"`
+	var attrs string
+	if zw.language.Val != "" {
+		attrs += ` w:val="` + xmlEscapeAttr(zw.language.Val) + `"`
+	}
 	if zw.language.EastAsia != "" {
 		attrs += ` w:eastAsia="` + xmlEscapeAttr(zw.language.EastAsia) + `"`
 	}
