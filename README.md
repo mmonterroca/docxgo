@@ -101,6 +101,7 @@ func main() {
         docx.WithDefaultFontSize(22), // 11pt in half-points
         docx.WithPageSize(docx.A4),
         docx.WithMargins(docx.NormalMargins),
+        docx.WithLanguage("en-US"), // spell-check, grammar, hyphenation
     )
 
     // Add content using fluent API
@@ -247,6 +248,7 @@ github.com/mmonterroca/docxgo/v2/
 **Core Document Structure**
 
 - Document creation with metadata (title, author, subject, keywords)
+- Default proofing language (spell-check, grammar, hyphenation) via `WithLanguage` / `WithLanguageEx`
 - Paragraphs with comprehensive formatting
 - Text runs with character-level styling
 - Tables with rows, cells, and styling

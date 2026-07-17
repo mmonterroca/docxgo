@@ -28,6 +28,7 @@ package writer
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -36,6 +37,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/internal/manager"
 	"github.com/mmonterroca/docxgo/v2/internal/serializer"
 	xmlstructs "github.com/mmonterroca/docxgo/v2/internal/xml"
@@ -46,6 +48,7 @@ import (
 type ZipWriter struct {
 	zipWriter  *zip.Writer
 	serializer *serializer.DocumentSerializer
+	language   *domain.Language
 }
 
 // NumberingPart represents numbering.xml data that should be preserved in the DOCX package.
@@ -76,6 +79,13 @@ func NewZipWriter(w io.Writer) *ZipWriter {
 		zipWriter:  zip.NewWriter(w),
 		serializer: serializer.NewDocumentSerializer(),
 	}
+}
+
+// SetLanguage sets the document's default proofing language, written to
+// word/settings.xml as w:themeFontLang when the default (non-preserved)
+// settings part is generated.
+func (zw *ZipWriter) SetLanguage(lang *domain.Language) {
+	zw.language = lang
 }
 
 // WriteDocument writes a complete .docx document structure.
@@ -600,9 +610,34 @@ func (zw *ZipWriter) writeDefaultSettings() error {
 	<w:characterSpacingControl w:val="doNotCompress"/>
 	<w:compat>
 		<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>
-	</w:compat>
+	</w:compat>` + zw.themeFontLangXML() + `
 </w:settings>`
 	return zw.writeRaw("word/settings.xml", []byte(settings))
+}
+
+// themeFontLangXML returns the w:themeFontLang element reflecting the
+// configured language, or an empty string when no language is set. It is
+// placed immediately after w:compat, which is schema-valid since no elements
+// between them (w:docVars, w:rsids, m:mathPr, w:attachedSchema) are emitted.
+func (zw *ZipWriter) themeFontLangXML() string {
+	if zw.language == nil || zw.language.Val == "" {
+		return ""
+	}
+	attrs := ` w:val="` + xmlEscapeAttr(zw.language.Val) + `"`
+	if zw.language.EastAsia != "" {
+		attrs += ` w:eastAsia="` + xmlEscapeAttr(zw.language.EastAsia) + `"`
+	}
+	if zw.language.Bidi != "" {
+		attrs += ` w:bidi="` + xmlEscapeAttr(zw.language.Bidi) + `"`
+	}
+	return "\n\t<w:themeFontLang" + attrs + "/>"
+}
+
+// xmlEscapeAttr escapes a string for safe use as an XML attribute value.
+func xmlEscapeAttr(s string) string {
+	var buf bytes.Buffer
+	_ = xml.EscapeText(&buf, []byte(s))
+	return buf.String()
 }
 
 // writeDefaultWebSettings writes a baseline word/webSettings.xml part.

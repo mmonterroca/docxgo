@@ -1,3 +1,20 @@
+## [Unreleased]
+
+### Added
+
+- **`WithLanguage` / `WithLanguageEx`** — set the document's default proofing language, used by Word for spell-checking, grammar-checking, and hyphenation (closes #44)
+  - `WithLanguage(lang string)` sets the primary language (BCP 47 tag, e.g. `"es-MX"`)
+  - `WithLanguageEx(docx.Language{Val, EastAsia, Bidi})` additionally sets East Asian (CJK) and right-to-left (bidi) script languages
+  - Written as `w:lang` in `word/styles.xml`'s `docDefaults/rPrDefault/rPr` and as `w:themeFontLang` in `word/settings.xml`
+  - Only applies when building a new document; reading and re-saving an existing `.docx` preserves its original `styles.xml`/`settings.xml` verbatim
+  - `domain.Document` gained `SetLanguage`/`Language()`; `domain.Language` is the new public type (aliased as `docx.Language`)
+
+### Fixed
+
+- **`word/styles.xml` element order** — `internal/xml.Styles` now marshals `w:docDefaults` before `w:latentStyles`, matching the `CT_Styles` schema. This was previously backwards but unobservable, since `DocDefaults` was never populated before this change.
+
+---
+
 ## v2.5.0 — 2026-07-04
 
 ### Added

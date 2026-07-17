@@ -28,11 +28,15 @@ package xml
 import "encoding/xml"
 
 // Styles represents the styles.xml document.
+//
+// Field order matches the CT_Styles content model (docDefaults, then
+// latentStyles, then style*) — encoding/xml marshals in struct field order,
+// and Word rejects a docDefaults that appears after latentStyles.
 type Styles struct {
 	XMLName      xml.Name      `xml:"w:styles"`
 	Xmlns        string        `xml:"xmlns:w,attr"`
-	LatentStyles *LatentStyles `xml:"w:latentStyles,omitempty"`
 	DocDefaults  *DocDefaults  `xml:"w:docDefaults,omitempty"`
+	LatentStyles *LatentStyles `xml:"w:latentStyles,omitempty"`
 	Styles       []*Style      `xml:"w:style"`
 }
 

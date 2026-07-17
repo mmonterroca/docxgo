@@ -25,11 +25,51 @@ SOFTWARE.
 package docx
 
 import (
+	"archive/zip"
+	"bytes"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
+
+// readZipPart builds doc, writes it to a buffer, and returns the content of
+// the named part (e.g. "word/styles.xml") from the resulting .docx ZIP.
+func readZipPart(t *testing.T, doc domain.Document, part string) string {
+	t.Helper()
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	zr, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		t.Fatalf("failed to read ZIP: %v", err)
+	}
+
+	for _, f := range zr.File {
+		if f.Name != part {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("failed to open %s: %v", part, err)
+		}
+		defer rc.Close()
+
+		content, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatalf("failed to read %s: %v", part, err)
+		}
+		return string(content)
+	}
+
+	t.Fatalf("part %s not found in ZIP", part)
+	return ""
+}
 
 func TestDocumentBuilder_Build(t *testing.T) {
 	t.Run("builds document with paragraph", func(t *testing.T) {
@@ -871,6 +911,24 @@ func TestOptions_Validation(t *testing.T) {
 			t.Fatal("expected nil document, got non-nil")
 		}
 	})
+
+	t.Run("WithLanguage validates language tag", func(t *testing.T) {
+		// A paragraph must be added: Build() also fails on an empty document,
+		// and without content that unrelated error would mask whether the
+		// empty language tag was actually rejected.
+		builder := NewDocumentBuilder(
+			WithLanguage(""),
+		)
+		builder.AddParagraph().Text("Test").End()
+
+		doc, err := builder.Build()
+		if err == nil {
+			t.Fatal("expected error for empty language tag, got nil")
+		}
+		if doc != nil {
+			t.Fatal("expected nil document, got non-nil")
+		}
+	})
 }
 
 func TestDocumentBuilder_Options(t *testing.T) {
@@ -1252,4 +1310,89 @@ func TestParagraphBuilder_AddImage(t *testing.T) {
 			t.Fatal("expected error for nil image data, got nil")
 		}
 	})
+}
+
+func TestWithLanguage_WritesLanguageDefaults(t *testing.T) {
+	builder := NewDocumentBuilder(
+		WithLanguage("es-MX"),
+	)
+	builder.AddParagraph().Text("Hola").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	styles := readZipPart(t, doc, "word/styles.xml")
+	if !strings.Contains(styles, `<w:docDefaults>`) {
+		t.Error("expected word/styles.xml to contain w:docDefaults")
+	}
+	if !strings.Contains(styles, `<w:lang w:val="es-MX"`) {
+		t.Errorf("expected word/styles.xml to contain w:lang w:val=\"es-MX\", got: %s", styles)
+	}
+	// CT_Styles requires docDefaults before latentStyles; Word rejects the
+	// reverse order. This guards the internal/xml.Styles field order.
+	docDefaultsIdx := strings.Index(styles, "w:docDefaults")
+	latentStylesIdx := strings.Index(styles, "w:latentStyles")
+	if docDefaultsIdx == -1 || latentStylesIdx == -1 || docDefaultsIdx > latentStylesIdx {
+		t.Error("expected w:docDefaults to precede w:latentStyles in word/styles.xml")
+	}
+
+	settings := readZipPart(t, doc, "word/settings.xml")
+	if !strings.Contains(settings, `<w:themeFontLang w:val="es-MX"`) {
+		t.Errorf("expected word/settings.xml to contain w:themeFontLang w:val=\"es-MX\", got: %s", settings)
+	}
+}
+
+func TestWithLanguageEx_WritesEastAsiaAndBidi(t *testing.T) {
+	builder := NewDocumentBuilder(
+		WithLanguageEx(Language{
+			Val:      "en-US",
+			EastAsia: "ja-JP",
+			Bidi:     "ar-SA",
+		}),
+	)
+	builder.AddParagraph().Text("Test").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	styles := readZipPart(t, doc, "word/styles.xml")
+	for _, want := range []string{`w:val="en-US"`, `w:eastAsia="ja-JP"`, `w:bidi="ar-SA"`} {
+		if !strings.Contains(styles, want) {
+			t.Errorf("expected word/styles.xml to contain %s, got: %s", want, styles)
+		}
+	}
+
+	settings := readZipPart(t, doc, "word/settings.xml")
+	for _, want := range []string{`w:val="en-US"`, `w:eastAsia="ja-JP"`, `w:bidi="ar-SA"`} {
+		if !strings.Contains(settings, want) {
+			t.Errorf("expected word/settings.xml to contain %s, got: %s", want, settings)
+		}
+	}
+}
+
+// TestWithoutLanguage_NoRegression guards against the failure mode this
+// feature was built to avoid: language state silently going nowhere. Without
+// WithLanguage, output must stay exactly as before this change existed.
+func TestWithoutLanguage_NoRegression(t *testing.T) {
+	builder := NewDocumentBuilder()
+	builder.AddParagraph().Text("Test").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	styles := readZipPart(t, doc, "word/styles.xml")
+	if strings.Contains(styles, "w:docDefaults") || strings.Contains(styles, "w:lang") {
+		t.Errorf("expected no w:docDefaults/w:lang without WithLanguage, got: %s", styles)
+	}
+
+	settings := readZipPart(t, doc, "word/settings.xml")
+	if strings.Contains(settings, "themeFontLang") {
+		t.Errorf("expected no w:themeFontLang without WithLanguage, got: %s", settings)
+	}
 }

@@ -70,21 +70,22 @@ type document struct {
 	numberingPart   []byte
 	numberingTarget string
 	backgroundColor *domain.Color
+	language        *domain.Language
 
 	// Preserved parts for round-trip operations (read-modify-write).
 	// When set, these parts are written verbatim to preserve original content.
-	preservedStylesPart      []byte            // Original styles.xml
-	preservedHeaders         map[string][]byte // Original headers (e.g., "header1.xml" -> bytes)
-	preservedFooters         map[string][]byte // Original footers (e.g., "footer1.xml" -> bytes)
-	preservedDocRels         []byte            // Original word/_rels/document.xml.rels
-	preservedContentTypes    []byte            // Original [Content_Types].xml
-	preservedAdditional      map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
-	preservedThemes          map[string][]byte // Original theme parts
-	preservedFontTable       []byte            // Original fontTable.xml
-	preservedSettings        []byte            // Original settings.xml
-	preservedWebSettings     []byte            // Original webSettings.xml
-	preservedCustomProps     []byte            // Original docProps/custom.xml
-	preservedRootRels        []byte            // Original _rels/.rels
+	preservedStylesPart   []byte            // Original styles.xml
+	preservedHeaders      map[string][]byte // Original headers (e.g., "header1.xml" -> bytes)
+	preservedFooters      map[string][]byte // Original footers (e.g., "footer1.xml" -> bytes)
+	preservedDocRels      []byte            // Original word/_rels/document.xml.rels
+	preservedContentTypes []byte            // Original [Content_Types].xml
+	preservedAdditional   map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
+	preservedThemes       map[string][]byte // Original theme parts
+	preservedFontTable    []byte            // Original fontTable.xml
+	preservedSettings     []byte            // Original settings.xml
+	preservedWebSettings  []byte            // Original webSettings.xml
+	preservedCustomProps  []byte            // Original docProps/custom.xml
+	preservedRootRels     []byte            // Original _rels/.rels
 }
 
 // NewDocument creates a new Document.
@@ -399,6 +400,7 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 
 	// Create ZIP writer
 	zipWriter := writer.NewZipWriter(w)
+	zipWriter.SetLanguage(d.language)
 	defer func() {
 		if err := zipWriter.Close(); err != nil {
 			// Log error but don't override return value as document may have been partially written
@@ -414,7 +416,7 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	appProps := ser.SerializeAppProperties(d)
 
 	// Serialize styles (used only if no preserved styles are available)
-	styles := ser.SerializeStyles(d.styleManager)
+	styles := ser.SerializeStyles(d.styleManager, d.language)
 
 	mediaFiles := d.mediaManager.All()
 
@@ -538,6 +540,26 @@ func (d *document) BackgroundColor() (domain.Color, bool) {
 		return domain.Color{}, false
 	}
 	return *d.backgroundColor, true
+}
+
+// SetLanguage sets the document's default proofing language.
+func (d *document) SetLanguage(lang *domain.Language) error {
+	if d == nil {
+		return errors.InvalidState("Document.SetLanguage", "document is nil")
+	}
+	if lang != nil && lang.Val == "" {
+		return errors.InvalidArgument("Document.SetLanguage", "lang.Val", lang.Val, "language tag cannot be empty")
+	}
+	d.language = lang
+	return nil
+}
+
+// Language returns the document's default proofing language, or nil if unset.
+func (d *document) Language() *domain.Language {
+	if d == nil {
+		return nil
+	}
+	return d.language
 }
 
 // StyleManager returns the style manager for this document.

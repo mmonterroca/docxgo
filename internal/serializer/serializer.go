@@ -1228,13 +1228,24 @@ func (s *DocumentSerializer) DebugPrint(doc domain.Document) {
 		len(doc.Paragraphs()), len(doc.Tables()))
 }
 
-// SerializeStyles converts a domain.StyleManager to xml.Styles.
-func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager) *xml.Styles {
+// SerializeStyles converts a domain.StyleManager to xml.Styles. When lang is
+// non-nil, it is written as the document's default proofing language
+// (w:docDefaults/w:rPrDefault/w:rPr/w:lang).
+func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager, lang *domain.Language) *xml.Styles {
 	xmlStyles := xml.NewStyles()
 
-	// Set doc defaults
 	// Include Word's latent style catalog to avoid auto-added styles during repair
 	xmlStyles.LatentStyles = defaultLatentStyles
+
+	if lang != nil {
+		xmlStyles.DocDefaults = &xml.DocDefaults{
+			RunDefaults: &xml.RunDefaults{
+				Properties: &xml.RunProperties{
+					Lang: &xml.Language{Val: lang.Val, EastAsia: lang.EastAsia, Bidi: lang.Bidi},
+				},
+			},
+		}
+	}
 
 	// Serialize all styles from the style manager
 	for _, style := range styleManager.ListStyles() {

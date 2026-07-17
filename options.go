@@ -38,8 +38,14 @@ type Config struct {
 	Margins          Margins
 	StrictValidation bool
 	Metadata         *domain.Metadata
+	Language         *Language
 	Theme            interface{} // Theme to apply (using interface{} to avoid import cycle)
 }
+
+// Language represents a document's default proofing language, expressed as
+// BCP 47 language tags (e.g. "es-MX", "en-US"). See docx.WithLanguage and
+// docx.WithLanguageEx.
+type Language = domain.Language
 
 // PageSize represents paper dimensions.
 type PageSize struct {
@@ -226,6 +232,47 @@ func WithSubject(subject string) Option {
 			c.Metadata = &domain.Metadata{}
 		}
 		c.Metadata.Subject = subject
+	}
+}
+
+// WithLanguage sets the document's default proofing language, using a BCP 47
+// language tag. Word uses this to select the spell-checking and grammar
+// dictionaries, and to apply the correct hyphenation rules.
+//
+// This only takes effect when building a new document. When reading and
+// re-saving an existing .docx file, the original styles.xml and settings.xml
+// are preserved verbatim and WithLanguage has no effect.
+//
+// Example:
+//
+//	builder := docx.NewDocumentBuilder(
+//	    docx.WithLanguage("es-MX"),
+//	)
+func WithLanguage(lang string) Option {
+	return func(c *Config) {
+		c.Language = &Language{Val: lang}
+	}
+}
+
+// WithLanguageEx sets the document's default proofing language, including
+// optional language tags for East Asian (CJK) and right-to-left (bidi)
+// scripts. Use this over WithLanguage when the document mixes scripts, e.g.
+// Latin text with embedded Japanese or Arabic.
+//
+// See WithLanguage for the same round-trip caveat.
+//
+// Example:
+//
+//	builder := docx.NewDocumentBuilder(
+//	    docx.WithLanguageEx(docx.Language{
+//	        Val:      "en-US",
+//	        EastAsia: "ja-JP",
+//	        Bidi:     "ar-SA",
+//	    }),
+//	)
+func WithLanguageEx(lang Language) Option {
+	return func(c *Config) {
+		c.Language = &lang
 	}
 }
 
