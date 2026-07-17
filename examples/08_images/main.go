@@ -1,17 +1,16 @@
-/*
-MIT License
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024-2026 Misael Monterroca
+//
+// See LICENSE for the full copyright notice, including predecessor authors,
+// and CREDITS.md for the project genealogy.
 
-Copyright (c) 2025 Misael Monterroca
-
-Example: Image insertion with various positioning options
-
-This example demonstrates:
-- Adding inline images to paragraphs
-- Custom image sizes
-- Floating images with positioning
-- Builder pattern for fluent API
-*/
-
+// Example: Image insertion with various positioning options
+//
+// This example demonstrates:
+//   - Adding inline images to paragraphs
+//   - Custom image sizes
+//   - Floating images with positioning
+//   - Builder pattern for fluent API
 package main
 
 import (

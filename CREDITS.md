@@ -11,7 +11,9 @@ Role: Project Lead, v2 Architect & Lead Developer
 
 This project has evolved through multiple stages, with each contributor adding significant value. We maintain this history to honor all contributions while clarifying the current state of the project.
 
-### 🚀 Version 2.0 (2024-2025) - mmonterroca/docxgo
+Listed newest first. See the timeline below for the chronological view.
+
+### 🚀 Version 2.0 (2024-2026) - mmonterroca/docxgo
 
 **Status**: Current Active Development  
 **Repository**: https://github.com/mmonterroca/docxgo  
@@ -54,10 +56,10 @@ This project has evolved through multiple stages, with each contributor adding s
 
 ---
 
-### 📦 Version 1.x Enhanced (2023-2024) - Misael Monterroca Fork
+### 📦 Version 1.x — mmonterroca fork (2023-2024)
 
 **Repository**: https://github.com/mmonterroca/docxgo (root code, now deprecated)  
-**Based on**: fumiama/go-docx
+**Forked from**: fumiama/go-docx, in 2023. Upstream continued independently afterwards — see below.
 
 #### Author
 - **Misael Monterroca** - Professional document features
@@ -94,14 +96,18 @@ This project has evolved through multiple stages, with each contributor adding s
 
 ---
 
-### 🔧 Version 1.x Original (2022-2023) - fumiama/go-docx
+### 🔧 Version 1.x — fumiama/go-docx, upstream (2023-2025)
 
 **Repository**: https://github.com/fumiama/go-docx  
-**Based on**: gonfva/docxlib  
-**License**: AGPL-3.0 (original fork license)
+**Forked from**: gonfva/docxlib (MIT)  
+**License**: AGPL-3.0 — relicensed by fumiama on 2023-02-24, having received the code under MIT
+
+This is the upstream the mmonterroca fork above branched from. Its dates overlap because
+development continued here independently after the 2023 fork; the two are parallel, not
+sequential.
 
 #### Author
-- **fumiama** - Expanded functionality
+- **fumiama** - Expanded functionality (first commit 2023-02-08, last 2025-05-06)
 
 #### Major Contributions
 
@@ -125,11 +131,12 @@ This project has evolved through multiple stages, with each contributor adding s
 
 ---
 
-### 📄 Version 0.x Original Library (2020-2022) - gonfva/docxlib
+### 📄 Version 0.x Original Library (2021-2022) - gonfva/docxlib
 
 **Repository**: https://github.com/gonfva/docxlib  
-**Author**: Gonzalo Fernández-Victorio  
-**License**: AGPL-3.0 (original library license)
+**Author**: Gonzalo Fernández-Victorio, for Basement Crowd Ltd  
+**Forked from**: gingfrederik/docx (2020, MIT)  
+**License**: MIT
 
 #### Original Purpose
 
@@ -158,23 +165,29 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
 ## Evolution Timeline
 
 ```
-2020-2022: gonfva/docxlib
-           └─ Basic OOXML manipulation
-           └─ Foundation for future work
+2020       gingfrederik/docx                                   [MIT]
+             └─ Original library
 
-2022-2023: fumiama/go-docx (fork)
-           └─ Enhanced with images, tables, shapes
-           └─ Expanded API surface
+2021-2022  gonfva/docxlib  (fork)                              [MIT]
+             └─ Basic OOXML manipulation, ZIP/XML foundation
 
-2023-2024: mmonterroca/docxgo v1 (fork)
-           └─ Professional features (headers, TOC, links)
-           └─ Comprehensive documentation
+2023       fumiama/go-docx  (fork)      ← relicensed AGPL-3.0 on 2023-02-24
+             └─ Images, tables, shapes; expanded API surface
+             └─ upstream continued independently through 2025-05
+                    │
+                    │  forked 2023
+                    ▼
+2023-2024  mmonterroca/docxgo v1  (fork)
+             └─ Headers/footers, TOC, hyperlinks, fields
 
-2024-2025: mmonterroca/docxgo v2 (complete rewrite)
-           └─ Clean architecture
-           └─ Production-grade code quality
-           └─ Independent project
+2024-2026  mmonterroca/docxgo v2  (complete rewrite)           [MIT]
+             └─ Clean architecture
+             └─ Production-grade code quality
+             └─ Independent project
 ```
+
+The AGPL-3.0 licensing enters the chain only at fumiama's 2023 relicense; everything
+before it was MIT. docxgo is MIT — see LICENSE for the full copyright notice.
 
 ---
 
@@ -187,21 +200,14 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
    - Different design principles (clean architecture)
    - Breaking changes throughout
 
-2. **Original Fork Inactive**
-   - `fumiama/go-docx` has had no updates in months
-   - No PR merges from other forks
-   - Community fragmentation
-
-3. **Significant Divergence**
-   - v2 is ~70% new code
+2. **Significant Divergence**
    - Different package structure
    - Different API design
    - Different error handling philosophy
 
-4. **Namespace Clarity**
+3. **Namespace Clarity**
    - Users need clear distinction between versions
    - Original namespace doesn't reflect current reality
-   - Misael Monterroca organization as proper owner
 
 ### Attribution Philosophy
 
@@ -222,23 +228,14 @@ We maintain **full transparency** about project history:
 - **[kingzbauer/docx](https://github.com/kingzbauer/docx)** - Alternative approach
 - **[nguyenthenguyen/docx](https://github.com/nguyenthenguyen/docx)** - Different implementation
 
-### Why Choose mmonterroca/docxgo v2?
-
-- ✅ **Open source** (MIT) - no commercial license needed
-- ✅ **Clean architecture** - testable, maintainable, extensible
-- ✅ **Both read and write** - parse existing + create new documents
-- ✅ **Type safe** - no `interface{}`, proper error handling
-- ✅ **Well tested** - unit + round-trip integration tests
-- ✅ **Active development** - regular updates, responsive maintenance
-- ✅ **Comprehensive docs** - examples, guides, API reference
-
 ---
 
 ## Acknowledgments
 
 ### Special Thanks
 
-- **Gonzalo Fernández-Victorio** - For creating the foundation that made this work possible
+- **gingfrederik** - For the original docx library
+- **Gonzalo Fernández-Victorio** and **Basement Crowd Ltd** - For creating the foundation that made this work possible
 - **fumiama** - For expanding the feature set and maintaining an active fork
 - **The Go Team** - For an excellent language and standard library
 - **ECMA-376 Authors** - For the OOXML specification
@@ -258,9 +255,11 @@ See [LICENSE](LICENSE) for full text.
 ### Copyright Notices
 
 ```
-Copyright (C) 2024-2025 Misael Monterroca / Misael Monterroca (v2 architecture & development)
-Copyright (C) 2022-2024 fumiama (v1 enhancements)
-Copyright (C) 2020-2022 Gonzalo Fernández-Victorio (original library)
+Copyright (c) 2024-2026 Misael Monterroca (v2 architecture & development)
+Copyright (c) 2023-2025 fumiama (enhanced fork)
+Copyright (c) 2021 Gonzalo Fernandez-Victorio (original library)
+Copyright (c) 2021 Basement Crowd Ltd (https://www.basementcrowd.com)
+Copyright (c) 2020 gingfrederik (original library)
 ```
 
 ---

@@ -471,9 +471,11 @@ See [LICENSE](LICENSE) for full text.
 ### Copyright
 
 ```
-Copyright (C) 2024-2026 Misael Monterroca
-Copyright (C) 2022-2024 fumiama (original enhancements)
-Copyright (C) 2020-2022 Gonzalo Fernández-Victorio (original library)
+Copyright (c) 2024-2026 Misael Monterroca (v2 architecture & development)
+Copyright (c) 2023-2025 fumiama (enhanced fork)
+Copyright (c) 2021 Gonzalo Fernandez-Victorio (original library)
+Copyright (c) 2021 Basement Crowd Ltd (https://www.basementcrowd.com)
+Copyright (c) 2020 gingfrederik (original library)
 ```
 
 See [CREDITS.md](CREDITS.md) for complete project history.
@@ -484,10 +486,11 @@ See [CREDITS.md](CREDITS.md) for complete project history.
 
 This project evolved through multiple stages:
 
-1. **gonfva/docxlib** (2020-2022) - Original library by Gonzalo Fernández-Victorio
-2. **fumiama/go-docx** (2022-2024) - Enhanced fork with images, tables, shapes
-3. **mmonterroca/docxgo v1** (2023-2024) - Professional features (headers, TOC, links)
-4. **mmonterroca/docxgo v2** (2024-2026) - Complete architectural rewrite
+1. **gingfrederik/docx** (2020) — Original library · MIT
+2. **gonfva/docxlib** (2021-2022) - Original library by Gonzalo Fernández-Victorio · MIT
+3. **fumiama/go-docx** (2023-2025) - Enhanced fork with images, tables, shapes · relicensed AGPL-3.0 on 2023-02-24
+4. **mmonterroca/docxgo v1** (2023-2024) - Professional features (headers, TOC, links)
+5. **mmonterroca/docxgo v2** (2024-2026) - Complete architectural rewrite · MIT
 
 **Current Maintainer**: Misael Monterroca (misael@monterroca.com)
 **GitHub**: [@mmonterroca](https://github.com/mmonterroca)
