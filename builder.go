@@ -211,6 +211,12 @@ func NewDocumentBuilder(opts ...Option) *DocumentBuilder {
 		}
 	}
 
+	if config.Language != nil {
+		if err := doc.SetLanguage(config.Language); err != nil {
+			builder.errors = append(builder.errors, err)
+		}
+	}
+
 	// Apply theme if provided
 	if config.Theme != nil {
 		// Use type assertion to get Theme interface

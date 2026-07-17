@@ -70,21 +70,22 @@ type document struct {
 	numberingPart   []byte
 	numberingTarget string
 	backgroundColor *domain.Color
+	language        *domain.Language
 
 	// Preserved parts for round-trip operations (read-modify-write).
 	// When set, these parts are written verbatim to preserve original content.
-	preservedStylesPart      []byte            // Original styles.xml
-	preservedHeaders         map[string][]byte // Original headers (e.g., "header1.xml" -> bytes)
-	preservedFooters         map[string][]byte // Original footers (e.g., "footer1.xml" -> bytes)
-	preservedDocRels         []byte            // Original word/_rels/document.xml.rels
-	preservedContentTypes    []byte            // Original [Content_Types].xml
-	preservedAdditional      map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
-	preservedThemes          map[string][]byte // Original theme parts
-	preservedFontTable       []byte            // Original fontTable.xml
-	preservedSettings        []byte            // Original settings.xml
-	preservedWebSettings     []byte            // Original webSettings.xml
-	preservedCustomProps     []byte            // Original docProps/custom.xml
-	preservedRootRels        []byte            // Original _rels/.rels
+	preservedStylesPart   []byte            // Original styles.xml
+	preservedHeaders      map[string][]byte // Original headers (e.g., "header1.xml" -> bytes)
+	preservedFooters      map[string][]byte // Original footers (e.g., "footer1.xml" -> bytes)
+	preservedDocRels      []byte            // Original word/_rels/document.xml.rels
+	preservedContentTypes []byte            // Original [Content_Types].xml
+	preservedAdditional   map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
+	preservedThemes       map[string][]byte // Original theme parts
+	preservedFontTable    []byte            // Original fontTable.xml
+	preservedSettings     []byte            // Original settings.xml
+	preservedWebSettings  []byte            // Original webSettings.xml
+	preservedCustomProps  []byte            // Original docProps/custom.xml
+	preservedRootRels     []byte            // Original _rels/.rels
 }
 
 // NewDocument creates a new Document.
@@ -399,6 +400,7 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 
 	// Create ZIP writer
 	zipWriter := writer.NewZipWriter(w)
+	zipWriter.SetLanguage(d.language)
 	defer func() {
 		if err := zipWriter.Close(); err != nil {
 			// Log error but don't override return value as document may have been partially written
@@ -414,7 +416,7 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	appProps := ser.SerializeAppProperties(d)
 
 	// Serialize styles (used only if no preserved styles are available)
-	styles := ser.SerializeStyles(d.styleManager)
+	styles := ser.SerializeStyles(d.styleManager, d.language)
 
 	mediaFiles := d.mediaManager.All()
 
@@ -538,6 +540,59 @@ func (d *document) BackgroundColor() (domain.Color, bool) {
 		return domain.Color{}, false
 	}
 	return *d.backgroundColor, true
+}
+
+// SetLanguage sets the document's default proofing language. It returns an
+// error on a document opened via OpenDocument/OpenDocumentFromBytes/
+// OpenDocumentFromReader whose styles.xml or settings.xml were preserved for
+// round-trip fidelity: WriteTo writes those parts verbatim, so a language set
+// here would silently never reach the saved file. Only documents created with
+// NewDocument (including via NewDocumentBuilder) support SetLanguage.
+func (d *document) SetLanguage(lang *domain.Language) error {
+	if d == nil {
+		return errors.InvalidState("Document.SetLanguage", "document is nil")
+	}
+	if len(d.preservedStylesPart) > 0 || len(d.preservedSettings) > 0 {
+		return errors.InvalidState("Document.SetLanguage",
+			"cannot set the proofing language on a document whose styles.xml/settings.xml are preserved from round-trip; only documents created with NewDocument support SetLanguage")
+	}
+	if lang != nil && lang.Val == "" && lang.EastAsia == "" && lang.Bidi == "" {
+		return errors.InvalidArgument("Document.SetLanguage", "lang", lang, "at least one of Val, EastAsia, or Bidi must be set")
+	}
+	if lang == nil {
+		d.language = nil
+		return nil
+	}
+	langCopy := *lang
+	d.language = &langCopy
+	return nil
+}
+
+// Language returns a copy of the document's default proofing language, or
+// nil if unset. Mutating the returned value has no effect on the document.
+func (d *document) Language() *domain.Language {
+	if d == nil || d.language == nil {
+		return nil
+	}
+	langCopy := *d.language
+	return &langCopy
+}
+
+// SetLanguageRaw hydrates the document's language field directly, bypassing
+// SetLanguage's round-trip guard. Used exclusively by the reader package
+// during OpenDocument to reflect a language already present in the source
+// file's styles.xml — not part of domain.Document, reached only via the
+// reader's own type-assertion (mirrors SetPreservedStylesPart/SetNumberingPart).
+func (d *document) SetLanguageRaw(lang *domain.Language) {
+	if d == nil {
+		return
+	}
+	if lang == nil {
+		d.language = nil
+		return
+	}
+	langCopy := *lang
+	d.language = &langCopy
 }
 
 // StyleManager returns the style manager for this document.
