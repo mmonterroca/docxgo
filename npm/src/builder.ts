@@ -247,29 +247,40 @@ export class DocumentBuilder {
   /**
    * Create the document and return it as a base64 buffer.
    *
+   * Tracks the new document's ID internally, so it can be followed by
+   * further operations (applyPatch, inspect, saveToBuffer, etc.) on the
+   * same in-memory document without needing open()/openFromBase64() — which
+   * would round-trip it and, e.g., break setLanguage's round-trip guard.
+   *
    * @returns Result containing `data` (base64) and `documentId`.
    */
   async create(): Promise<BufferResult> {
-    return this.rpc.call<BufferResult>('document.create', {
+    const result = await this.rpc.call<BufferResult>('document.create', {
       options: this.options,
       content: this.content,
       output: 'buffer',
     });
+    this.documentId = result.documentId;
+    return result;
   }
 
   /**
    * Create the document and save it to a file.
    *
+   * Tracks the new document's ID internally — see create().
+   *
    * @param filePath The output .docx file path.
    * @returns Result containing `filePath` and `documentId`.
    */
   async createToFile(filePath: string): Promise<FileResult> {
-    return this.rpc.call<FileResult>('document.create', {
+    const result = await this.rpc.call<FileResult>('document.create', {
       options: this.options,
       content: this.content,
       output: 'file',
       filePath,
     });
+    this.documentId = result.documentId;
+    return result;
   }
 
   /**

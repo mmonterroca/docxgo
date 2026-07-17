@@ -28,6 +28,7 @@ run_example "02: Tables and Sections" "02_tables_and_sections.ts"
 run_example "03: Read, Modify, Save" "03_read_modify.ts"
 run_example "04: Template / Mail Merge" "04_template.ts"
 run_example "05: Patch and System" "05_patch_and_system.ts"
+run_example "06: Document Language" "06_language.ts"
 
 echo "========================================"
 echo "  Output files:"

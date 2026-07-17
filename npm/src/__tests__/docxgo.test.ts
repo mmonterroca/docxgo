@@ -600,6 +600,23 @@ describe('document.applyPatch (via DocumentBuilder)', () => {
     doc.reset();
   });
 
+  it('applies setLanguage directly after create() without reopening', async () => {
+    // create() tracks the new document's ID internally, so applyPatch()
+    // can target it right away — no open()/openFromBase64() round-trip,
+    // which would trip setLanguage's round-trip guard.
+    await doc.addParagraph('Doc for direct language patch').create();
+
+    const patchResult = await doc.applyPatch([{ op: 'setLanguage', val: 'es-MX' }]);
+    assert.equal(patchResult.ok, true);
+    assert.equal(patchResult.applied, 1);
+
+    const inspection = await doc.inspect();
+    assert.equal(inspection.language?.val, 'es-MX');
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+
   it('applies setMetadata operation', async () => {
     const result = await doc
       .addParagraph('Doc with metadata')

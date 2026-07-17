@@ -222,6 +222,8 @@ new DocumentBuilder(options?: DocumentBuilderOptions)
 | `createToFile(path)` | `FileResult` | Create and write to file |
 | `toBuffer()` | `Buffer` | Create as a Node.js Buffer |
 
+`create()`/`createToFile()` track the new document's ID internally, so you can chain further operations (`applyPatch`, `inspect`, `saveToFile`/`saveToBuffer`, etc.) on the same in-memory document right after creating it — no need to save and reopen. This matters for `setLanguage`, whose round-trip guard would otherwise reject it after a reopen (see [Patch Methods](#patch-methods)).
+
 #### Open & Modify
 
 | Method | Returns | Description |
