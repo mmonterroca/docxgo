@@ -117,6 +117,8 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleInspect(req)
 	case "document.setMetadata":
 		return s.handleSetMetadata(req)
+	case "document.setLanguage":
+		return s.handleSetLanguage(req)
 	case "document.setBackgroundColor":
 		return s.handleSetBackgroundColor(req)
 	case "document.addContent":
@@ -204,6 +206,16 @@ type setMetadataParams struct {
 	Keywords    []string `json:"keywords,omitempty"`
 	Created     string   `json:"created,omitempty"`
 	Modified    string   `json:"modified,omitempty"`
+}
+
+// setLanguageParams are the parameters for document.setLanguage. Val,
+// EastAsia, and Bidi are BCP 47 language tags (e.g. "es-MX", "en-US"); at
+// least one must be set.
+type setLanguageParams struct {
+	DocumentID string `json:"documentId"`
+	Val        string `json:"val,omitempty"`
+	EastAsia   string `json:"eastAsia,omitempty"`
+	Bidi       string `json:"bidi,omitempty"`
 }
 
 // setBackgroundColorParams are the parameters for document.setBackgroundColor.
@@ -624,6 +636,14 @@ func (s *server) handleInspect(req *Request) Response {
 		result["backgroundColor"] = fmt.Sprintf("#%02X%02X%02X", bgColor.R, bgColor.G, bgColor.B)
 	}
 
+	if lang := doc.Language(); lang != nil {
+		result["language"] = map[string]interface{}{
+			"val":      lang.Val,
+			"eastAsia": lang.EastAsia,
+			"bidi":     lang.Bidi,
+		}
+	}
+
 	return Response{ID: req.ID, Result: result}
 }
 
@@ -656,6 +676,42 @@ func (s *server) handleSetMetadata(req *Request) Response {
 	}
 
 	if err := doc.SetMetadata(meta); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{"ok": true}}
+}
+
+// handleSetLanguage sets the document's default proofing language. Note:
+// SetLanguage rejects documents opened via document.open (round-trip guard —
+// see domain.Document.SetLanguage), so this only works on documents created
+// via document.create. document.inspect reports the language of an opened
+// document regardless, since the reader hydrates it separately.
+func (s *server) handleSetLanguage(req *Request) Response {
+	const op = "document.setLanguage"
+
+	var params setLanguageParams
+	raw := req.Params
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		raw = []byte("{}")
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	lang := &domain.Language{
+		Val:      params.Val,
+		EastAsia: params.EastAsia,
+		Bidi:     params.Bidi,
+	}
+
+	if err := doc.SetLanguage(lang); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
 	}
 
@@ -1070,18 +1126,17 @@ func (s *server) handleTemplateRender(req *Request) Response {
 		opts.CloseDelimiter = params.CloseDelimiter
 	}
 
-	// Validate first
+	// Validate first. Note: in strict mode, MergeTemplate below already fails
+	// hard (TEMPLATE_ERROR) on missing keys before this response is built, so
+	// any issue that reaches a successful response here is by construction
+	// non-fatal — report all of them as "warning", not their raw
+	// ValidationSeverity, to avoid an ok=true response listing "error"
+	// severities.
 	validationErrors := template.ValidateTemplate(doc, template.MergeData(params.Data), opts)
 	var warnings []map[string]interface{}
 	for _, ve := range validationErrors {
-		sev := "warning"
-		if ve.Severity == template.SeverityWarning {
-			sev = "warning"
-		} else {
-			sev = "info"
-		}
 		warnings = append(warnings, map[string]interface{}{
-			"severity": sev,
+			"severity": "warning",
 			"key":      ve.Key,
 			"message":  ve.Message,
 		})
@@ -1131,7 +1186,7 @@ func (s *server) handleApplyPatch(req *Request) Response {
 		if err := json.Unmarshal(raw, &pOp); err != nil {
 			return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 				fmt.Sprintf("invalid operation at index %d: %v", i, err), op,
-				map[string]interface{}{"index": i})
+				map[string]interface{}{"index": i, "applied": applied})
 		}
 
 		switch pOp.Op {
@@ -1140,18 +1195,18 @@ func (s *server) handleApplyPatch(req *Request) Response {
 			if err := json.Unmarshal(raw, &pItem); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid appendParagraph at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 			para, err := doc.AddParagraph()
 			if err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeInternal,
 					fmt.Sprintf("failed to add paragraph at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 			if err := applyParagraph(para, pItem); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("failed to apply paragraph at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 
 		case "appendTable":
@@ -1159,12 +1214,12 @@ func (s *server) handleApplyPatch(req *Request) Response {
 			if err := json.Unmarshal(raw, &tItem); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid appendTable at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 			if err := applyTable(doc, tItem); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("failed to apply table at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 
 		case "appendSection":
@@ -1172,19 +1227,19 @@ func (s *server) handleApplyPatch(req *Request) Response {
 			if err := json.Unmarshal(raw, &sItem); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid appendSection at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 			if err := applySection(doc, sItem); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("failed to apply section at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 
 		case "appendPageBreak":
 			if err := doc.AddPageBreak(); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeInternal,
 					fmt.Sprintf("failed to add page break at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 
 		case "setMetadata":
@@ -1201,7 +1256,7 @@ func (s *server) handleApplyPatch(req *Request) Response {
 			if err := json.Unmarshal(raw, &mp); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid setMetadata at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 			meta := &domain.Metadata{
 				Title:       mp.Title,
@@ -1215,7 +1270,7 @@ func (s *server) handleApplyPatch(req *Request) Response {
 			if err := doc.SetMetadata(meta); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("failed to set metadata at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 
 		case "setBackgroundColor":
@@ -1226,24 +1281,43 @@ func (s *server) handleApplyPatch(req *Request) Response {
 			if err := json.Unmarshal(raw, &bcp); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid setBackgroundColor at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 			color, err := parseHexColor(bcp.Color)
 			if err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid color at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 			if err := doc.SetBackgroundColor(color); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("failed to set background color at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i})
+					map[string]interface{}{"index": i, "applied": applied})
+			}
+
+		case "setLanguage":
+			var lp struct {
+				Op       string `json:"op"`
+				Val      string `json:"val,omitempty"`
+				EastAsia string `json:"eastAsia,omitempty"`
+				Bidi     string `json:"bidi,omitempty"`
+			}
+			if err := json.Unmarshal(raw, &lp); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("invalid setLanguage at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i, "applied": applied})
+			}
+			lang := &domain.Language{Val: lp.Val, EastAsia: lp.EastAsia, Bidi: lp.Bidi}
+			if err := doc.SetLanguage(lang); err != nil {
+				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
+					fmt.Sprintf("failed to set language at index %d: %v", i, err), op,
+					map[string]interface{}{"index": i, "applied": applied})
 			}
 
 		default:
 			return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 				fmt.Sprintf("unknown operation %q at index %d", pOp.Op, i), op,
-				map[string]interface{}{"index": i, "op": pOp.Op})
+				map[string]interface{}{"index": i, "op": pOp.Op, "applied": applied})
 		}
 
 		applied++

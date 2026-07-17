@@ -218,6 +218,42 @@ describe('DocxgoRPC', () => {
       },
     );
   });
+
+  it('sets and reports the document language', async () => {
+    const createResult = await rpc.call<BufferResult>('document.create', {
+      content: [],
+      output: 'buffer',
+    });
+    const docId = createResult.documentId;
+
+    await rpc.call('document.setLanguage', { documentId: docId, val: 'es-MX' });
+
+    const inspectResult = await rpc.call<InspectResult>('document.inspect', {
+      documentId: docId,
+    });
+    assert.equal(inspectResult.language?.val, 'es-MX');
+
+    await rpc.call('document.close', { documentId: docId });
+  });
+
+  it('rejects setLanguage on a round-trip-opened document', async () => {
+    const createResult = await rpc.call<BufferResult>('document.create', {
+      content: [],
+      output: 'buffer',
+    });
+    const openResult = await rpc.call<{ documentId: string }>('document.open', {
+      base64: createResult.data,
+    });
+
+    await assert.rejects(
+      () => rpc.call('document.setLanguage', { documentId: openResult.documentId, val: 'en-US' }),
+      (err: unknown) => {
+        assert.ok(err instanceof DocxgoError);
+        assert.equal(err.code, 'VALIDATION_ERROR');
+        return true;
+      },
+    );
+  });
 });
 
 // ─── DocumentBuilder ─────────────────────────────────────────────────────────
@@ -582,6 +618,29 @@ describe('document.applyPatch (via DocumentBuilder)', () => {
     const inspection = await doc.inspect();
     assert.equal(inspection.metadata?.title, 'Patched Title');
     assert.equal(inspection.metadata?.creator, 'Patch Author');
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+
+  it('rejects setLanguage operation on a round-trip-opened document', async () => {
+    const result = await doc
+      .addParagraph('Doc for language patch')
+      .create();
+    doc.reset();
+
+    await doc.openFromBase64(result.data);
+
+    await assert.rejects(
+      () => doc.applyPatch([{ op: 'setLanguage', val: 'fr-FR' }]),
+      (err: unknown) => {
+        assert.ok(err instanceof DocxgoError);
+        assert.equal(err.code, 'VALIDATION_ERROR');
+        assert.ok(err.data);
+        assert.equal(err.data!.applied, 0);
+        return true;
+      },
+    );
 
     await doc.closeDocument();
     doc.reset();

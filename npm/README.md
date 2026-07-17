@@ -6,7 +6,7 @@ Node.js wrapper for [docxgo](https://github.com/mmonterroca/docxgo) — create a
 
 - **Three client modes**: Sync one-shot (`DocxgoExec`), async persistent (`DocxgoRPC`), and fluent builder (`DocumentBuilder`)
 - **Template engine**: Inspect and render `{{placeholder}}` templates with strict mode validation
-- **Patch operations**: Apply atomic multi-operation patches (`appendParagraph`, `setMetadata`, etc.)
+- **Patch operations**: Apply multi-operation patches (`appendParagraph`, `setMetadata`, etc.) sequentially — not atomic; see below
 - **Batch requests**: Execute multiple RPC calls in a single roundtrip
 - **Full TypeScript support**: Complete type definitions for all RPC methods, options, and content types
 - **Cross-platform binaries**: Automatic binary resolution for macOS, Linux, and Windows (x64 & arm64)
@@ -139,7 +139,7 @@ import { DocumentBuilder } from '@mmonterroca/docxgo';
 const doc = new DocumentBuilder();
 await doc.open('/path/to/existing.docx');
 
-// Apply multiple atomic operations
+// Apply multiple operations in sequence (not atomic — see below)
 const result = await doc.applyPatch([
   { op: 'appendParagraph', style: 'Heading1', runs: [{ text: 'New Section' }] },
   { op: 'appendPageBreak' },
@@ -258,9 +258,13 @@ new DocumentBuilder(options?: DocumentBuilderOptions)
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `applyPatch(operations)` | `ApplyPatchResult` | Apply atomic multi-operation patches |
+| `applyPatch(operations)` | `ApplyPatchResult` | Apply multi-operation patches sequentially (not atomic) |
 
-Available patch operations: `appendParagraph`, `appendTable`, `appendSection`, `appendPageBreak`, `setMetadata`, `setBackgroundColor`.
+Available patch operations: `appendParagraph`, `appendTable`, `appendSection`, `appendPageBreak`, `setMetadata`, `setBackgroundColor`, `setLanguage`.
+
+`applyPatch` is **not atomic**: operations run in order and stop at the first failure. Operations already applied remain applied — there is no rollback. `ApplyPatchResult`'s `applied` count (and, on error, the error `data.applied` field) tells you how many operations succeeded before a failure.
+
+Note: the `setLanguage` patch operation, like the standalone `document.setLanguage` RPC method, fails on a document opened via `open()`/`openFromBase64()`/`openFromBuffer()` (round-trip guard) — it only works on documents created via `create()`/`createToFile()`.
 
 #### Lifecycle
 
@@ -392,9 +396,10 @@ The following JSON-RPC methods are available:
 | `document.inspect` | Get document metadata and statistics |
 | `document.setMetadata` | Update document metadata fields |
 | `document.setBackgroundColor` | Set document background color |
+| `document.setLanguage` | Set the document's default proofing language (BCP 47) — only on documents created via `document.create`, not opened ones |
 | `document.addContent` | Append content items to an opened document |
 | `document.addPageBreak` | Append a page break |
-| `document.applyPatch` | Apply atomic multi-operation patches |
+| `document.applyPatch` | Apply multi-operation patches sequentially (not atomic) |
 | `paragraph.add` | Add a single paragraph |
 | `paragraph.list` | List all paragraphs |
 | `table.add` | Add a single table |

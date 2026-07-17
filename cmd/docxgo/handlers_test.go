@@ -547,6 +547,100 @@ func TestHandleSetBackgroundColor_InvalidColor(t *testing.T) {
 	}
 }
 
+// ─── document.setLanguage tests ───────────────────────────────────────────────
+
+func TestHandleSetLanguage(t *testing.T) {
+	s := newServer()
+	createResp := s.dispatch(makeRequest(20, "document.create", map[string]interface{}{
+		"content": []interface{}{},
+		"output":  "buffer",
+	}))
+	if createResp.Error != nil {
+		t.Fatalf("create failed: %+v", createResp.Error)
+	}
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	setResp := s.dispatch(makeRequest(21, "document.setLanguage", map[string]interface{}{
+		"documentId": docID,
+		"val":        "es-MX",
+	}))
+	if setResp.Error != nil {
+		t.Fatalf("setLanguage failed: %+v", setResp.Error)
+	}
+
+	inspResp := s.dispatch(makeRequest(22, "document.inspect", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if inspResp.Error != nil {
+		t.Fatalf("inspect failed: %+v", inspResp.Error)
+	}
+	lang, ok := inspResp.Result.(map[string]interface{})["language"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected language in inspect result")
+	}
+	if lang["val"] != "es-MX" {
+		t.Errorf("expected val=es-MX, got %v", lang["val"])
+	}
+}
+
+func TestHandleSetLanguage_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(23, "document.setLanguage", map[string]interface{}{
+		"documentId": "nonexistent",
+		"val":        "en-US",
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for nonexistent document")
+	}
+	if resp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND, got %s", resp.Error.Code)
+	}
+}
+
+func TestHandleSetLanguage_Empty(t *testing.T) {
+	s := newServer()
+	createResp := s.dispatch(makeRequest(24, "document.create", map[string]interface{}{
+		"content": []interface{}{},
+		"output":  "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(25, "document.setLanguage", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error when val, eastAsia, and bidi are all empty")
+	}
+}
+
+// TestHandleSetLanguage_RoundTripGuard verifies that setLanguage refuses a
+// document opened from bytes (round-trip preserved styles.xml/settings.xml),
+// per domain.Document.SetLanguage's documented guard.
+func TestHandleSetLanguage_RoundTripGuard(t *testing.T) {
+	s := newServer()
+	createResp := s.dispatch(makeRequest(26, "document.create", map[string]interface{}{
+		"content": []interface{}{},
+		"output":  "buffer",
+	}))
+	b64 := createResp.Result.(map[string]interface{})["data"].(string)
+
+	openResp := s.dispatch(makeRequest(27, "document.open", map[string]interface{}{
+		"base64": b64,
+	}))
+	if openResp.Error != nil {
+		t.Fatalf("open failed: %+v", openResp.Error)
+	}
+	docID := openResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(28, "document.setLanguage", map[string]interface{}{
+		"documentId": docID,
+		"val":        "en-US",
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error setting language on a round-trip-opened document")
+	}
+}
+
 // ─── Integration test: create → open → inspect → save ────────────────────────
 
 func TestIntegration_CreateOpenInspectSave(t *testing.T) {
@@ -1950,6 +2044,37 @@ func TestHandleApplyPatch_SetMetadata(t *testing.T) {
 	result := resp.Result.(map[string]interface{})
 	if result["applied"] != 2 {
 		t.Errorf("expected 2 applied, got %v", result["applied"])
+	}
+}
+
+func TestHandleApplyPatch_SetLanguage(t *testing.T) {
+	s := newServer()
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{"output": "buffer"}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "document.applyPatch", map[string]interface{}{
+		"documentId": docID,
+		"operations": []map[string]interface{}{
+			{
+				"op":  "setLanguage",
+				"val": "fr-FR",
+			},
+		},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("applyPatch failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["applied"] != 1 {
+		t.Errorf("expected 1 applied, got %v", result["applied"])
+	}
+
+	inspResp := s.dispatch(makeRequest(3, "document.inspect", map[string]interface{}{
+		"documentId": docID,
+	}))
+	lang := inspResp.Result.(map[string]interface{})["language"].(map[string]interface{})
+	if lang["val"] != "fr-FR" {
+		t.Errorf("expected val=fr-FR, got %v", lang["val"])
 	}
 }
 

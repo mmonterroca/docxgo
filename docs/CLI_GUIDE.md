@@ -19,6 +19,7 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
   - [document.inspect](#documentinspect)
   - [document.setMetadata](#documentsetmetadata)
   - [document.setBackgroundColor](#documentsetbackgroundcolor)
+  - [document.setLanguage](#documentsetlanguage)
   - [document.addContent](#documentaddcontent)
   - [document.addPageBreak](#documentaddpagebreak)
   - [document.applyPatch](#documentapplypatch)
@@ -220,6 +221,7 @@ Returns a map of supported features for the current binary.
   "validate": true,
   "batch": true,
   "applyPatch": true,
+  "setLanguage": true,
   "streaming": false,
   "partialUpdate": false
 }
@@ -439,11 +441,12 @@ Extracts metadata, text, and structural information from a document.
     "created": "",
     "modified": ""
   },
-  "backgroundColor": "#E0F0FF"
+  "backgroundColor": "#E0F0FF",
+  "language": { "val": "es-MX", "eastAsia": "", "bidi": "" }
 }
 ```
 
-(`metadata` is omitted when not set; `backgroundColor` is omitted when not set.)
+(`metadata` is omitted when not set; `backgroundColor` is omitted when not set; `language` is omitted when the document has no default proofing language set.)
 
 ---
 
@@ -480,6 +483,35 @@ Sets the page background color for the entire document.
 | `color` | String | Yes | Hex color string (e.g. `"#E8F0FE"` or `"E8F0FE"`) |
 
 **Success result:** `{ "ok": true }`
+
+---
+
+### document.setLanguage
+
+Sets the document's default proofing language, used by Word for spell-check/grammar. Tags are BCP 47 (e.g. `"es-MX"`, `"en-US"`). At least one of `val`, `eastAsia`, or `bidi` is required.
+
+**Only works on documents created via `document.create`.** A document opened via `document.open` has preserved `styles.xml`/`settings.xml` bytes from round-trip, and `SetLanguage` refuses to touch those (the language change could never actually reach the saved file). `document.inspect` still reports the language of an opened document, since the reader hydrates it separately from `styles.xml` when the document is opened.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `val` | String | At least one of `val`/`eastAsia`/`bidi` | Primary language tag, applied to Latin-script text |
+| `eastAsia` | String | At least one of `val`/`eastAsia`/`bidi` | Language tag for East Asian (CJK) script runs |
+| `bidi` | String | At least one of `val`/`eastAsia`/`bidi` | Language tag for right-to-left (bidi) script runs |
+
+**Success result:** `{ "ok": true }`
+
+**Example:**
+
+```json
+{
+  "id": 6,
+  "method": "document.setLanguage",
+  "params": { "documentId": "doc-1", "val": "es-MX" }
+}
+```
 
 ---
 
@@ -539,7 +571,7 @@ Adds a page break to an existing document.
 
 ### document.applyPatch
 
-Applies a sequence of patch operations to an existing document sequentially. If any operation fails, subsequent operations are **not** applied and the error includes the failing index. Operations applied before the failure remain in effect (no rollback).
+Applies a sequence of patch operations to an existing document sequentially. **This is not atomic.** If any operation fails, subsequent operations are **not** applied and the error includes the failing index plus how many operations succeeded (`applied`) before the failure. Operations applied before the failure remain in effect — there is no rollback, so the document can be left partially patched. Use the `applied` count in the error to decide whether to retry the remaining operations or discard the document.
 
 **Params:**
 
@@ -558,6 +590,7 @@ Applies a sequence of patch operations to an existing document sequentially. If 
 | `appendPageBreak` | Append a page break | None |
 | `setMetadata` | Set document metadata | Same fields as `document.setMetadata` (title, creator, etc.) |
 | `setBackgroundColor` | Set background color | `color` (hex string) |
+| `setLanguage` | Set proofing language | Same fields as `document.setLanguage` (`val`, `eastAsia`, `bidi`) — fails with the same round-trip guard on documents opened via `document.open` |
 
 **Success result:**
 
@@ -572,7 +605,7 @@ Applies a sequence of patch operations to an existing document sequentially. If 
   "code": "VALIDATION_ERROR",
   "message": "unknown operation \"deleteAll\" at index 2",
   "operation": "document.applyPatch",
-  "data": { "index": 2, "op": "deleteAll" }
+  "data": { "index": 2, "op": "deleteAll", "applied": 2 }
 }
 ```
 

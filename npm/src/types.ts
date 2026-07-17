@@ -267,6 +267,21 @@ export interface SetBackgroundColorParams {
   color: string;
 }
 
+/**
+ * Params for document.setLanguage. val, eastAsia, and bidi are BCP 47
+ * language tags (e.g. "es-MX", "en-US"); at least one must be set.
+ *
+ * Note: the docxgo binary rejects this on a document opened via
+ * `document.open` / `DocumentBuilder.open()` (round-trip guard) — it only
+ * works on documents created via `document.create` / `DocumentBuilder.create()`.
+ */
+export interface SetLanguageParams {
+  documentId: string;
+  val?: string;
+  eastAsia?: string;
+  bidi?: string;
+}
+
 export interface AddContentParams {
   documentId: string;
   content: ContentItem[];
@@ -355,12 +370,20 @@ export interface InspectMetadata {
   modified: string;
 }
 
+/** A document's default proofing language, as reported by document.inspect. */
+export interface LanguageInfo {
+  val: string;
+  eastAsia: string;
+  bidi: string;
+}
+
 export interface InspectResult {
   paragraphCount: number;
   tableCount: number;
   text: string[];
   metadata?: InspectMetadata;
   backgroundColor?: string;
+  language?: LanguageInfo;
 }
 
 export interface OkResult {
@@ -551,6 +574,14 @@ export interface SetBackgroundColorOp extends PatchOperationBase {
   color: string;
 }
 
+/** Set the document's default proofing language. See SetLanguageParams. */
+export interface SetLanguageOp extends PatchOperationBase {
+  op: 'setLanguage';
+  val?: string;
+  eastAsia?: string;
+  bidi?: string;
+}
+
 /** Union of all patch operations. */
 export type PatchOperation =
   | AppendParagraphOp
@@ -558,7 +589,8 @@ export type PatchOperation =
   | AppendSectionOp
   | AppendPageBreakOp
   | SetMetadataOp
-  | SetBackgroundColorOp;
+  | SetBackgroundColorOp
+  | SetLanguageOp;
 
 /** Params for document.applyPatch. */
 export interface ApplyPatchParams {

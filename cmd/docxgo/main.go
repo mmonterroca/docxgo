@@ -104,6 +104,7 @@ func capabilitiesMap() map[string]bool {
 		"validate":      true,
 		"batch":         true,
 		"applyPatch":    true,
+		"setLanguage":   true,
 		"streaming":     false,
 		"partialUpdate": false,
 	}
