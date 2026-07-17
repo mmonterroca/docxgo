@@ -153,10 +153,13 @@ export class DocxgoRPC {
 
   /**
    * Gracefully close the RPC process.
-   * Closes stdin which causes the Go process to exit.
+   * Closes stdin which causes the Go process to exit. Marks the client as
+   * closed immediately so new calls are rejected right away instead of
+   * racing the process's actual exit (which fires asynchronously).
    */
   close(): void {
     if (!this.closed) {
+      this.closed = true;
       this.proc.stdin?.end();
     }
   }
@@ -166,6 +169,7 @@ export class DocxgoRPC {
    */
   kill(): void {
     if (!this.closed) {
+      this.closed = true;
       this.proc.kill('SIGTERM');
     }
   }

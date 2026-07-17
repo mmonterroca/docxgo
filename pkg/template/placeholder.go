@@ -97,8 +97,14 @@ func findPlaceholdersWithPattern(doc domain.Document, pattern *regexp.Regexp) []
 	var results []Placeholder
 
 	_ = walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
-		// Consolidate runs to heal split placeholders
-		ConsolidateRuns(para)
+		// Consolidate runs to heal split placeholders. This is a best-effort,
+		// read-only scan (FindPlaceholders/FindPlaceholdersCustom don't return
+		// an error), so a consolidation failure here just stops the walk
+		// early rather than scanning a paragraph left in an inconsistent
+		// mid-rebuild state.
+		if err := ConsolidateRuns(para); err != nil {
+			return err
+		}
 
 		found := scanParagraph(para, pattern, ctx)
 		results = append(results, found...)

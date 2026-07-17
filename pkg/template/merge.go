@@ -47,7 +47,9 @@ func MergeTemplate(doc domain.Document, data MergeData, opts ...MergeOptions) er
 	var missingKeys []string
 
 	err := walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
-		ConsolidateRuns(para)
+		if err := ConsolidateRuns(para); err != nil {
+			return err
+		}
 		missing := replaceParagraph(para, data, pattern, opt)
 		missingKeys = append(missingKeys, missing...)
 		return nil
