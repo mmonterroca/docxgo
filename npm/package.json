@@ -14,13 +14,14 @@
   "files": [
     "dist/",
     "bin/",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc && node scripts/build-esm.js",
     "test": "tsx --test src/__tests__/*.test.ts",
     "lint": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepack": "node scripts/copy-license.js && npm run build"
   },
   "keywords": [
     "docx",
