@@ -94,7 +94,7 @@ This index helps you find the right documentation for your needs.
    - 10_paragraph_spacing - Line and paragraph spacing
    - 11_multi_section - Multi-section layouts
    - 12_read_and_modify - Read/modify existing documents
-   - 13_themes - Theme system (5 preset themes)
+   - 13_themes - Theme system (7 preset themes)
    - 14_mail_merge - Template engine with mail merge
    - 15_external_template - Mail merge with external Word template
 
@@ -224,4 +224,4 @@ See: IMPLEMENTATION_STATUS.md - Features list
 ---
 
 **Last Updated**: July 2026  
-**Documentation Version**: v2.7.0
+**Documentation Version**: v2.7.1

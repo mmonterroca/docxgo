@@ -102,9 +102,10 @@ Listed newest first. See the timeline below for the chronological view.
 **Forked from**: gonfva/docxlib (MIT)  
 **License**: AGPL-3.0 — relicensed by fumiama on 2023-02-24, having received the code under MIT
 
-This is the upstream the mmonterroca fork above branched from. Its dates overlap because
-development continued here independently after the 2023 fork; the two are parallel, not
-sequential.
+This is the upstream docxgo v2 forks from. docxgo v2's `master` descends from
+this repository's history through its 2025-05 HEAD (i.e. sequentially, through
+the AGPL period — not as a parallel branch taken during the earlier MIT
+window). See [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md), Finding 1.
 
 #### Author
 - **fumiama** - Expanded functionality (first commit 2023-02-08, last 2025-05-06)
@@ -173,40 +174,45 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
 
 2023       fumiama/go-docx  (fork)      ← relicensed AGPL-3.0 on 2023-02-24
              └─ Images, tables, shapes; expanded API surface
-             └─ upstream continued independently through 2025-05
+             └─ development continued through 2025-05
                     │
-                    │  forked 2023
+                    │  docxgo v2 forks fumiama's 2025-05 HEAD (AGPL-era),
+                    │  first own commit 2025-10-21
                     ▼
-2023-2024  mmonterroca/docxgo v1  (fork)
-             └─ Headers/footers, TOC, hyperlinks, fields
-
-2024-2026  mmonterroca/docxgo v2  (complete rewrite)           [MIT]
-             └─ Clean architecture
-             └─ Production-grade code quality
-             └─ Independent project
+2025-2026  mmonterroca/docxgo v2  (substantial rewrite on the AGPL-era base)
+             └─ Clean-architecture rewrite; current tree shares only
+                schema-dictated OOXML boilerplate with the upstream
+             └─ Distributed under MIT — see the licensing note below
 ```
 
-The AGPL-3.0 licensing enters the chain only at fumiama's 2023 relicense; everything
-before it was MIT. docxgo is MIT — see LICENSE for the full copyright notice.
+docxgo is currently distributed under the MIT license ([LICENSE](LICENSE)). It
+is a fork of the AGPL-licensed `fumiama/go-docx`; its provenance and the
+resulting open licensing question are documented in
+**[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md)** — the single source of
+truth for this topic. This file records authorship and copyright only; it draws
+no conclusion about the license status.
 
 ---
 
-## Why v2 is Independent
+## How v2 diverges from the upstream
 
-### Reasons for Independence
+These points describe how far docxgo v2 has been rewritten from the
+`fumiama/go-docx` base. They are engineering facts about divergence — they do
+**not** establish legal independence from the AGPL upstream, which is an open
+question addressed only in [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md).
 
-1. **Complete Architectural Rewrite**
-   - No shared code patterns with v1
-   - Different design principles (clean architecture)
+1. **Substantial architectural rewrite**
+   - Clean-architecture layering; different design principles
    - Breaking changes throughout
+   - Current tree shares only schema-dictated OOXML boilerplate with fumiama
 
-2. **Significant Divergence**
+2. **Significant divergence**
    - Different package structure
    - Different API design
    - Different error handling philosophy
 
-3. **Namespace Clarity**
-   - Users need clear distinction between versions
+3. **Namespace clarity**
+   - Users need a clear distinction between versions
    - Original namespace doesn't reflect current reality
 
 ### Attribution Philosophy
@@ -214,8 +220,8 @@ before it was MIT. docxgo is MIT — see LICENSE for the full copyright notice.
 We maintain **full transparency** about project history:
 - Original authors credited in LICENSE
 - This CREDITS.md preserved indefinitely
-- MIT license adopted for v2
 - Fork history acknowledged in documentation
+- Licensing provenance and its open question recorded in [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md)
 
 ---
 
@@ -248,9 +254,11 @@ We welcome contributions from the community. See [CONTRIBUTING.md](CONTRIBUTING.
 
 ## License
 
-This project is licensed under the **MIT License**.
-
-See [LICENSE](LICENSE) for full text.
+docxgo is currently distributed under the **MIT License** ([LICENSE](LICENSE)).
+Its provenance relative to the AGPL-licensed `fumiama/go-docx` upstream, and the
+resulting open licensing question, are documented in
+[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md) — the single source of truth
+for this topic.
 
 ### Copyright Notices
 

@@ -53,7 +53,7 @@ The builder API provides a more convenient way to create documents:
 	builder := docx.NewDocumentBuilder()
 
 	builder.AddParagraph().
-	    Text("Welcome to go-docx v2!").
+	    Text("Welcome to docxgo!").
 	    Bold().
 	    FontSize(16).
 	    Color(docx.Blue).
@@ -289,10 +289,10 @@ This library generates Office Open XML (OOXML) documents compatible with:
 
 # Version
 
-Current version: 2.5.0
+Current version: 2.7.1 (see the Version constant for the authoritative value).
 
 This is a major rewrite of the original go-docx library with breaking changes.
-See the migration guide in docs/V2_DESIGN.md for details.
+See the migration guide in MIGRATION.md for details.
 
 # Examples
 
@@ -309,7 +309,10 @@ See the examples/ directory for complete working examples:
 
 # License
 
-MIT License - see LICENSE file for details.
+Currently distributed under the MIT License - see the LICENSE file.
+docxgo is a fork of the AGPL-licensed fumiama/go-docx; its provenance and the
+resulting open licensing question are documented in docs/PROVENANCE_AUDIT.md,
+the single source of truth for that topic.
 
 Copyright (c) 2024-2026 Misael Monterroca
 Predecessors: fumiama (enhanced fork, 2023-2025), Gonzalo Fernandez-Victorio and

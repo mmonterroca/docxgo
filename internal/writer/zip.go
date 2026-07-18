@@ -416,7 +416,7 @@ func (zw *ZipWriter) writeCoreProperties(props *xmlstructs.CoreProperties) error
 			XMLnsDC:      constants.NamespaceDC,
 			XMLnsDCTerms: constants.NamespaceDCTerms,
 			XMLnsXSI:     "http://www.w3.org/2001/XMLSchema-instance",
-			Creator:      "go-docx v2",
+			Creator:      "docxgo",
 			Created: &xmlstructs.DCDate{
 				Type:  "dcterms:W3CDTF",
 				Value: now.Format(time.RFC3339),
@@ -435,7 +435,7 @@ func (zw *ZipWriter) writeAppProperties(props *xmlstructs.AppProperties) error {
 	if props == nil {
 		props = &xmlstructs.AppProperties{
 			Xmlns:       constants.NamespaceExtendedProperties,
-			Application: "go-docx v2.0.0",
+			Application: "docxgo",
 			DocSecurity: 0,
 		}
 	}
