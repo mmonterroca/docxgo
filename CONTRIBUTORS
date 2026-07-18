@@ -10,20 +10,31 @@
 
 ## Original Authors
 
-**fumiama** (2020-2023)
-- Original go-docx library implementation
-- GitHub: https://github.com/fumiama/go-docx
+Listed in chronological order. See CREDITS.md for the full genealogy.
 
-**Gonzalo Fernández-Victorio** (2020-2022)
-- Initial OOXML library foundation
+**gingfrederik** (2020)
+- Original docx library
+- License: MIT
+- GitHub: https://github.com/gingfrederik/docx
+
+**Gonzalo Fernández-Victorio** (2021-2022)
+- Initial OOXML library foundation, for Basement Crowd Ltd
+- License: MIT
+- GitHub: https://github.com/gonfva/docxlib
+
+**fumiama** (2023-2025)
+- Enhanced fork: images, tables, shapes
+- Relicensed the project to AGPL-3.0 on 2023-02-24
+- GitHub: https://github.com/fumiama/go-docx
 
 ## Project History
 
-This project (docxgo) is a complete rewrite of the original go-docx library,
-implementing clean architecture principles and comprehensive OOXML support.
+This project (docxgo) is a complete rewrite, implementing clean architecture
+principles and comprehensive OOXML support. Its git history descends from
+fumiama/go-docx (AGPL-3.0), which descends from the MIT-licensed libraries
+above. docxgo is MIT.
 
-While inspired by and crediting the original work, docxgo represents a 
-ground-up redesign focused on:
+docxgo represents a ground-up redesign focused on:
 - Modern Go practices
 - Clean architecture (domain/internal/pkg)
 - Comprehensive testing (95%+ coverage)

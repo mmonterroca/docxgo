@@ -2,9 +2,11 @@ MIT License
 
 go-docx - Microsoft Word .docx (OOXML) manipulation library for Go
 
-Copyright (C) 2024-2025 Misael Monterroca
-Copyright (C) 2022-2024 fumiama (original enhancements)
-Copyright (C) 2020-2022 Gonzalo Fernández-Victorio (original library)
+Copyright (c) 2024-2026 Misael Monterroca (v2 architecture & development)
+Copyright (c) 2023-2025 fumiama (enhanced fork)
+Copyright (c) 2021 Gonzalo Fernandez-Victorio (original library)
+Copyright (c) 2021 Basement Crowd Ltd (https://www.basementcrowd.com)
+Copyright (c) 2020 gingfrederik (original library)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -1,22 +1,21 @@
-/*
-MIT License
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024-2026 Misael Monterroca
+//
+// See LICENSE for the full copyright notice, including predecessor authors,
+// and CREDITS.md for the project genealogy.
 
-Copyright (c) 2025 Misael Monterroca
-
-Example: Document Themes
-
-This example demonstrates the theme system in go-docx:
-1. Lists all available preset themes
-2. Creates a themed document for each preset
-3. Creates a comparison document showing all themes side by side
-
-Themes control:
-- Colors (primary, secondary, accent, text, headings)
-- Fonts (body, heading, monospace)
-- Spacing (paragraph, line, heading, section)
-- Heading styles (size, bold, uppercase, color)
-*/
-
+// Example: Document Themes
+//
+// This example demonstrates the theme system in go-docx:
+//  1. Lists all available preset themes
+//  2. Creates a themed document for each preset
+//  3. Creates a comparison document showing all themes side by side
+//
+// Themes control:
+//   - Colors (primary, secondary, accent, text, headings)
+//   - Fonts (body, heading, monospace)
+//   - Spacing (paragraph, line, heading, section)
+//   - Heading styles (size, bold, uppercase, color)
 package main
 
 import (

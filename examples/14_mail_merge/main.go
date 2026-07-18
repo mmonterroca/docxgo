@@ -1,24 +1,23 @@
-/*
-MIT License
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024-2026 Misael Monterroca
+//
+// See LICENSE for the full copyright notice, including predecessor authors,
+// and CREDITS.md for the project genealogy.
 
-Copyright (c) 2025 Misael Monterroca
-
-Example: Mail Merge / Template Engine
-
-This example demonstrates the template / mail merge workflow:
-1. Create a template document with {{placeholders}}
-2. Open the template and inspect its placeholders
-3. Merge with data to produce personalized documents
-4. Demonstrate batch merge for multiple recipients
-
-This showcases:
-- Creating reusable document templates
-- Placeholder detection and validation
-- Single and batch mail merge
-- Formatting preservation during merge
-- Table cell placeholder replacement
-*/
-
+// Example: Mail Merge / Template Engine
+//
+// This example demonstrates the template / mail merge workflow:
+//  1. Create a template document with {{placeholders}}
+//  2. Open the template and inspect its placeholders
+//  3. Merge with data to produce personalized documents
+//  4. Demonstrate batch merge for multiple recipients
+//
+// This showcases:
+//   - Creating reusable document templates
+//   - Placeholder detection and validation
+//   - Single and batch mail merge
+//   - Formatting preservation during merge
+//   - Table cell placeholder replacement
 package main
 
 import (

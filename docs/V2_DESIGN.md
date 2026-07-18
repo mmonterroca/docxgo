@@ -1324,7 +1324,7 @@ if err != nil {
 ### Previous Contributions
 
 - **fumiama** (2022-2024): Original fork with enhanced features
-- **Gonzalo Fernández-Victorio** (2020-2022): Original `gonfva/docxlib` library
+- **Gonzalo Fernández-Victorio** (2021): Original `gonfva/docxlib` library, for Basement Crowd Ltd
 
 See [CREDITS.md](../CREDITS.md) for complete project history.
 
