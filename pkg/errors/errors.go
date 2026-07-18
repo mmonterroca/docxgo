@@ -4,7 +4,7 @@
 // See LICENSE for the full copyright notice, including predecessor authors,
 // and CREDITS.md for the project genealogy.
 
-// Package errors provides structured error types for go-docx v2.
+// Package errors provides structured error types for docxgo v2.
 package errors
 
 import (
@@ -23,7 +23,7 @@ const (
 	ErrCodeUnsupported  = "UNSUPPORTED"
 )
 
-// DocxError represents a structured error in go-docx v2.
+// DocxError represents a structured error in docxgo v2.
 type DocxError struct {
 	Code    string                 // Error code (e.g., "VALIDATION_ERROR")
 	Op      string                 // Operation that failed (e.g., "Document.AddParagraph")

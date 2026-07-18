@@ -1,6 +1,6 @@
 # Example 12: Read and Modify Documents
 
-This example demonstrates the complete document read/modify/write workflow in go-docx v2.
+This example demonstrates the complete document read/modify/write workflow in docxgo v2.
 
 ## What This Example Demonstrates
 
@@ -68,7 +68,7 @@ Compare these files in Microsoft Word or LibreOffice to see the modifications cl
 ```go
 builder := docx.NewDocumentBuilder(
     docx.WithTitle("Document Showcase"),
-    docx.WithAuthor("go-docx v2"),
+    docx.WithAuthor("docxgo v2"),
 )
 
 builder.AddParagraph().
@@ -256,7 +256,7 @@ When you run this example, you'll see:
 
    📝 First 3 paragraphs:
       1. "Document Showcase - All Features"
-      2. "This document demonstrates all capabilities of go-docx v2"
+      2. "This document demonstrates all capabilities of docxgo v2"
       3. ""
 
    📋 First table:

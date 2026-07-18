@@ -3,21 +3,20 @@ name: npm Publish
 on:
   release:
     types: [published]
-  # Manual fallback: release.yml creates the GitHub Release using the default
-  # GITHUB_TOKEN, and GitHub does not let GITHUB_TOKEN-authored events trigger
-  # other workflows (anti-recursion protection) — so "release: published"
-  # above never actually fires. Until release.yml is updated to create the
-  # release with a PAT instead, run this manually after each release.
+  # GitHub does not let GITHUB_TOKEN-authored events trigger other workflows.
+  # release.yml creates the release with RELEASE_PAT so the event above fires
+  # automatically; this dispatch remains an idempotent fallback.
   #
   # workflow_dispatch is only usable against a ref where the workflow file
   # itself already declares this trigger, so the release tag (created before
   # this fallback existed, and every future tag, which is cut before this
   # workflow can be edited from it) can't be used directly as the dispatch
-  # ref. Run this from the default branch instead and pass the version input.
+  # ref. Run this from the default branch and pass the version input; the jobs
+  # below still check out the matching vX.Y.Z tag before building.
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g. 2.7.0, no "v" prefix)'
+        description: 'Version to publish (e.g. 2.7.2, no "v" prefix)'
         required: true
 
 permissions:
@@ -51,8 +50,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.23.x'
           cache: false
@@ -90,7 +91,7 @@ jobs:
             "os": ["${{ matrix.goos == 'windows' && 'win32' || matrix.goos }}"],
             "cpu": ["${{ matrix.goarch == 'amd64' && 'x64' || matrix.goarch }}"],
             "main": "",
-            "files": ["bin/", "README.md"],
+            "files": ["bin/", "README.md", "LICENSE"],
             "license": "MIT",
             "repository": {
               "type": "git",
@@ -99,6 +100,9 @@ jobs:
             }
           }
           EOF
+
+      - name: Copy license into platform package
+        run: cp LICENSE npm/platforms/${{ matrix.suffix }}/LICENSE
 
       - name: Generate platform README
         run: |
@@ -131,6 +135,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
 
       - uses: actions/setup-node@v4
         with:

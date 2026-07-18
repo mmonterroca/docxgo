@@ -4,7 +4,7 @@
 // See LICENSE for the full copyright notice, including predecessor authors,
 // and CREDITS.md for the project genealogy.
 
-// Package color provides color utilities for go-docx v2.
+// Package color provides color utilities for docxgo v2.
 package color
 
 import (

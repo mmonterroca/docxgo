@@ -62,7 +62,7 @@ Verify the installation:
 
 ```bash
 docxgo version
-# 2.0.0-beta
+# 2.7.2
 ```
 
 ---
@@ -194,7 +194,7 @@ Returns version, protocol version, and platform information.
 ```json
 {
   "name": "docxgo",
-  "version": "2.0.0-beta",
+  "version": "2.7.2",
   "protocolVersion": "1.0",
   "goVersion": "go1.23.0",
   "platform": "darwin",
@@ -247,7 +247,7 @@ Executes multiple RPC requests in a single roundtrip. Each sub-request is proces
 {
   "responses": [
     { "result": { "status": "ok" } },
-    { "result": { "name": "docxgo", "version": "2.0.0-beta", ... } },
+    { "result": { "name": "docxgo", "version": "2.7.2", ... } },
     { "error": { "code": "NOT_FOUND", "message": "..." } }
   ]
 }

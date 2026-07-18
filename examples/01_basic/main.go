@@ -18,7 +18,7 @@ func main() {
 	// Create a new document builder with options
 	builder := docx.NewDocumentBuilder(
 		docx.WithTitle("Builder Pattern Demo"),
-		docx.WithAuthor("go-docx v2"),
+		docx.WithAuthor("docxgo v2"),
 		docx.WithDefaultFont("Calibri"),
 		docx.WithDefaultFontSize(22), // 11pt = 22 half-points
 		docx.WithPageSize(docx.A4),
@@ -27,7 +27,7 @@ func main() {
 
 	// Add title using builder fluent API
 	builder.AddParagraph().
-		Text("Welcome to go-docx v2 Builder Pattern").
+		Text("Welcome to docxgo v2 Builder Pattern").
 		Bold().
 		FontSize(16).
 		Color(docx.Blue).

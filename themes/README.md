@@ -1,6 +1,6 @@
 # Document Themes
 
-The `themes` package provides a comprehensive theme system for go-docx, allowing you to apply consistent visual styling to your documents with a single configuration.
+The `themes` package provides a comprehensive theme system for docxgo, allowing you to apply consistent visual styling to your documents with a single configuration.
 
 ## Overview
 
@@ -15,7 +15,7 @@ Themes define a complete visual style for documents, including:
 ```go
 import (
     docx "github.com/mmonterroca/docxgo/v2"
-    "github.com/mmonterroca/docxgo/themes"
+    "github.com/mmonterroca/docxgo/v2/themes"
 )
 
 // Apply a preset theme

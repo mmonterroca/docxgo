@@ -4,7 +4,7 @@
 // See LICENSE for the full copyright notice, including predecessor authors,
 // and CREDITS.md for the project genealogy.
 
-// Package manager provides internal management services for go-docx v2.
+// Package manager provides internal management services for docxgo v2.
 package manager
 
 import (

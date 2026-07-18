@@ -1,6 +1,6 @@
 # Example 04: Fields
 
-This example demonstrates how to use fields in Word documents using go-docx v2.
+This example demonstrates how to use fields in Word documents using docxgo v2.
 
 ## What are Fields?
 
@@ -125,8 +125,8 @@ refField.SetCode(`REF MyBookmark \h`)
 
 ## See Also
 
-- [Example 01: Hello World](../01_hello/) - Basic document creation
-- [Example 02: Formatted Text](../02_formatted/) - Text formatting
+- [Example 01: Basic](../01_basic/) - Basic document creation
+- [Example 02: Intermediate](../02_intermediate/) - Text formatting
 - [Example 03: Table of Contents](../03_toc/) - TOC generation
-- [API Documentation](../../docs/API_DOCUMENTATION.md)
-- [OOXML Field Reference](http://officeopenxml.com/WPfields.php)
+- [API Guide](../../docs/V2_API_GUIDE.md)
+- [Open XML Wordprocessing Run reference](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.run?view=openxml-3.0.1)

@@ -99,7 +99,7 @@ New comprehensive example demonstrating:
 - Architecture decision records
 - Multiple sections with consistent branding
 
-See [`examples/13_themes/04_tech_architecture/`](examples/13_themes/04_tech_architecture/) for complete implementation.
+See [`examples/13_themes/`](examples/13_themes/) for the current complete implementation.
 
 **Features:**
 - Generates both light and dark mode versions
@@ -188,12 +188,12 @@ All examples from v2.0.0 continue to work, plus:
 
 | Example | Description | Key Features |
 |---------|-------------|--------------|
-| `13_themes/04_tech_architecture` | Technical documentation | Themes, PlantUML, code blocks, tables |
+| `13_themes` | Technical documentation | Themes, code blocks, tables |
 
 ### Running the New Example
 
 ```bash
-cd examples/13_themes/04_tech_architecture
+cd examples/13_themes
 go run main.go
 ```
 

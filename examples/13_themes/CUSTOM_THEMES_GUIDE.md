@@ -1,6 +1,6 @@
 # Creating Custom Themes - Developer Guide
 
-This guide shows external developers how to create their own themes for go-docx.
+This guide shows external developers how to create their own themes for docxgo.
 
 ## Three Ways to Create Custom Themes
 
@@ -13,8 +13,8 @@ package main
 
 import (
     docx "github.com/mmonterroca/docxgo/v2"
-    "github.com/mmonterroca/docxgo/domain"
-    "github.com/mmonterroca/docxgo/themes"
+    "github.com/mmonterroca/docxgo/v2/domain"
+    "github.com/mmonterroca/docxgo/v2/themes"
 )
 
 func main() {
@@ -48,8 +48,8 @@ Build a completely new theme:
 package main
 
 import (
-    "github.com/mmonterroca/docxgo/domain"
-    "github.com/mmonterroca/docxgo/themes"
+    "github.com/mmonterroca/docxgo/v2/domain"
+    "github.com/mmonterroca/docxgo/v2/themes"
 )
 
 func main() {
@@ -113,8 +113,8 @@ Create a reusable package with multiple themes:
 package mythemes
 
 import (
-    "github.com/mmonterroca/docxgo/domain"
-    "github.com/mmonterroca/docxgo/themes"
+    "github.com/mmonterroca/docxgo/v2/domain"
+    "github.com/mmonterroca/docxgo/v2/themes"
 )
 
 // Export your themes
@@ -280,8 +280,8 @@ To share your themes with others:
    package mydocxthemes
    
    import (
-       "github.com/mmonterroca/docxgo/domain"
-       "github.com/mmonterroca/docxgo/themes"
+       "github.com/mmonterroca/docxgo/v2/domain"
+       "github.com/mmonterroca/docxgo/v2/themes"
    )
    
    var MyAwesomeTheme = themes.NewTheme(...)
@@ -330,7 +330,7 @@ Use these resources for color schemes:
 
 ## Need Help?
 
-- Check the [main themes README](../../../themes/README.md)
+- Check the [main themes README](../../themes/README.md)
 - See [examples](../) for more usage patterns
 - Open an issue on GitHub for questions
 

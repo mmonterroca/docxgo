@@ -1,6 +1,6 @@
-# go-docx v2 API Guide
+# docxgo v2 API Guide
 
-**Version**: 2.7.1
+**Version**: 2.7.2
 **Last Updated**: July 2026
 
 ---
@@ -27,9 +27,9 @@
 
 ---
 
-## 🎯 Introduction
+## Introduction
 
-**go-docx v2** is a complete rewrite with clean architecture, proper error handling, and comprehensive OOXML support. Key improvements:
+**docxgo v2** is a complete rewrite with clean architecture, proper error handling, and comprehensive OOXML support. Key improvements:
 
 ✅ **Two API Styles**:
 
@@ -48,22 +48,22 @@
 
 - Type-safe API (minimal `interface{}`)
 - Comprehensive error handling
-- Thread-safe operations
+- Thread-safe internal managers; synchronize access to a shared `Document`
 - Comprehensive unit and round-trip tests
 
 ---
 
-## 📦 Installation
+## Installation
 
 ```bash
 go get github.com/mmonterroca/docxgo/v2@latest
 ```
 
-**Minimum Go version**: 1.20
+**Minimum Go version**: 1.23
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Builder Pattern (Recommended)
 
@@ -144,7 +144,7 @@ func main() {
 
 ---
 
-## 🎨 API Patterns
+## API Patterns
 
 ### Builder Pattern
 
@@ -211,7 +211,7 @@ if err := run.SetText("Hello"); err != nil {
 
 ---
 
-## 🔧 Core Features
+## Core Features
 
 ### Document Creation
 
@@ -493,11 +493,9 @@ img, _ := para.AddImageWithPosition("diagram.png",
     })
 ```
 
-**Supported Formats**:
-
-- PNG, JPEG, GIF, BMP
-- TIFF, SVG, WEBP
-- ICO, EMF
+**Supported Formats**: PNG, JPEG, and GIF decode end-to-end. Other format
+identifiers are reserved in the domain enum but are not accepted by the
+current image decoding pipeline.
 
 **Size Units**:
 
@@ -725,7 +723,7 @@ run.SetText("Chapter 1: Introduction")
 
 ---
 
-## 💡 Examples
+## Examples
 
 ### Complete Document with TOC
 
@@ -829,7 +827,7 @@ doc.SaveAs("report.docx")
 
 ---
 
-## 🔄 Migration from v1
+## Migration from v1
 
 ### v1 API (Legacy - Pre-rewrite)
 
@@ -996,4 +994,4 @@ See [`examples/14_mail_merge/`](../examples/14_mail_merge/) for a complete worki
 ---
 
 **Last Updated**: July 2026
-**Version**: 2.7.1
+**Version**: 2.7.2

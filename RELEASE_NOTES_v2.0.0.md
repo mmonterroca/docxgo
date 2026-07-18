@@ -402,7 +402,7 @@ See [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for detailed 
 
 ### Examples & Guides
 - **[examples/README.md](examples/README.md)** - Example overview and usage
-- **[examples/v2_README.md](examples/v2_README.md)** - v2-specific examples
+- **[examples/README.md](examples/README.md)** - v2 examples
 
 ---
 
@@ -435,7 +435,7 @@ You are free to:
 ### Getting Help
 - 📖 **Documentation**: Start with [README.md](README.md) and [docs/](docs/)
 - 💬 **Issues**: Report bugs on [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
-- 📧 **Questions**: Open a discussion on [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
+- 📧 **Questions**: Open an item in [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
 
 ### Contributing
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

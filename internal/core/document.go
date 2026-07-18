@@ -4,7 +4,7 @@
 // See LICENSE for the full copyright notice, including predecessor authors,
 // and CREDITS.md for the project genealogy.
 
-// Package core provides concrete implementations of domain interfaces for go-docx v2.
+// Package core provides concrete implementations of domain interfaces for docxgo v2.
 //
 // This package contains the core document model implementations including:
 // - Document: The main document structure

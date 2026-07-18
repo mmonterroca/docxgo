@@ -289,7 +289,7 @@ This library generates Office Open XML (OOXML) documents compatible with:
 
 # Version
 
-Current version: 2.7.1 (see the Version constant for the authoritative value).
+Current version: 2.7.2 (see the Version constant for the authoritative value).
 
 This is a major rewrite of the original go-docx library with breaking changes.
 See the migration guide in MIGRATION.md for details.
@@ -305,18 +305,20 @@ See the examples/ directory for complete working examples:
 
   - GitHub: https://github.com/mmonterroca/docxgo
   - Documentation: https://pkg.go.dev/github.com/mmonterroca/docxgo/v2
-  - Examples: https://github.com/mmonterroca/docxgo/tree/main/examples
+  - Examples: https://github.com/mmonterroca/docxgo/tree/master/examples
 
 # License
 
-Currently distributed under the MIT License - see the LICENSE file.
-docxgo is a fork of the AGPL-licensed fumiama/go-docx; its provenance and the
-resulting open licensing question are documented in docs/PROVENANCE_AUDIT.md,
-the single source of truth for that topic.
+Distributed under the MIT License - see the LICENSE file. The Git history
+includes AGPL-era fumiama/go-docx snapshots, but the completed provenance audit
+in docs/PROVENANCE_AUDIT.md determines that the current rewritten release does
+not contain protectable AGPL implementation. Historical commits retain their
+original licenses.
 
 Copyright (c) 2024-2026 Misael Monterroca
-Predecessors: fumiama (enhanced fork, 2023-2025), Gonzalo Fernandez-Victorio and
-Basement Crowd Ltd (original library, 2021), gingfrederik (original library, 2020).
+MIT-era predecessor notices: Fumiama Minamoto (2023), Gonzalo
+Fernandez-Victorio and Basement Crowd Ltd (2021), gingfrederik (2020).
+Later AGPL-era authorship is credited separately in CREDITS.md.
 See CREDITS.md for the full genealogy.
 */
 package docx
