@@ -1,6 +1,6 @@
 # docxgo
 
-Production-grade Microsoft Word `.docx` (OOXML) creation and manipulation in Go — usable from **any language** via a JSON-RPC CLI and a Node.js wrapper.
+A Go library for creating and editing Microsoft Word (`.docx` / OOXML) documents, with a JSON-RPC CLI and Node.js wrapper for use from other languages.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/mmonterroca/docxgo/v2.svg)](https://pkg.go.dev/github.com/mmonterroca/docxgo/v2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -8,9 +8,9 @@ Production-grade Microsoft Word `.docx` (OOXML) creation and manipulation in Go 
 
 ## Overview
 
-**docxgo** is a clean-architecture library for building and editing Word documents in Go. It has a fluent builder, a template/mail-merge engine, themes, images, tables, and full read-modify-save round-tripping — with type-safe, interface-based APIs and structured error handling throughout.
+**docxgo** builds and edits Word documents in Go through a fluent, type-safe API. It covers document creation, a template and mail-merge engine, themes, images, tables, and full read-modify-save round-tripping, with structured error handling on every operation.
 
-New in v2.7.0: a **JSON-RPC command-line interface** and a **Node.js wrapper** (`@mmonterroca/docxgo`), so you can drive docxgo from Node, AWS Lambda, Python, or a shell script — on any platform, with no config, ports, or auth.
+Since v2.7.0 it also ships a JSON-RPC command-line interface and a Node.js wrapper (`@mmonterroca/docxgo`), so the same engine can be driven from Node, Python, a shell script, or AWS Lambda without a running server.
 
 - **Fluent builder** — chainable API for documents, paragraphs, runs, tables, sections
 - **Read & modify** existing `.docx` files with round-trip style preservation
@@ -18,7 +18,6 @@ New in v2.7.0: a **JSON-RPC command-line interface** and a **Node.js wrapper** (
 - **Themes** — 7 preset themes (Corporate, Startup, Modern, Fintech, Academic, TechPresentation, TechDarkMode) for coordinated colors, fonts, and spacing
 - **Rich content** — tables (merging, nesting, 8 styles), in-memory images (PNG, JPEG, GIF), fields (TOC, page numbers, hyperlinks), headers/footers, 40+ built-in styles
 - **Proofing language** — `WithLanguage` / `WithLanguageEx` for spell-check, grammar, hyphenation
-- **Any language** — a JSON-RPC binary + typed Node.js wrapper (see [Node.js & CLI](#nodejs--cli))
 - **Production quality** — clean architecture, explicit errors, thread-safe internals
 
 **Status:** v2.7.0 · Production-ready · Requires Go 1.23+ (no external C dependencies; runs on Linux, macOS, Windows). See the [CHANGELOG](CHANGELOG.md) for version history.
@@ -149,14 +148,6 @@ Node.js examples live in [`npm/examples/`](npm/examples/).
 
 ---
 
-## Features
-
-Documents and metadata, rich text formatting, tables (merging, nesting, styles), images (PNG, JPEG, GIF, in-memory), fields (TOC, page numbers, hyperlinks), headers/footers, 40+ built-in styles, templates/mail merge, themes, and proofing language.
-
-For the full, up-to-date feature matrix, see **[docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)**.
-
----
-
 ## Architecture
 
 Clean architecture with clear layer boundaries — `domain/` (public interfaces), `internal/` (implementations), `pkg/` (utilities), `themes/`, plus the `cmd/docxgo/` CLI binary and `npm/` Node.js wrapper. Interface segregation, dependency injection, explicit errors, strong typing (no `interface{}`), and thread-safe internal managers (a single `Document` is not thread-safe — guard concurrent access; see the package godoc's Thread Safety section). See **[docs/V2_DESIGN.md](docs/V2_DESIGN.md)** for the full rationale.
@@ -183,7 +174,7 @@ Coverage varies by package — `domain` and `pkg/errors` are at 100%, `internal/
 
 ## Documentation
 
-- **[V2 API Guide](docs/V2_API_GUIDE.md)** — complete API reference with examples ⭐ start here
+- **[V2 API Guide](docs/V2_API_GUIDE.md)** — complete API reference with examples (start here)
 - **[CLI Guide](docs/CLI_GUIDE.md)** — JSON-RPC protocol for the CLI / Node.js wrapper
 - **[Node.js wrapper](npm/README.md)** — `@mmonterroca/docxgo` API reference
 - **[Implementation Status](docs/IMPLEMENTATION_STATUS.md)** — what's implemented and planned
@@ -207,7 +198,3 @@ docxgo is currently distributed under the MIT license ([LICENSE](LICENSE)). It i
 
 - **Issues:** [GitHub Issues](https://github.com/mmonterroca/docxgo/issues) · **Discussions:** [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
 - **Email:** misael@monterroca.com
-
----
-
-**Made with ❤️ by [Misael Monterroca](https://github.com/mmonterroca)** — star ⭐ this repo if you find it useful!
