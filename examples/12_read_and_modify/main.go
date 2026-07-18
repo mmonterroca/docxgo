@@ -1,24 +1,23 @@
-/*
-MIT License
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024-2026 Misael Monterroca
+//
+// See LICENSE for the full copyright notice, including predecessor authors,
+// and CREDITS.md for the project genealogy.
 
-Copyright (c) 2025 Misael Monterroca
-
-Example: Read and Modify Documents
-
-This example demonstrates the complete read/modify/write workflow:
-1. Create a comprehensive showcase document with all features
-2. Read it back using OpenDocument()
-3. Modify its content (add paragraphs, modify text, add tables)
-4. Save the modified version with a new name
-
-This showcases:
-- Document reading and parsing
-- Content inspection and traversal
-- In-place modification
-- Preserving existing formatting
-- Adding new content to existing documents
-*/
-
+// Example: Read and Modify Documents
+//
+// This example demonstrates the complete read/modify/write workflow:
+//  1. Create a comprehensive showcase document with all features
+//  2. Read it back using OpenDocument()
+//  3. Modify its content (add paragraphs, modify text, add tables)
+//  4. Save the modified version with a new name
+//
+// This showcases:
+//   - Document reading and parsing
+//   - Content inspection and traversal
+//   - In-place modification
+//   - Preserving existing formatting
+//   - Adding new content to existing documents
 package main
 
 import (

@@ -203,7 +203,7 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the dev
 
 MIT licensed — free for commercial and private use; see [LICENSE](LICENSE).
 
-docxgo builds on the lineage of [gonfva/docxlib](https://github.com/gonfva/docxlib) (2020–2022) → [fumiama/go-docx](https://github.com/fumiama/go-docx) (2022–2024); v2 is a complete clean-architecture rewrite by Misael Monterroca. See [CREDITS.md](CREDITS.md) for the full project history and copyright notices.
+docxgo's lineage is [gingfrederik/docx](https://github.com/gingfrederik/docx) (2020, MIT) → [gonfva/docxlib](https://github.com/gonfva/docxlib) (2021–2022, MIT) → [fumiama/go-docx](https://github.com/fumiama/go-docx) (forked 2023; upstream relicensed AGPL-3.0 on 2023-02-24). v2 is a complete, independent clean-architecture rewrite by Misael Monterroca, MIT licensed throughout — AGPL only ever entered fumiama's fork, never this codebase. See [CREDITS.md](CREDITS.md) for the full genealogy and copyright notices.
 
 ## Support
 

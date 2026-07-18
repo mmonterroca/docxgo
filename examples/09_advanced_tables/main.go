@@ -1,20 +1,19 @@
-/*
-MIT License
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024-2026 Misael Monterroca
+//
+// See LICENSE for the full copyright notice, including predecessor authors,
+// and CREDITS.md for the project genealogy.
 
-Copyright (c) 2025 Misael Monterroca
-
-Example: Advanced table features - cell merging, nested tables, and styling
-
-This example demonstrates:
-- Horizontal cell merging (colspan)
-- Vertical cell merging (rowspan)
-- Combined horizontal and vertical merging
-- Nested tables within cells
-- Table styling
-- Row height control
-- Complex table layouts (calendar, invoice, etc.)
-*/
-
+// Example: Advanced table features - cell merging, nested tables, and styling
+//
+// This example demonstrates:
+//   - Horizontal cell merging (colspan)
+//   - Vertical cell merging (rowspan)
+//   - Combined horizontal and vertical merging
+//   - Nested tables within cells
+//   - Table styling
+//   - Row height control
+//   - Complex table layouts (calendar, invoice, etc.)
 package main
 
 import (
