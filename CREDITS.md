@@ -189,6 +189,10 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
 The AGPL-3.0 licensing enters the chain only at fumiama's 2023 relicense; everything
 before it was MIT. docxgo is MIT — see LICENSE for the full copyright notice.
 
+A line-level and structural code provenance audit of docxgo v2 against the
+AGPL-licensed `fumiama/go-docx` upstream is available at
+[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md).
+
 ---
 
 ## Why v2 is Independent
