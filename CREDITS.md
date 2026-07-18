@@ -182,22 +182,15 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
 2025-2026  mmonterroca/docxgo v2  (substantial rewrite on the AGPL-era base)
              └─ Clean-architecture rewrite; current tree shares only
                 schema-dictated OOXML boilerplate with the upstream
-             └─ Distributed under MIT — but see the licensing caveat below
+             └─ Distributed under MIT — see the licensing note below
 ```
 
-> **Licensing caveat.** The `[MIT]` badge on docxgo v2 reflects the license
-> currently applied to its distribution, **not** a settled legal conclusion.
-> docxgo v2's git history descends from `fumiama/go-docx` *through* its AGPL
-> period (its `master` contains fumiama's full history through 2025-05, and
-> docxgo's own work begins 2025-10-21 on top of it). Whether docxgo may be
-> distributed under MIT — versus whether AGPL obligations attach — is a
-> derivative-work question for IP counsel, **not resolved here**. Earlier
-> versions of this file and the README described v2 as an "independent"
-> project; that framing was inaccurate and has been corrected.
->
-> The full, reproducible provenance record is in
-> [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md) — read it (and its
-> "Status & open question" section) before relying on the MIT status.
+docxgo is currently distributed under the MIT license ([LICENSE](LICENSE)). It
+is a fork of the AGPL-licensed `fumiama/go-docx`; its provenance and the
+resulting open licensing question are documented in
+**[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md)** — the single source of
+truth for this topic. This file records authorship and copyright only; it draws
+no conclusion about the license status.
 
 ---
 
@@ -205,8 +198,8 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
 
 These points describe how far docxgo v2 has been rewritten from the
 `fumiama/go-docx` base. They are engineering facts about divergence — they do
-**not** establish legal independence from the AGPL upstream (see the licensing
-caveat above and `docs/PROVENANCE_AUDIT.md`).
+**not** establish legal independence from the AGPL upstream, which is an open
+question addressed only in [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md).
 
 1. **Substantial architectural rewrite**
    - Clean-architecture layering; different design principles
@@ -227,8 +220,8 @@ caveat above and `docs/PROVENANCE_AUDIT.md`).
 We maintain **full transparency** about project history:
 - Original authors credited in LICENSE
 - This CREDITS.md preserved indefinitely
-- MIT license adopted for v2
 - Fork history acknowledged in documentation
+- Licensing provenance and its open question recorded in [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md)
 
 ---
 
@@ -261,9 +254,11 @@ We welcome contributions from the community. See [CONTRIBUTING.md](CONTRIBUTING.
 
 ## License
 
-This project is licensed under the **MIT License**.
-
-See [LICENSE](LICENSE) for full text.
+docxgo is currently distributed under the **MIT License** ([LICENSE](LICENSE)).
+Its provenance relative to the AGPL-licensed `fumiama/go-docx` upstream, and the
+resulting open licensing question, are documented in
+[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md) — the single source of truth
+for this topic.
 
 ### Copyright Notices
 

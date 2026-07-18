@@ -201,9 +201,7 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the dev
 
 ## License & Credits
 
-Distributed under the MIT license; see [LICENSE](LICENSE).
-
-docxgo's lineage is [gingfrederik/docx](https://github.com/gingfrederik/docx) (2020, MIT) → [gonfva/docxlib](https://github.com/gonfva/docxlib) (2021–2022, MIT) → [fumiama/go-docx](https://github.com/fumiama/go-docx) (relicensed from MIT to AGPL-3.0 on 2023-02-24). docxgo v2 was substantially rewritten on top of that upstream by Misael Monterroca; the current tree shares only schema-dictated OOXML boilerplate with it, but its git history descends from the AGPL-era upstream. The provenance facts — and the resulting open licensing question, which requires IP-counsel review — are documented in [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md); see [CREDITS.md](CREDITS.md) for the genealogy and copyright notices.
+docxgo is currently distributed under the MIT license ([LICENSE](LICENSE)). It is a fork of the AGPL-licensed [`fumiama/go-docx`](https://github.com/fumiama/go-docx); its provenance and the resulting open licensing question are documented in **[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md)** — the single source of truth for this topic. See [CREDITS.md](CREDITS.md) for authorship and copyright notices.
 
 ## Support
 
