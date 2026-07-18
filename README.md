@@ -19,7 +19,7 @@ New in v2.7.0: a **JSON-RPC command-line interface** and a **Node.js wrapper** (
 - **Rich content** — tables (merging, nesting, 8 styles), in-memory images (PNG, JPEG, GIF), fields (TOC, page numbers, hyperlinks), headers/footers, 40+ built-in styles
 - **Proofing language** — `WithLanguage` / `WithLanguageEx` for spell-check, grammar, hyphenation
 - **Any language** — a JSON-RPC binary + typed Node.js wrapper (see [Node.js & CLI](#nodejs--cli))
-- **Production quality** — clean architecture, explicit errors, thread-safe internals, MIT licensed
+- **Production quality** — clean architecture, explicit errors, thread-safe internals
 
 **Status:** v2.7.0 · Production-ready · Requires Go 1.23+ (no external C dependencies; runs on Linux, macOS, Windows). See the [CHANGELOG](CHANGELOG.md) for version history.
 

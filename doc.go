@@ -309,7 +309,10 @@ See the examples/ directory for complete working examples:
 
 # License
 
-MIT License - see LICENSE file for details.
+Currently distributed under the MIT License - see the LICENSE file.
+docxgo is a fork of the AGPL-licensed fumiama/go-docx; its provenance and the
+resulting open licensing question are documented in docs/PROVENANCE_AUDIT.md,
+the single source of truth for that topic.
 
 Copyright (c) 2024-2026 Misael Monterroca
 Predecessors: fumiama (enhanced fork, 2023-2025), Gonzalo Fernandez-Victorio and
