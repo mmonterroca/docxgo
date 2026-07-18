@@ -103,7 +103,12 @@ jobs:
       - name: Publish platform package (provenance)
         run: |
           cd npm/platforms/${{ matrix.suffix }}
-          npm publish --access public --provenance
+          PKG="@mmonterroca/docxgo-${{ matrix.suffix }}@${{ steps.version.outputs.version }}"
+          if npm view "$PKG" version >/dev/null 2>&1; then
+            echo "$PKG already published, skipping (safe re-run)"
+          else
+            npm publish --access public --provenance
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -135,7 +140,7 @@ jobs:
         run: cd npm && npm run build
 
       - name: Set version
-        run: cd npm && npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+        run: cd npm && npm version ${{ steps.version.outputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Update optionalDependencies versions
         run: |
@@ -150,7 +155,14 @@ jobs:
           "
 
       - name: Publish (provenance)
-        run: cd npm && npm publish --access public --provenance
+        run: |
+          cd npm
+          PKG="@mmonterroca/docxgo@${{ steps.version.outputs.version }}"
+          if npm view "$PKG" version >/dev/null 2>&1; then
+            echo "$PKG already published, skipping (safe re-run)"
+          else
+            npm publish --access public --provenance
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
