@@ -295,6 +295,8 @@ func AllThemes() []Theme {
 		Modern,
 		Fintech,
 		Academic,
+		TechPresentation,
+		TechDarkMode,
 	}
 }
 

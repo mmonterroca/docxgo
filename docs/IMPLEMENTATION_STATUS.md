@@ -99,9 +99,7 @@ All development phases have been completed. The library has gone through multipl
 - ✅ Custom image dimensions (`AddImageWithSize()`)
 - ✅ Floating images with positioning (`AddImageWithPosition()`)
 - ✅ Supported formats:
-  - ✅ PNG, JPEG, GIF, BMP
-  - ✅ TIFF, SVG, WEBP
-  - ✅ ICO, EMF
+  - ✅ PNG, JPEG, GIF
 - ✅ Automatic format detection
 - ✅ Image dimension reading
 

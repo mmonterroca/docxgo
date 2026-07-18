@@ -129,7 +129,7 @@ cd 07_advanced && go run main.go
 **Status**: ✅ Fully functional
 **Demonstrates**: Complete image handling
 
-- 9 image formats (PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP, ICO, EMF)
+- Supported formats: PNG, JPEG, GIF
 - Inline and floating images
 - Custom dimensions (pixels, inches, EMUs)
 - Positioning (left, center, right, custom coordinates)
@@ -214,7 +214,7 @@ cd 12_read_and_modify && go run main.go
 **Status**: ✅ Fully functional
 **Demonstrates**: Complete theme system
 
-- 5 preset themes (Corporate, Startup, Modern, Fintech, Academic), plus TechPresentation and TechDarkMode available directly
+- 7 preset themes (Corporate, Startup, Modern, Fintech, Academic, TechPresentation, TechDarkMode)
 - Custom colors, fonts, spacing, and heading styles
 - Professional document generation with consistent branding
 - Theme application via `WithTheme()` builder option

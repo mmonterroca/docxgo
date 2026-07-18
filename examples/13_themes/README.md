@@ -4,7 +4,7 @@ This example demonstrates the theme system in go-docx, which allows you to apply
 
 ## Available Themes
 
-The library includes 5 preset themes:
+The library includes 7 preset themes: 5 general-purpose themes below, plus two Tech themes (TechPresentation, TechDarkMode) shown in the [Technical Architecture example](#4-technical-architecture-example-04_tech_architecture).
 
 ### 1. Corporate
 Professional business theme with navy blue and red accents. Ideal for business reports, proposals, and corporate documentation.

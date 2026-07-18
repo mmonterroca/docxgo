@@ -15,11 +15,11 @@ New in v2.7.0: a **JSON-RPC command-line interface** and a **Node.js wrapper** (
 - **Fluent builder** — chainable API for documents, paragraphs, runs, tables, sections
 - **Read & modify** existing `.docx` files with round-trip style preservation
 - **Templates / mail merge** — placeholder detection, data merge, batch generation, external Word templates (MERGEFIELD)
-- **Themes** — 5 preset themes for coordinated colors, fonts, and spacing
-- **Rich content** — tables (merging, nesting, 8 styles), in-memory images (7 formats), fields (TOC, page numbers, hyperlinks), headers/footers, 40+ built-in styles
+- **Themes** — 7 preset themes (Corporate, Startup, Modern, Fintech, Academic, TechPresentation, TechDarkMode) for coordinated colors, fonts, and spacing
+- **Rich content** — tables (merging, nesting, 8 styles), in-memory images (PNG, JPEG, GIF), fields (TOC, page numbers, hyperlinks), headers/footers, 40+ built-in styles
 - **Proofing language** — `WithLanguage` / `WithLanguageEx` for spell-check, grammar, hyphenation
 - **Any language** — a JSON-RPC binary + typed Node.js wrapper (see [Node.js & CLI](#nodejs--cli))
-- **Production quality** — clean architecture, explicit errors, thread-safe, MIT licensed
+- **Production quality** — clean architecture, explicit errors, thread-safe internals, MIT licensed
 
 **Status:** v2.7.0 · Production-ready · Requires Go 1.23+ (no external C dependencies; runs on Linux, macOS, Windows). See the [CHANGELOG](CHANGELOG.md) for version history.
 
@@ -151,7 +151,7 @@ Node.js examples live in [`npm/examples/`](npm/examples/).
 
 ## Features
 
-Documents and metadata, rich text formatting, tables (merging, nesting, styles), images (7 formats, in-memory), fields (TOC, page numbers, hyperlinks), headers/footers, 40+ built-in styles, templates/mail merge, themes, and proofing language.
+Documents and metadata, rich text formatting, tables (merging, nesting, styles), images (PNG, JPEG, GIF, in-memory), fields (TOC, page numbers, hyperlinks), headers/footers, 40+ built-in styles, templates/mail merge, themes, and proofing language.
 
 For the full, up-to-date feature matrix, see **[docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)**.
 
@@ -159,7 +159,7 @@ For the full, up-to-date feature matrix, see **[docs/IMPLEMENTATION_STATUS.md](d
 
 ## Architecture
 
-Clean architecture with clear layer boundaries — `domain/` (public interfaces), `internal/` (implementations), `pkg/` (utilities), `themes/`, plus the `cmd/docxgo/` CLI binary and `npm/` Node.js wrapper. Interface segregation, dependency injection, explicit errors, strong typing (no `interface{}`), and thread-safe concurrent access throughout. See **[docs/V2_DESIGN.md](docs/V2_DESIGN.md)** for the full rationale.
+Clean architecture with clear layer boundaries — `domain/` (public interfaces), `internal/` (implementations), `pkg/` (utilities), `themes/`, plus the `cmd/docxgo/` CLI binary and `npm/` Node.js wrapper. Interface segregation, dependency injection, explicit errors, strong typing (no `interface{}`), and thread-safe internal managers (a single `Document` is not thread-safe — guard concurrent access; see the package godoc's Thread Safety section). See **[docs/V2_DESIGN.md](docs/V2_DESIGN.md)** for the full rationale.
 
 ---
 

@@ -1346,7 +1346,7 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 **Current State:**
 - ✅ Core architecture: Complete (clean architecture, domain-driven design)
 - ✅ Builder pattern: Complete (fluent API with error handling)
-- ✅ Images: Complete (9 formats, inline/floating positioning)
+- ✅ Images: Complete (PNG, JPEG, GIF, inline/floating positioning)
 - ✅ Advanced tables: Complete (merging, nesting, 8 styles, proper border serialization)
 - ✅ Theme system: Complete (7 preset themes, custom theme support)
 - ✅ Document reading: Complete (round-trip with style/hyperlink/image preservation)
