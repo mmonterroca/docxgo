@@ -198,7 +198,13 @@ type inspectParams struct {
 
 // setMetadataParams are the parameters for document.setMetadata.
 type setMetadataParams struct {
-	DocumentID  string   `json:"documentId"`
+	DocumentID string `json:"documentId"`
+	metadataFields
+}
+
+// metadataFields are the document.setMetadata fields, shared with the
+// setMetadata operation in document.applyPatch.
+type metadataFields struct {
 	Title       string   `json:"title,omitempty"`
 	Subject     string   `json:"subject,omitempty"`
 	Creator     string   `json:"creator,omitempty"`
@@ -208,20 +214,55 @@ type setMetadataParams struct {
 	Modified    string   `json:"modified,omitempty"`
 }
 
+// metadataFromFields builds a domain.Metadata from the wire fields.
+func metadataFromFields(f metadataFields) *domain.Metadata {
+	return &domain.Metadata{
+		Title:       f.Title,
+		Subject:     f.Subject,
+		Creator:     f.Creator,
+		Description: f.Description,
+		Keywords:    f.Keywords,
+		Created:     f.Created,
+		Modified:    f.Modified,
+	}
+}
+
 // setLanguageParams are the parameters for document.setLanguage. Val,
 // EastAsia, and Bidi are BCP 47 language tags (e.g. "es-MX", "en-US"); at
 // least one must be set.
 type setLanguageParams struct {
 	DocumentID string `json:"documentId"`
-	Val        string `json:"val,omitempty"`
-	EastAsia   string `json:"eastAsia,omitempty"`
-	Bidi       string `json:"bidi,omitempty"`
+	languageFields
+}
+
+// languageFields are the document.setLanguage fields, shared with the
+// setLanguage operation in document.applyPatch.
+type languageFields struct {
+	Val      string `json:"val,omitempty"`
+	EastAsia string `json:"eastAsia,omitempty"`
+	Bidi     string `json:"bidi,omitempty"`
+}
+
+// languageFromFields builds a domain.Language from the wire fields.
+func languageFromFields(f languageFields) *domain.Language {
+	return &domain.Language{Val: f.Val, EastAsia: f.EastAsia, Bidi: f.Bidi}
 }
 
 // setBackgroundColorParams are the parameters for document.setBackgroundColor.
 type setBackgroundColorParams struct {
 	DocumentID string `json:"documentId"`
 	Color      string `json:"color"` // hex string e.g. "#FF0000"
+}
+
+// applyBackgroundColor parses colorHex and sets it as doc's background color,
+// shared between document.setBackgroundColor and the setBackgroundColor
+// operation in document.applyPatch.
+func applyBackgroundColor(doc domain.Document, colorHex string) error {
+	color, err := parseHexColor(colorHex)
+	if err != nil {
+		return fmt.Errorf("invalid color: %w", err)
+	}
+	return doc.SetBackgroundColor(color)
 }
 
 // closeParams are the parameters for document.close.
@@ -665,17 +706,7 @@ func (s *server) handleSetMetadata(req *Request) Response {
 			fmt.Sprintf("document %q not found", params.DocumentID), op)
 	}
 
-	meta := &domain.Metadata{
-		Title:       params.Title,
-		Subject:     params.Subject,
-		Creator:     params.Creator,
-		Description: params.Description,
-		Keywords:    params.Keywords,
-		Created:     params.Created,
-		Modified:    params.Modified,
-	}
-
-	if err := doc.SetMetadata(meta); err != nil {
+	if err := doc.SetMetadata(metadataFromFields(params.metadataFields)); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
 	}
 
@@ -705,13 +736,7 @@ func (s *server) handleSetLanguage(req *Request) Response {
 			fmt.Sprintf("document %q not found", params.DocumentID), op)
 	}
 
-	lang := &domain.Language{
-		Val:      params.Val,
-		EastAsia: params.EastAsia,
-		Bidi:     params.Bidi,
-	}
-
-	if err := doc.SetLanguage(lang); err != nil {
+	if err := doc.SetLanguage(languageFromFields(params.languageFields)); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
 	}
 
@@ -736,12 +761,7 @@ func (s *server) handleSetBackgroundColor(req *Request) Response {
 			fmt.Sprintf("document %q not found", params.DocumentID), op)
 	}
 
-	color, err := parseHexColor(params.Color)
-	if err != nil {
-		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid color: "+err.Error(), op)
-	}
-
-	if err := doc.SetBackgroundColor(color); err != nil {
+	if err := applyBackgroundColor(doc, params.Color); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
 	}
 
@@ -1248,30 +1268,15 @@ func (s *server) handleApplyPatch(req *Request) Response {
 
 		case "setMetadata":
 			var mp struct {
-				Op          string   `json:"op"`
-				Title       string   `json:"title,omitempty"`
-				Subject     string   `json:"subject,omitempty"`
-				Creator     string   `json:"creator,omitempty"`
-				Description string   `json:"description,omitempty"`
-				Keywords    []string `json:"keywords,omitempty"`
-				Created     string   `json:"created,omitempty"`
-				Modified    string   `json:"modified,omitempty"`
+				Op string `json:"op"`
+				metadataFields
 			}
 			if err := json.Unmarshal(raw, &mp); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid setMetadata at index %d: %v", i, err), op,
 					map[string]interface{}{"index": i, "applied": applied})
 			}
-			meta := &domain.Metadata{
-				Title:       mp.Title,
-				Subject:     mp.Subject,
-				Creator:     mp.Creator,
-				Description: mp.Description,
-				Keywords:    mp.Keywords,
-				Created:     mp.Created,
-				Modified:    mp.Modified,
-			}
-			if err := doc.SetMetadata(meta); err != nil {
+			if err := doc.SetMetadata(metadataFromFields(mp.metadataFields)); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("failed to set metadata at index %d: %v", i, err), op,
 					map[string]interface{}{"index": i, "applied": applied})
@@ -1287,13 +1292,7 @@ func (s *server) handleApplyPatch(req *Request) Response {
 					fmt.Sprintf("invalid setBackgroundColor at index %d: %v", i, err), op,
 					map[string]interface{}{"index": i, "applied": applied})
 			}
-			color, err := parseHexColor(bcp.Color)
-			if err != nil {
-				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
-					fmt.Sprintf("invalid color at index %d: %v", i, err), op,
-					map[string]interface{}{"index": i, "applied": applied})
-			}
-			if err := doc.SetBackgroundColor(color); err != nil {
+			if err := applyBackgroundColor(doc, bcp.Color); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("failed to set background color at index %d: %v", i, err), op,
 					map[string]interface{}{"index": i, "applied": applied})
@@ -1301,18 +1300,15 @@ func (s *server) handleApplyPatch(req *Request) Response {
 
 		case "setLanguage":
 			var lp struct {
-				Op       string `json:"op"`
-				Val      string `json:"val,omitempty"`
-				EastAsia string `json:"eastAsia,omitempty"`
-				Bidi     string `json:"bidi,omitempty"`
+				Op string `json:"op"`
+				languageFields
 			}
 			if err := json.Unmarshal(raw, &lp); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("invalid setLanguage at index %d: %v", i, err), op,
 					map[string]interface{}{"index": i, "applied": applied})
 			}
-			lang := &domain.Language{Val: lp.Val, EastAsia: lp.EastAsia, Bidi: lp.Bidi}
-			if err := doc.SetLanguage(lang); err != nil {
+			if err := doc.SetLanguage(languageFromFields(lp.languageFields)); err != nil {
 				return errorResponseWithData(req.ID, errors.ErrCodeValidation,
 					fmt.Sprintf("failed to set language at index %d: %v", i, err), op,
 					map[string]interface{}{"index": i, "applied": applied})
