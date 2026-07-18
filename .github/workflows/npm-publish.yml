@@ -3,6 +3,13 @@ name: npm Publish
 on:
   release:
     types: [published]
+  # Manual fallback: release.yml creates the GitHub Release using the default
+  # GITHUB_TOKEN, and GitHub does not let GITHUB_TOKEN-authored events trigger
+  # other workflows (anti-recursion protection) — so "release: published"
+  # above never actually fires. Until release.yml is updated to create the
+  # release with a PAT instead, run this manually after each release, picking
+  # the release's tag (e.g. v2.7.0) as the ref to run the workflow from.
+  workflow_dispatch:
 
 permissions:
   contents: read
