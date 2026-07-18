@@ -8,8 +8,12 @@ present in the shipped code.
 
 **Date:** 2026-07-18
 **Method:** Automated line-level and structural comparison of the docxgo v2
-working tree (`master`) against the full `fumiama/go-docx` working tree
-(140 commits, 2021-04-23 → 2025-05-06, which accumulates all AGPL-era code).
+working tree (`master`) against `fumiama/go-docx` pinned at commit
+[`0c30fd0`](https://github.com/fumiama/go-docx/commit/0c30fd09304b17fdb42b0dcea142962b2f4883a3)
+(2025-05-06, HEAD as of this writing; 140 commits, 2021-04-23 → 2025-05-06,
+so this tree accumulates all AGPL-era code). Fully reproducible: clone that
+commit and run [`docs/provenance/compare_line_overlap.py`](provenance/compare_line_overlap.py)
+against this repo — see that script's docstring for the exact commands.
 
 > **Not legal advice.** This is a *technical* provenance analysis performed to
 > support a licensing position. It is strong, reproducible evidence for a
@@ -52,31 +56,41 @@ AGPL-3.0 header, plus the Apache-2.0 header on `internal/writer/zip.go`
 ### 1. Verbatim line overlap — whole tree (102 files)
 
 Distinctive lines (≥25 chars, comments excluded, whitespace-normalized) from
-every docxgo `.go` file were checked against the full fumiama corpus
-(1,299 distinctive lines).
+every docxgo `.go` file were checked against the fumiama corpus (its 36
+non-test `.go` files, 1,247 distinctive lines, at the pinned commit above).
+Reproduce with `docs/provenance/compare_line_overlap.py`.
 
 | docxgo file | verbatim overlap |
 |---|---|
-| `internal/xml/run.go` | 34.2% (13/38) |
-| `internal/xml/document.go` | 21.6% (11/51) |
-| `internal/xml/table.go` | 18.8% (13/69) |
-| `internal/xml/section.go` | 12.0% (6/50) |
-| `internal/xml/paragraph.go` | 10.4% (5/48) |
-| `internal/xml/style.go` | 6.7% (7/105) |
-| `internal/writer/writer_test.go` | 6.5% (4/62) |
-| `internal/serializer/serializer.go` | **0.0% (0/652)** |
+| `internal/xml/run.go` | 26.5% (9/34) |
+| `internal/xml/document.go` | 18.8% (9/48) |
+| `internal/xml/table.go` | 13.3% (8/60) |
+| `internal/xml/section.go` | 12.5% (6/48) |
+| `internal/xml/paragraph.go` | 8.7% (4/46) |
+| `internal/xml/field.go` | 6.7% (1/15) |
+| `internal/writer/writer_test.go` | 4.7% (2/43) |
+| `internal/xml/style.go` | 3.0% (3/99) |
+| `internal/xml/drawing.go` | 1.9% (2/103) |
+| `internal/manager/relationship.go` | 1.7% (1/59) |
+| `internal/core/io_test.go` | 1.1% (1/93) |
+| `cmd/docxgo/handlers.go` | 0.1% (1/672) |
+| `internal/serializer/serializer.go` | **0.0% (0/550)** |
 | `internal/serializer/latent_styles.go` | **0.0% (0/214)** |
-| `internal/serializer/serializer_test.go` | **0.0% (0/409)** |
-| `internal/writer/zip.go` | **0.0% (0/300)** |
-| `cmd/docxgo/handlers.go` | 0.1% (1/913) |
+| `internal/serializer/serializer_test.go` | **0.0% (0/318)** |
+| `internal/writer/zip.go` | **0.0% (0/284)** |
 
-**Every file containing real logic is at 0–2%.** Overlap is concentrated
-entirely in `internal/xml/*.go`, which hold OOXML struct *definitions*.
+Across the whole tree (102 `.go` files, 11,564 distinctive lines total),
+**47 lines match anything in the fumiama corpus — 0.4% of docxgo's
+distinctive lines.** Every file containing real, non-OOXML-struct logic is
+at 0–2%, and the four files that carried inherited AGPL/Apache headers with
+actual implementation logic (`serializer.go`, `latent_styles.go`,
+`serializer_test.go`, `zip.go`) are at a **verified, exact 0%.** Overlap is
+concentrated in `internal/xml/*.go`, which hold OOXML struct *definitions*.
 
 ### 2. What the overlapping lines actually are
 
-100% of the matched lines are struct field declarations whose form is dictated
-by the ECMA-376 (OOXML) schema, e.g.:
+Of the 47 matched lines, 43 are struct field or struct type declarations
+whose form is dictated by the ECMA-376 (OOXML) schema, e.g.:
 
 ```
 type RunProperties struct {
@@ -89,24 +103,39 @@ There is essentially only one correct way to map an OOXML element such as
 `w:color val="…"` onto a Go struct tag. Under the copyright **merger doctrine**,
 expression that is dictated by an external constraint (here, the schema) is not
 protectable, and its presence in two independent implementations is expected —
-not evidence of copying. The test files' overlap is the universal Go idiom
-`for _, f := range zipReader.File {` plus the fixed path string
-`word/document.xml`.
+not evidence of copying.
+
+The remaining 4 matched lines are **not** struct declarations — they're
+generic Go idioms, unrelated to the OOXML schema: `writer_test.go` and
+`io_test.go` each match on the standard `for _, f := range zipReader.File {`
+zip-iteration loop (`writer_test.go` also matches the literal path check
+`if f.Name == "word/document.xml" {`), and `handlers.go` matches on the
+generic `items = append(items, item)` idiom. These are unavoidable
+consequences of both projects reading a `.docx` zip archive and appending to
+a slice in Go — not evidence of copying either, but distinct from the
+schema-merger argument above, so called out separately here rather than
+folded into a blanket "100%" claim.
 
 ### 3. Structural design is opposite, not derived
 
 The `Run` type — the file with the highest surface overlap — is designed on
 **incompatible principles** in the two projects:
 
-| | fumiama/go-docx (AGPL) | docxgo v2 (MIT) |
+| | fumiama/go-docx `Run` (AGPL) | docxgo v2 `Run` (MIT) |
 |---|---|---|
 | Child content | `Children []interface{}` (polymorphic) | typed optional fields (`Text *Text`, `Break *Break`, `Drawing *Drawing`, …) |
 | Parsing | custom `UnmarshalXML` token walk | standard `encoding/xml` struct mapping |
 | Doc coupling | holds `file *Docx` back-pointer | none |
-| Philosophy | interface-based children | **no `interface{}`** (docxgo's stated design goal) |
 
 This is precisely the difference between the legacy fork and an independent
-clean-architecture rewrite.
+clean-architecture rewrite, for the `Run` type specifically — the file with
+the highest surface overlap. This is **not** a project-wide "docxgo never
+uses `interface{}`" claim: docxgo's public `domain` package API has zero
+`interface{}` usage, but several internal serialization types
+(`internal/xml/document.go`, `paragraph.go`, `table.go`) do use
+`[]interface{}` to model OOXML's own polymorphic "any child" content model —
+the same general technique fumiama uses, just confined to internal plumbing
+rather than exposed on the public API or used in `Run` itself.
 
 ### 4. No shared functions, types, or assets
 
@@ -116,11 +145,17 @@ clean-architecture rewrite.
   the `W*`/`A*` naming conventions) appear anywhere in docxgo. Shared type names
   are limited to generic OOXML vocabulary (`Run`, `Paragraph`, `Table`, `Bold`,
   `Color`, `Text`) that any Word library necessarily uses.
-- **Embedded default XML** (docxgo's built-in `theme1.xml`, `settings.xml`,
-  `fontTable.xml` blobs): none of their distinctive markers
-  (`panose1 020F0502020204030204`, `characterSpacingControl doNotCompress`,
-  `compatibilityMode`, `Office Theme`) appear in fumiama. docxgo's defaults are
-  independently sourced from Microsoft's standard output.
+- **Embedded default XML** (docxgo's built-in `settings.xml` / `fontTable.xml`
+  content in `internal/writer/zip.go`): its distinctive markers —
+  `<w:panose1 w:val="020F0502020204030204"/>`,
+  `<w:characterSpacingControl w:val="doNotCompress"/>`, and the
+  `compatibilityMode` compat setting — do not appear anywhere in fumiama.
+  (Both projects' default `theme1.xml` do share the literal string
+  `name="Office Theme"` — but that's Microsoft's own generic default theme
+  name, present in effectively every OOXML theme part on Earth, so it's not
+  a distinctive marker either way and proves nothing about derivation.)
+  docxgo's settings/fontTable defaults are independently sourced from
+  Microsoft's standard output.
 
 ### 5. The residual overlap predates AGPL
 
@@ -156,10 +191,11 @@ and stronger for due diligence.
 
 ## Recommended follow-ups
 
-1. Keep this document in-repo (e.g. `docs/PROVENANCE_AUDIT.md`) as a
-   due-diligence artifact.
+1. Keep this document, and `docs/provenance/compare_line_overlap.py`, in-repo
+   as due-diligence artifacts.
 2. Before offering a paid license warranty/indemnification, have an IP attorney
-   review this analysis and sign off — the reproducible method above should make
-   that inexpensive.
-3. Re-run this diff on major refactors that touch `internal/xml/*` or import
-   upstream code, to keep the record current.
+   review this analysis and sign off — the pinned commit and checked-in script
+   should make independent re-verification (and that review) inexpensive.
+3. Re-run the script (against a fresh fumiama `HEAD`, since it has continued
+   commits after `0c30fd0`) on major docxgo refactors that touch
+   `internal/xml/*` or import upstream code, to keep the record current.
