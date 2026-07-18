@@ -102,9 +102,10 @@ Listed newest first. See the timeline below for the chronological view.
 **Forked from**: gonfva/docxlib (MIT)  
 **License**: AGPL-3.0 — relicensed by fumiama on 2023-02-24, having received the code under MIT
 
-This is the upstream the mmonterroca fork above branched from. Its dates overlap because
-development continued here independently after the 2023 fork; the two are parallel, not
-sequential.
+This is the upstream docxgo v2 forks from. docxgo v2's `master` descends from
+this repository's history through its 2025-05 HEAD (i.e. sequentially, through
+the AGPL period — not as a parallel branch taken during the earlier MIT
+window). See [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md), Finding 1.
 
 #### Author
 - **fumiama** - Expanded functionality (first commit 2023-02-08, last 2025-05-06)
@@ -173,44 +174,52 @@ Created for [Basement Crowd](https://www.basementcrowd.com) and [FromCounsel](ht
 
 2023       fumiama/go-docx  (fork)      ← relicensed AGPL-3.0 on 2023-02-24
              └─ Images, tables, shapes; expanded API surface
-             └─ upstream continued independently through 2025-05
+             └─ development continued through 2025-05
                     │
-                    │  forked 2023
+                    │  docxgo v2 forks fumiama's 2025-05 HEAD (AGPL-era),
+                    │  first own commit 2025-10-21
                     ▼
-2023-2024  mmonterroca/docxgo v1  (fork)
-             └─ Headers/footers, TOC, hyperlinks, fields
-
-2024-2026  mmonterroca/docxgo v2  (complete rewrite)           [MIT]
-             └─ Clean architecture
-             └─ Production-grade code quality
-             └─ Independent project
+2025-2026  mmonterroca/docxgo v2  (substantial rewrite on the AGPL-era base)
+             └─ Clean-architecture rewrite; current tree shares only
+                schema-dictated OOXML boilerplate with the upstream
+             └─ Distributed under MIT — but see the licensing caveat below
 ```
 
-The AGPL-3.0 licensing enters the chain only at fumiama's 2023 relicense; everything
-before it was MIT. docxgo is MIT — see LICENSE for the full copyright notice.
-
-A line-level and structural code provenance audit of docxgo v2 against the
-AGPL-licensed `fumiama/go-docx` upstream is available at
-[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md).
+> **Licensing caveat.** The `[MIT]` badge on docxgo v2 reflects the license
+> currently applied to its distribution, **not** a settled legal conclusion.
+> docxgo v2's git history descends from `fumiama/go-docx` *through* its AGPL
+> period (its `master` contains fumiama's full history through 2025-05, and
+> docxgo's own work begins 2025-10-21 on top of it). Whether docxgo may be
+> distributed under MIT — versus whether AGPL obligations attach — is a
+> derivative-work question for IP counsel, **not resolved here**. Earlier
+> versions of this file and the README described v2 as an "independent"
+> project; that framing was inaccurate and has been corrected.
+>
+> The full, reproducible provenance record is in
+> [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md) — read it (and its
+> "Status & open question" section) before relying on the MIT status.
 
 ---
 
-## Why v2 is Independent
+## How v2 diverges from the upstream
 
-### Reasons for Independence
+These points describe how far docxgo v2 has been rewritten from the
+`fumiama/go-docx` base. They are engineering facts about divergence — they do
+**not** establish legal independence from the AGPL upstream (see the licensing
+caveat above and `docs/PROVENANCE_AUDIT.md`).
 
-1. **Complete Architectural Rewrite**
-   - No shared code patterns with v1
-   - Different design principles (clean architecture)
+1. **Substantial architectural rewrite**
+   - Clean-architecture layering; different design principles
    - Breaking changes throughout
+   - Current tree shares only schema-dictated OOXML boilerplate with fumiama
 
-2. **Significant Divergence**
+2. **Significant divergence**
    - Different package structure
    - Different API design
    - Different error handling philosophy
 
-3. **Namespace Clarity**
-   - Users need clear distinction between versions
+3. **Namespace clarity**
+   - Users need a clear distinction between versions
    - Original namespace doesn't reflect current reality
 
 ### Attribution Philosophy

@@ -201,9 +201,9 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the dev
 
 ## License & Credits
 
-MIT licensed — free for commercial and private use; see [LICENSE](LICENSE).
+Distributed under the MIT license; see [LICENSE](LICENSE).
 
-docxgo's lineage is [gingfrederik/docx](https://github.com/gingfrederik/docx) (2020, MIT) → [gonfva/docxlib](https://github.com/gonfva/docxlib) (2021–2022, MIT) → [fumiama/go-docx](https://github.com/fumiama/go-docx) (forked 2023; upstream relicensed AGPL-3.0 on 2023-02-24). v2 is a complete, independent clean-architecture rewrite by Misael Monterroca, MIT licensed throughout. A line-level and structural provenance audit against the AGPL-licensed upstream found no shared logic, functions, or assets — only OOXML schema-dictated struct mappings and standard-library idioms in common, which also predate the AGPL relicense. See [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md) for the full analysis and [CREDITS.md](CREDITS.md) for the genealogy and copyright notices.
+docxgo's lineage is [gingfrederik/docx](https://github.com/gingfrederik/docx) (2020, MIT) → [gonfva/docxlib](https://github.com/gonfva/docxlib) (2021–2022, MIT) → [fumiama/go-docx](https://github.com/fumiama/go-docx) (relicensed from MIT to AGPL-3.0 on 2023-02-24). docxgo v2 was substantially rewritten on top of that upstream by Misael Monterroca; the current tree shares only schema-dictated OOXML boilerplate with it, but its git history descends from the AGPL-era upstream. The provenance facts — and the resulting open licensing question, which requires IP-counsel review — are documented in [docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md); see [CREDITS.md](CREDITS.md) for the genealogy and copyright notices.
 
 ## Support
 

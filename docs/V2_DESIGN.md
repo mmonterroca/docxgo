@@ -5,7 +5,7 @@
 **Latest Release**: v2.7.0 (July 2026)
 **Breaking Changes**: Yes (major version bump from original fork)
 
-> **Project Note**: This project originated as a fork of `fumiama/go-docx` but has been completely rewritten with a clean architecture design. The current version represents a ground-up rebuild focused on maintainability, type safety, and modern Go practices.
+> **Project Note**: This project is a fork of `fumiama/go-docx` (AGPL-3.0) that has been substantially rewritten with a clean-architecture design focused on maintainability, type safety, and modern Go practices. It is *not* an independent from-scratch project: its git history descends from the AGPL-era upstream. The provenance facts and the resulting open licensing question (which needs IP-counsel review) are documented in [PROVENANCE_AUDIT.md](./PROVENANCE_AUDIT.md).
 
 > **✅ Validation Status**: All examples pass DocxValidator (strict OOXML schema). Ready for beta release.
 > **📖 For API usage, see [V2_API_GUIDE.md](./V2_API_GUIDE.md)**
@@ -482,6 +482,13 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 ### ✅ Phase 5.5: Project Restructuring - COMPLETE
 
 **Goal**: Transform from fork to independent project
+
+> **Caveat (added 2026-07-18):** the "Update LICENSE to MIT" step below, applied
+> to a codebase whose git history descends from the AGPL-3.0 `fumiama/go-docx`,
+> is precisely the action whose validity is the open licensing question. This
+> checklist is left intact as an accurate record of what was done; it does not
+> imply the relicensing is legally settled. See
+> [PROVENANCE_AUDIT.md](./PROVENANCE_AUDIT.md).
 
 - [x] Create CREDITS.md with complete project history
 - [x] Move to personal namespace (github.com/mmonterroca/docxgo)
