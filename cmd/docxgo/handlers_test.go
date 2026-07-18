@@ -78,7 +78,7 @@ func TestResponseJSON(t *testing.T) {
 
 func TestParseHexColor(t *testing.T) {
 	tests := []struct {
-		input string
+		input   string
 		r, g, b uint8
 		wantErr bool
 	}{
@@ -144,7 +144,10 @@ func TestParseUnderline(t *testing.T) {
 }
 
 func TestParsePageSize(t *testing.T) {
-	tests := []struct{ input string; wantW, wantH int }{
+	tests := []struct {
+		input        string
+		wantW, wantH int
+	}{
 		{"A4", 11906, 16838},
 		{"Letter", 12240, 15840},
 		{"Legal", 12240, 20160},
@@ -652,8 +655,8 @@ func TestIntegration_CreateOpenInspectSave(t *testing.T) {
 	// 1. Create document and save to file
 	createResp := s.dispatch(makeRequest("i1", "document.create", map[string]interface{}{
 		"options": map[string]interface{}{
-			"title":   "Integration Test",
-			"author":  "Tester",
+			"title":    "Integration Test",
+			"author":   "Tester",
 			"pageSize": "A4",
 		},
 		"content": []interface{}{
@@ -1928,8 +1931,8 @@ func TestHandleApplyPatch_Basic(t *testing.T) {
 				"runs": []map[string]interface{}{{"text": "First paragraph", "bold": true}},
 			},
 			{
-				"op":   "appendParagraph",
-				"runs": []map[string]interface{}{{"text": "Second paragraph"}},
+				"op":    "appendParagraph",
+				"runs":  []map[string]interface{}{{"text": "Second paragraph"}},
 				"style": "Heading1",
 			},
 			{

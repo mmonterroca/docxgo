@@ -34,20 +34,20 @@ import (
 
 // tableStyle implements domain.Style and domain.TableStyleDef for table styles.
 type tableStyle struct {
-	mu              sync.RWMutex
-	id              string
-	name            string
-	basedOn         string
-	next            string
-	font            domain.Font
-	isDefault       bool
-	isBuiltIn       bool
-	tableBorders    domain.TableLevelBorders
-	hasTableBorders bool
-	cellMarginTop   int
-	cellMarginLeft  int
+	mu               sync.RWMutex
+	id               string
+	name             string
+	basedOn          string
+	next             string
+	font             domain.Font
+	isDefault        bool
+	isBuiltIn        bool
+	tableBorders     domain.TableLevelBorders
+	hasTableBorders  bool
+	cellMarginTop    int
+	cellMarginLeft   int
 	cellMarginBottom int
-	cellMarginRight int
+	cellMarginRight  int
 }
 
 // newTableStyle creates a new table style.

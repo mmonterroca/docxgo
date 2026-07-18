@@ -159,7 +159,7 @@ func (s *server) dispatch(req *Request) Response {
 type createParams struct {
 	Options  *docOptions       `json:"options,omitempty"`
 	Content  []json.RawMessage `json:"content,omitempty"`
-	Output   string            `json:"output"`            // "buffer" | "file"
+	Output   string            `json:"output"` // "buffer" | "file"
 	FilePath string            `json:"filePath,omitempty"`
 }
 
@@ -182,7 +182,7 @@ type openParams struct {
 // saveParams are the parameters for document.save.
 type saveParams struct {
 	DocumentID string `json:"documentId"`
-	Output     string `json:"output"`            // "buffer" | "file"
+	Output     string `json:"output"` // "buffer" | "file"
 	FilePath   string `json:"filePath,omitempty"`
 }
 
@@ -335,7 +335,7 @@ type runItem struct {
 	Italic    bool          `json:"italic,omitempty"`
 	Underline string        `json:"underline,omitempty"`
 	Strike    bool          `json:"strike,omitempty"`
-	Color     string        `json:"color,omitempty"`     // hex string
+	Color     string        `json:"color,omitempty"`    // hex string
 	FontSize  int           `json:"fontSize,omitempty"` // in points
 	Font      string        `json:"font,omitempty"`
 	Highlight string        `json:"highlight,omitempty"`
@@ -902,9 +902,9 @@ func (s *server) handleTableList(req *Request) Response {
 	items := make([]map[string]interface{}, 0, len(tables))
 	for i, t := range tables {
 		items = append(items, map[string]interface{}{
-			"index":    i,
-			"rows":     t.RowCount(),
-			"columns":  t.ColumnCount(),
+			"index":   i,
+			"rows":    t.RowCount(),
+			"columns": t.ColumnCount(),
 		})
 	}
 
