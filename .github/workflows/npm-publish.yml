@@ -152,6 +152,12 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           fi
 
+      # Platform packages are published by the prerequisite job. Refresh the
+      # lock metadata now so a release version that did not exist when the tag
+      # was cut is present before npm ci performs its strict sync check.
+      - name: Sync published platform dependencies
+        run: cd npm && npm install --package-lock-only --ignore-scripts
+
       - name: Install dependencies
         run: cd npm && npm ci
 
