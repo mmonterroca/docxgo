@@ -1378,6 +1378,10 @@ func lookupTheme(name string) themes.Theme {
 		return themes.Fintech
 	case "academic":
 		return themes.Academic
+	case "tech-presentation", "techpresentation":
+		return themes.TechPresentation
+	case "tech-darkmode", "techdarkmode":
+		return themes.TechDarkMode
 	}
 	return nil
 }

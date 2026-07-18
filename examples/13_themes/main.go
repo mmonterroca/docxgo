@@ -32,11 +32,9 @@ func main() {
 	fmt.Println("==========================")
 	fmt.Println()
 
-	// Get all available themes (Corporate, Startup, Modern, Fintech, Academic)
+	// Get all available themes (Corporate, Startup, Modern, Fintech, Academic,
+	// TechPresentation, TechDarkMode)
 	allThemes := themes.AllThemes()
-
-	// Also include the tech themes
-	allThemes = append(allThemes, themes.TechPresentation, themes.TechDarkMode)
 
 	fmt.Printf("Available themes: %d\n", len(allThemes))
 	for _, theme := range allThemes {

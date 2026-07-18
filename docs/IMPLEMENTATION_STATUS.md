@@ -1,7 +1,7 @@
 # go-docx v2 Implementation Status
 
 **Last Updated**: July 2026
-**Version**: 2.7.0 (Stable)
+**Version**: 2.7.1 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -35,6 +35,7 @@ All development phases have been completed. The library has gone through multipl
 | v2.5.0      | Jul 2026 | Cell run formatting (Italic/Color/FontSize/Underline), per-part header/footer relationship fix |
 | v2.6.0      | Jul 2026 | Default proofing language (`WithLanguage`/`WithLanguageEx`) |
 | v2.7.0      | Jul 2026 | JSON-RPC CLI (`cmd/docxgo`) + Node.js wrapper (`@mmonterroca/docxgo`), `document.setLanguage` |
+| v2.7.1      | Jul 2026 | Tech themes discoverable via public API (7 total), `docxgo` output branding, doc/provenance alignment |
 
 ---
 
@@ -99,9 +100,7 @@ All development phases have been completed. The library has gone through multipl
 - ✅ Custom image dimensions (`AddImageWithSize()`)
 - ✅ Floating images with positioning (`AddImageWithPosition()`)
 - ✅ Supported formats:
-  - ✅ PNG, JPEG, GIF, BMP
-  - ✅ TIFF, SVG, WEBP
-  - ✅ ICO, EMF
+  - ✅ PNG, JPEG, GIF
 - ✅ Automatic format detection
 - ✅ Image dimension reading
 
@@ -417,5 +416,5 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 ---
 
 **Last Updated**: July 2026
-**Status**: Production Ready (v2.7.0 Stable)
+**Status**: Production Ready (v2.7.1 Stable)
 **Maintained by**: Misael Monterroca ([@mmonterroca](https://github.com/mmonterroca))
