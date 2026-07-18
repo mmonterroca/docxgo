@@ -213,7 +213,7 @@ See: IMPLEMENTATION_STATUS.md - Features list
 1. Check [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) - Feature might not be implemented yet
 2. Review [examples/](../examples/) - Working code often explains best
 3. Read [V2_API_GUIDE.md](./V2_API_GUIDE.md) - Comprehensive API reference
-4. Open a GitHub Discussion - Community can help
+4. Open a GitHub Issue - Community can help
 
 **Found an issue in the docs?**
 
@@ -224,4 +224,4 @@ See: IMPLEMENTATION_STATUS.md - Features list
 ---
 
 **Last Updated**: July 2026  
-**Documentation Version**: v2.7.1
+**Documentation Version**: v2.7.2

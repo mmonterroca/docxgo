@@ -20,7 +20,7 @@ Since v2.7.0 it also ships a JSON-RPC command-line interface and a Node.js wrapp
 - **Proofing language** — `WithLanguage` / `WithLanguageEx` for spell-check, grammar, hyphenation
 - **Production quality** — clean architecture, explicit errors, thread-safe internals
 
-**Status:** v2.7.1 · Production-ready · Requires Go 1.23+ (no external C dependencies; runs on Linux, macOS, Windows). See the [CHANGELOG](CHANGELOG.md) for version history.
+**Status:** v2.7.2 · Production-ready · Requires Go 1.23+ (no external C dependencies; runs on Linux, macOS, Windows). See the [CHANGELOG](CHANGELOG.md) for version history.
 
 ---
 
@@ -150,7 +150,7 @@ Node.js examples live in [`npm/examples/`](npm/examples/).
 
 ## Architecture
 
-Clean architecture with clear layer boundaries — `domain/` (public interfaces), `internal/` (implementations), `pkg/` (utilities), `themes/`, plus the `cmd/docxgo/` CLI binary and `npm/` Node.js wrapper. Interface segregation, dependency injection, explicit errors, strong typing (no `interface{}`), and thread-safe internal managers (a single `Document` is not thread-safe — guard concurrent access; see the package godoc's Thread Safety section). See **[docs/V2_DESIGN.md](docs/V2_DESIGN.md)** for the full rationale.
+Clean architecture with clear layer boundaries — `domain/` (public interfaces), `internal/` (implementations), `pkg/` (utilities), `themes/`, plus the `cmd/docxgo/` CLI binary and `npm/` Node.js wrapper. Interface segregation, dependency injection, explicit errors, a strongly typed public API, and thread-safe internal managers (a single `Document` is not thread-safe — guard concurrent access; see the package godoc's Thread Safety section). See **[docs/V2_DESIGN.md](docs/V2_DESIGN.md)** for the full rationale.
 
 ---
 
@@ -192,9 +192,9 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the dev
 
 ## License & Credits
 
-docxgo is currently distributed under the MIT license ([LICENSE](LICENSE)). It is a fork of the AGPL-licensed [`fumiama/go-docx`](https://github.com/fumiama/go-docx); its provenance and the resulting open licensing question are documented in **[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md)** — the single source of truth for this topic. See [CREDITS.md](CREDITS.md) for authorship and copyright notices.
+docxgo v2 is distributed under the MIT license ([LICENSE](LICENSE)). Its Git history descends from [`fumiama/go-docx`](https://github.com/fumiama/go-docx) and includes AGPL-era upstream snapshots; the completed [provenance audit](docs/PROVENANCE_AUDIT.md) determines that the current rewritten release contains no protectable AGPL implementation. Historical commits retain their original licenses. See [CREDITS.md](CREDITS.md) for the full genealogy.
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/mmonterroca/docxgo/issues) · **Discussions:** [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
+- **Support:** [GitHub Issues](https://github.com/mmonterroca/docxgo/issues) for bugs, questions, and feature requests
 - **Email:** misael@monterroca.com

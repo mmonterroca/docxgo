@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.23.x'
           cache: false
@@ -48,14 +48,15 @@ jobs:
         run: |
           mkdir -p dist
           go build -ldflags="-s -w" -o dist/docxgo${{ matrix.ext }} ./cmd/docxgo/
+          cp LICENSE dist/LICENSE
 
       - name: Package archive
         run: |
           cd dist
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            zip ../docxgo-${{ matrix.suffix }}.zip docxgo${{ matrix.ext }}
+            zip ../docxgo-${{ matrix.suffix }}.zip docxgo${{ matrix.ext }} LICENSE
           else
-            tar czf ../docxgo-${{ matrix.suffix }}.tar.gz docxgo${{ matrix.ext }}
+            tar czf ../docxgo-${{ matrix.suffix }}.tar.gz docxgo${{ matrix.ext }} LICENSE
           fi
 
       - name: Upload artifact
@@ -70,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.23.x'
           cache: false

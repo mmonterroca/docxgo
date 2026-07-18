@@ -222,7 +222,7 @@ Update documentation when adding features:
 ## Community
 
 - **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
-- **Discussions**: Ask questions or share ideas in [GitHub Discussions](https://github.com/mmonterroca/docxgo/discussions)
+- **Questions and ideas**: Use [GitHub Issues](https://github.com/mmonterroca/docxgo/issues)
 - **Code of Conduct**: Be respectful and constructive
 
 ## Questions?

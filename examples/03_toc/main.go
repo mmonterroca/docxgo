@@ -101,7 +101,7 @@ func addCover(doc domain.Document) error {
 	if err != nil {
 		return fmt.Errorf("add title run: %w", err)
 	}
-	if err := titleRun.SetText("go-docx v2 Table of Contents Demo"); err != nil {
+	if err := titleRun.SetText("docxgo v2 Table of Contents Demo"); err != nil {
 		return fmt.Errorf("set title text: %w", err)
 	}
 

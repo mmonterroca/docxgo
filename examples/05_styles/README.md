@@ -1,6 +1,6 @@
 # Example 05: Style Management
 
-This example demonstrates the comprehensive style management system in go-docx v2.
+This example demonstrates the comprehensive style management system in docxgo v2.
 
 ## Features Demonstrated
 
@@ -83,4 +83,4 @@ The generated document includes:
 
 - See [Example 06](../06_sections) for section and page layout management
 - See [Example 07](../07_advanced) for combining all advanced features
-- Read [API Documentation](../../../docs/API_DOCUMENTATION.md) for complete style reference
+- Read the [API guide](../../docs/V2_API_GUIDE.md) for the complete style reference

@@ -1,3 +1,23 @@
+## v2.7.2 — 2026-07-18
+
+### Compliance
+
+- **Definitive MIT provenance determination.** `docs/PROVENANCE_AUDIT.md` now records the reproducible conclusion that the current v2 implementation may remain MIT: AGPL applies to the historical upstream snapshots in Git history, not to the current release tree. No project-wide AGPL relicense or further licensing consultation is an open release task.
+- **Corrected copyright notices.** The root `LICENSE` preserves the exact MIT-era predecessor notices without implying that fumiama's later AGPL-era work was licensed as MIT. `CREDITS.md`, the README, package godoc, and design documentation now use the same determination.
+- **License-complete artifacts.** Platform npm packages and GitHub binary archives now include the root MIT license text. This repairs the notice omission identified in the published v2.7.1 artifacts.
+
+### Fixed
+
+- **Release metadata and documentation** now consistently report v2.7.2 across the Go version constant, CLI examples, API/design/status guides, and npm package metadata.
+- **Documentation import paths and branding** now use the public `/v2` module path and the `docxgo` project name.
+- **Release automation comments and actions** now match the actual PAT-triggered npm publication path, and Go setup actions are aligned on `actions/setup-go@v7`.
+
+### Compatibility
+
+- No public Go, CLI protocol, or Node.js API changed. This is a backward-compatible compliance, packaging, and documentation patch.
+
+---
+
 ## v2.7.1 — 2026-07-18
 
 ### Added
@@ -198,7 +218,7 @@
 
 ### Acknowledgements
 
-- Original fix: [PR #3](https://github.com/mmonterroca/docxgo/pull/3) by @g-mero
+- Original fix contributed by @g-mero; the historical PR is no longer available
 - Validation & extension: [PR #4](https://github.com/mmonterroca/docxgo/pull/4) by @Copilot
 
 ---

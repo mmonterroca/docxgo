@@ -1,11 +1,11 @@
-# go-docx v2.0 - Clean Architecture Design
+# docxgo v2 - Clean Architecture Design
 
-**Status**: ✅ v2.7.1 Stable
+**Status**: ✅ v2.7.2 Stable
 **Progress**: Production Ready (all core features complete)
-**Latest Release**: v2.7.1 (July 2026)
+**Latest Release**: v2.7.2 (July 2026)
 **Breaking Changes**: Yes (major version bump from original fork)
 
-> **Project Note**: This project is a substantially-rewritten fork of `fumiama/go-docx` (AGPL-3.0), focused on clean architecture, type safety, and modern Go practices. Its provenance and the resulting open licensing question are documented in [PROVENANCE_AUDIT.md](./PROVENANCE_AUDIT.md) — the single source of truth for that topic.
+> **Project Note**: This project is a substantially rewritten successor to `fumiama/go-docx`, focused on clean architecture, type safety, and modern Go practices. The Git history includes AGPL-era upstream snapshots; the completed [provenance audit](./PROVENANCE_AUDIT.md) determines that the current MIT release contains no protectable AGPL implementation.
 
 > **✅ Validation Status**: All examples pass DocxValidator (strict OOXML schema). Ready for beta release.
 > **📖 For API usage, see [V2_API_GUIDE.md](./V2_API_GUIDE.md)**
@@ -409,14 +409,14 @@ doc.WriteTo(file)
 
 ```go
 // v2 (new - current)
-import docx "github.com/mmonterroca/docxgo/v2"  // NEW namespace (no /v2 suffix in root)
+import docx "github.com/mmonterroca/docxgo/v2"
 
 // Builder pattern with error handling
-doc := docx.NewDocument(
+builder := docx.NewDocumentBuilder(
     docx.WithDefaultFont("Calibri"),
 )
 
-doc.AddParagraph().
+builder.AddParagraph().
     Text("Hello").
     Bold().
     Color(docx.Red).
@@ -424,7 +424,7 @@ doc.AddParagraph().
     End()
 
 // Validate and build
-finalDoc, err := doc.Build()
+finalDoc, err := builder.Build()
 if err != nil {
     log.Fatal(err)
 }
@@ -441,7 +441,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 
 ### ✅ Phase 1: Foundation (Weeks 1-2) - COMPLETE
 
-- [x] Set up v2 module (`go mod init github.com/mmonterroca/docxgo`)
+- [x] Set up v2 module (`go mod init github.com/mmonterroca/docxgo/v2`)
 - [x] Define core interfaces (`domain/`)
 - [x] Create package structure
 - [x] Set up testing framework
@@ -483,13 +483,12 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 
 **Goal**: Restructure into a standalone project namespace
 
-> **Note:** the "Set distribution license to MIT" step below is the very action
-> whose validity is the open licensing question. This checklist is an accurate
-> record of what was done; it draws no legal conclusion. See
-> [PROVENANCE_AUDIT.md](./PROVENANCE_AUDIT.md), the single source of truth.
+> **Note:** the completed [provenance audit](./PROVENANCE_AUDIT.md) confirms the
+> MIT determination for the rewritten v2 release. Historical AGPL snapshots
+> retain their original license.
 
 - [x] Create CREDITS.md with complete project history
-- [x] Move to personal namespace (github.com/mmonterroca/docxgo)
+- [x] Move to personal namespace (`github.com/mmonterroca/docxgo/v2` module)
 - [x] Set distribution license to MIT
 - [x] Rename project to "docxgo" (avoid confusion)
 - [x] Update all documentation with new namespace
@@ -607,7 +606,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
 
 - [x] Domain interfaces (image.go) (~172 lines)
   - [x] Image interface with dimensions, format, data
-  - [x] ImageFormat enum (PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP)
+  - [x] ImageFormat enum (PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP); PNG/JPEG/GIF currently decode end-to-end
   - [x] ImageSize struct with width/height in pixels and EMUs
   - [x] ImagePosition with inline/floating support
 - [x] Core implementation (internal/core/image.go) (~270 lines)
@@ -1038,7 +1037,7 @@ docs/
 5. 917f48d - Complete godoc documentation - Task 6
 6. b648bfe - Complete test coverage analysis - Task 7
 7. 725d7d0 - Complete error handling review - Task 9
-8. (pending) - Complete documentation overhaul - Task 10
+8. Documentation overhaul completed in the Phase 11 work described here
 
 **Documentation Created/Updated:**
 
@@ -1328,7 +1327,7 @@ if err != nil {
 
 ### Previous Contributions
 
-- **fumiama** (2022-2024): Original fork with enhanced features
+- **fumiama** (2023-2025): Upstream fork with enhanced features
 - **Gonzalo Fernández-Victorio** (2021): Original `gonfva/docxlib` library, for Basement Crowd Ltd
 
 See [CREDITS.md](../CREDITS.md) for complete project history.
@@ -1340,12 +1339,12 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 - [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 - [Effective Go](https://golang.org/doc/effective_go)
 - [Go Proverbs](https://go-proverbs.github.io/)
-- [OOXML Specification](http://www.ecma-international.org/publications/standards/Ecma-376.htm)
+- [ECMA-376 OOXML Specification](https://ecma-international.org/publications-and-standards/standards/ecma-376/)
 
 ---
 
-**Last Updated**: April 2026
-**Status**: ✅ v2.7.1 Stable
+**Last Updated**: July 2026
+**Status**: ✅ v2.7.2 Stable
 **Progress**: Production Ready (all core features complete)
 
 **Current State:**

@@ -1,6 +1,6 @@
 # Example 03: Table of Contents (TOC)
 
-This example shows how to build a Table of Contents using go-docx v2. The document:
+This example shows how to build a Table of Contents using docxgo v2. The document:
 
 - Uses the fluent builder API for cover, chapters, and appendix content
 - Inserts a TOC field configured for Heading 1 and Heading 2 entries with hyperlinks

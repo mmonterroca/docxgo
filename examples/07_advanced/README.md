@@ -82,7 +82,7 @@ func setupHeader(header domain.Header) {
     para.SetAlignment(domain.AlignmentRight)
     
     run, _ := para.AddRun()
-    run.AddText("go-docx v2 • Advanced Features Demo")
+    run.AddText("docxgo v2 • Advanced Features Demo")
     run.SetFontSize(10)
     run.SetColor(0x4472C4) // Blue
 }
@@ -185,9 +185,9 @@ The generated document is approximately 4-5 pages and includes:
 ## Next Steps
 
 - Review individual examples for specific features
-- Read [API Documentation](../../../docs/API_DOCUMENTATION.md)
-- Check [MIGRATION.md](../../../MIGRATION.md) for v1→v2 transition
-- Explore [V2_DESIGN.md](../../../docs/V2_DESIGN.md) for architecture
+- Read the [API guide](../../docs/V2_API_GUIDE.md)
+- Check [MIGRATION.md](../../MIGRATION.md) for the v1→v2 transition
+- Explore [V2_DESIGN.md](../../docs/V2_DESIGN.md) for architecture
 
 ## Performance Note
 

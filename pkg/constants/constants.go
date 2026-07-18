@@ -4,7 +4,7 @@
 // See LICENSE for the full copyright notice, including predecessor authors,
 // and CREDITS.md for the project genealogy.
 
-// Package constants provides OOXML constants and measurements for go-docx v2.
+// Package constants provides OOXML constants and measurements for docxgo v2.
 package constants
 
 // Measurement conversions

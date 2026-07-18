@@ -4,7 +4,7 @@
 // See LICENSE for the full copyright notice, including predecessor authors,
 // and CREDITS.md for the project genealogy.
 
-// Package domain defines the core domain interfaces for go-docx v2.
+// Package domain defines the core domain interfaces for docxgo v2.
 //
 // This package provides a clean, testable API for working with Word documents.
 // All functionality is exposed through interfaces to promote loose coupling

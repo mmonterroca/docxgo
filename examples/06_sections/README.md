@@ -1,6 +1,6 @@
 # Example 06: Section and Page Layout Management
 
-This example demonstrates comprehensive section management, page layout configuration, and headers/footers in go-docx v2.
+This example demonstrates comprehensive section management, page layout configuration, and headers/footers in docxgo v2.
 
 ## Features Demonstrated
 
@@ -174,4 +174,4 @@ The generated document includes:
 
 - See [Example 07](../07_advanced) for combining sections with fields and styles
 - See [Example 04](../04_fields) for more field types
-- Read [API Documentation](../../../docs/API_DOCUMENTATION.md) for complete section reference
+- Read the [API guide](../../docs/V2_API_GUIDE.md) for the complete section reference

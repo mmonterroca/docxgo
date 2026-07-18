@@ -17,7 +17,8 @@ that corpus.
 This is a coarse, line-set-membership check, not an AST or semantic diff —
 by design: it flags any verbatim textual overlap at all (including
 schema-dictated struct tags, which are then manually reviewed for whether
-they're independently protectable, per docs/PROVENANCE_AUDIT.md Finding 2).
+they're independently protectable, per the "Exact line overlap" section of
+docs/PROVENANCE_AUDIT.md).
 """
 import os
 import re

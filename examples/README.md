@@ -1,6 +1,6 @@
 # go-docx Examples
 
-This directory contains practical, runnable examples demonstrating go-docx v2 capabilities.
+This directory contains practical, runnable examples demonstrating docxgo v2 capabilities.
 
 ## ✅ Working Examples (v2)
 

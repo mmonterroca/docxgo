@@ -1,6 +1,6 @@
 # Troubleshooting DOCX Validation Errors
 
-This document describes the OOXML validation issues encountered during go-docx v2 development and the solutions implemented. It serves as a guide for diagnosing and resolving similar issues in the future.
+This document describes the OOXML validation issues encountered during docxgo v2 development and the solutions implemented. It serves as a guide for diagnosing and resolving similar issues in the future.
 
 ## Table of Contents
 
@@ -341,7 +341,7 @@ These errors come from original documents created by Word and are **tolerated by
 
 - [ECMA-376 Office Open XML](https://www.ecma-international.org/publications-and-standards/standards/ecma-376/)
 - [DrawingML Positioning](https://docs.microsoft.com/en-us/dotnet/api/documentformat.openxml.drawing.wordprocessing)
-- [OpenXML SDK Validation](https://docs.microsoft.com/en-us/office/open-xml/how-to-validate-a-word-processing-document)
+- [Open XML SDK validation](https://learn.microsoft.com/en-us/office/open-xml/word/how-to-validate-a-word-processing-document)
 
 ---
 

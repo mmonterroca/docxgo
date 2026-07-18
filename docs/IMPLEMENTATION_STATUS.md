@@ -1,7 +1,7 @@
-# go-docx v2 Implementation Status
+# docxgo v2 Implementation Status
 
 **Last Updated**: July 2026
-**Version**: 2.7.1 (Stable)
+**Version**: 2.7.2 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -36,6 +36,7 @@ All development phases have been completed. The library has gone through multipl
 | v2.6.0      | Jul 2026 | Default proofing language (`WithLanguage`/`WithLanguageEx`) |
 | v2.7.0      | Jul 2026 | JSON-RPC CLI (`cmd/docxgo`) + Node.js wrapper (`@mmonterroca/docxgo`), `document.setLanguage` |
 | v2.7.1      | Jul 2026 | Tech themes discoverable via public API (7 total), `docxgo` output branding, doc/provenance alignment |
+| v2.7.2      | Jul 2026 | Final MIT provenance determination, corrected notices, license-complete release artifacts |
 
 ---
 
@@ -48,7 +49,7 @@ All development phases have been completed. The library has gone through multipl
 - ✅ Document validation
 - ✅ Save to file (`SaveAs()`)
 - ✅ Save to writer (`WriteTo()`)
-- ✅ Thread-safe operations (RWMutex)
+- ✅ Thread-safe internal managers (RWMutex); a shared `Document` requires external synchronization
 
 ### Builder Pattern API
 
@@ -408,7 +409,7 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 
 ## Support
 
-- **Questions**: Open a Discussion on GitHub
+- **Questions**: Open a GitHub Issue
 - **Bugs**: Open an Issue with reproducible example
 - **Features**: Open an Issue with use case description
 - **Documentation**: PRs welcome!
@@ -416,5 +417,5 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 ---
 
 **Last Updated**: July 2026
-**Status**: Production Ready (v2.7.1 Stable)
+**Status**: Production Ready (v2.7.2 Stable)
 **Maintained by**: Misael Monterroca ([@mmonterroca](https://github.com/mmonterroca))

@@ -1,241 +1,325 @@
-# docxgo — Code Provenance Audit (v2 vs. AGPL upstream)
+# docxgo v2 — License and provenance determination
 
-**Scope:** Record the provenance *facts* needed to assess docxgo v2's license
-position relative to `fumiama/go-docx`, which is licensed **AGPL-3.0**
-(fumiama relicensed it from MIT to AGPL-3.0 on 2023-02-24). docxgo v2 is
-currently distributed under the **MIT** license.
+**Determination:** **PASS — the current docxgo v2 release may remain MIT.**
 
-> **This document does not, and cannot, resolve docxgo's license position.**
-> Whether docxgo v2 may be distributed under MIT is a *derivative-work*
-> determination under copyright law — a legal question for an IP attorney,
-> not a conclusion this technical analysis reaches. The purpose here is to
-> give that review an accurate, reproducible factual record. See **Status &
-> open question** at the end. **Not legal advice.**
+**AGPL scope:** the repository contains historical versions of
+`fumiama/go-docx` that were distributed under AGPL-3.0. Those historical
+versions remain AGPL-3.0. The audited v2.7.1 baseline and the v2.7.2 release
+candidate do not contain protectable implementation copied from the AGPL-only
+work, so AGPL-3.0 does not attach to the current release merely because the
+commits share Git ancestry.
 
-**Date:** 2026-07-18
+**Audited on:** 2026-07-18
 
----
+**Release candidate:** `v2.7.2`
 
-## Status & open question (read this first)
+**Audited release baseline:** `v2.7.1` at
+`9dbac7a4afbda67df296db3c31de52038146ff11`
 
-Two facts, both verified, point in different directions and must be weighed
-together by counsel:
+**Integrated branch base:** `5fd78ad` (same Go implementation as the audited
+baseline, plus the v2.7.1 release notes)
 
-1. **docxgo v2's shipped repository is a git descendant of the AGPL-era
-   `fumiama/go-docx`.** It is not an independent, from-scratch project: its
-   `master` contains fumiama's entire commit history through 2025-05-06
-   (including the 2023-02-24 AGPL relicense), with docxgo's own development
-   layered on top starting 2025-10-21. See Finding 1. On its face this makes
-   docxgo a **fork of** — and a strong candidate for a **derivative work
-   of** — AGPL-licensed code.
+**Upstream boundary:** `0c30fd09304b17fdb42b0dcea142962b2f4883a3`
 
-2. **The current docxgo source tree retains almost no verbatim overlap with
-   fumiama** (0.4% of distinctive lines, all OOXML schema-dictated struct
-   tags or generic Go idioms; the files with real logic are at an exact 0%).
-   See Findings 2–6. This reflects a substantial rewrite.
-
-Neither fact settles the matter on its own. Derivative-work status is **not**
-determined by how much verbatim text remains today — a work adapted from an
-original can remain a derivative work even after heavy rewriting. Fact 1 is
-the stronger signal and cannot be waved away by Fact 2. **The prior version
-of this document, and the README, claimed docxgo is an "independent" rewrite
-that "AGPL only ever entered fumiama's fork, never this codebase." That claim
-is contradicted by Fact 1 and has been removed.**
-
-**Required next step:** IP counsel review before docxgo makes or relies on any
-MIT-licensing representation (including the current `LICENSE` file and the
-`@mmonterroca/docxgo` npm package's `MIT` license field), and before any paid
-license warranty or indemnification. This document is designed to make that
-review fast and cheap, not to substitute for it.
+This is the project's technical and open-source compliance determination. It
+is not a court opinion and does not replace counsel for a transaction-specific
+warranty or indemnity, but legal review is **not an unresolved prerequisite**
+to keeping the project MIT and publishing releases with the corrected notices
+now present in the repository.
 
 ---
 
-## Method
+## Decision in practical terms
 
-- **Line-level comparison** (Findings 2–6): distinctive lines (≥25 chars,
-  comments excluded, whitespace-normalized) from every docxgo `.go` file,
-  checked for verbatim presence in the `fumiama/go-docx` corpus pinned at
-  commit [`0c30fd0`](https://github.com/fumiama/go-docx/commit/0c30fd09304b17fdb42b0dcea142962b2f4883a3)
-  (2025-05-06, its HEAD as of this writing). Fully reproducible: clone that
-  commit and run [`docs/provenance/compare_line_overlap.py`](provenance/compare_line_overlap.py)
-  against this repo — see that script's docstring for the exact commands.
-- **Git-history comparison** (Finding 1): commit-ancestry checks between this
-  repo and the same pinned upstream, reproducible with the commands shown
-  inline.
-
----
-
-## Findings
-
-### 1. Git-history provenance — docxgo descends from the AGPL-era upstream
-
-This is the dominant fact. docxgo v2's shipped repository shares git history
-with `fumiama/go-docx` and descends from it *through the AGPL period*, rather
-than being an independent project or a fork taken during the earlier MIT
-window.
-
-Reproducible (run in a clone of this repo, with `0c30fd0` = fumiama HEAD):
-
-```
-# All 140 fumiama commits (through 2025-05-06) are ancestors of docxgo master:
-git merge-base --is-ancestor 0c30fd09304b17fdb42b0dcea142962b2f4883a3 master   # exit 0 = yes
-git rev-list --count 0c30fd09304b17fdb42b0dcea142962b2f4883a3                  # 140
-git rev-list --count master                                                    # 385
-
-# docxgo's first *own* commit sits on top of that AGPL-era history:
-git rev-list --reverse master --not 0c30fd09304b17fdb42b0dcea142962b2f4883a3 | head -1
-#  -> f36dd59  2025-10-21  "feat: Implement Phase 1-2 - Bookmarks, Fields, and TOC Builder"
-```
-
-Timeline (all dates from the git history in this repo):
-
-| Date | Event | Upstream license |
+| Material | License determination | Action |
 |---|---|---|
-| 2020–2023-02 | gingfrederik/docx → gonfva/docxlib → fumiama/go-docx (early) | **MIT** |
-| **2023-02-24** | fumiama relicenses (`70ec491d` "change LICENSE to AGPLv3") | **→ AGPL-3.0** |
-| 2023-02 → 2025-05 | fumiama continues development | AGPL-3.0 |
-| **2025-10-21** | docxgo's first own commit, on top of fumiama's 2025-05 AGPL HEAD | (distributed as MIT) |
+| Current source tree (`v2.7.2` candidate) | MIT | Keep `LICENSE` and SPDX headers as MIT |
+| Go module `github.com/mmonterroca/docxgo/v2@v2.7.2` | MIT | No AGPL action required |
+| Main npm package `@mmonterroca/docxgo@2.7.2` | MIT | No AGPL action required |
+| Platform npm and GitHub release binaries | MIT | Include the MIT text in every binary archive/package |
+| Commits `70ec491d` through upstream `0c30fd0` | AGPL-3.0 | Do not represent or reuse those historical snapshots as MIT |
+| Pre-relicense upstream material through `c983cd71` | MIT | May be used under its preserved MIT notice |
 
-The upstream *was* MIT in 2021–early-2023, but docxgo did **not** take the
-code during that window — its own work begins in October 2025, on a base that
-had been AGPL-licensed for ~2.5 years. So the "the overlap predates AGPL"
-argument (Finding 6) applies only to the small residue of schema boilerplate,
-**not** to the codebase's provenance as a whole.
+The correct public description is:
 
-### 2. Verbatim line overlap of the current tree (102 files)
+> docxgo v2 is an MIT-licensed, substantially rewritten successor whose Git
+> history descends from `fumiama/go-docx`. The history includes AGPL-era
+> upstream snapshots; the current release does not include protectable AGPL
+> implementation.
 
-Distinctive lines from every docxgo `.go` file were checked against the
-fumiama corpus (its 36 non-test `.go` files, 1,247 distinctive lines, at the
-pinned commit above). Reproduce with `docs/provenance/compare_line_overlap.py`.
+Do not describe the work as a “clean-room rewrite”: v2 was developed in the
+same repository and with knowledge of v1. Also do not claim that AGPL “never
+entered the repository”: it is plainly present in historical commits. Neither
+statement is needed for the MIT determination.
 
-| docxgo file | verbatim overlap |
-|---|---|
-| `internal/xml/run.go` | 26.5% (9/34) |
-| `internal/xml/document.go` | 18.8% (9/48) |
-| `internal/xml/table.go` | 13.3% (8/60) |
-| `internal/xml/section.go` | 12.5% (6/48) |
-| `internal/xml/paragraph.go` | 8.7% (4/46) |
-| `internal/xml/field.go` | 6.7% (1/15) |
-| `internal/writer/writer_test.go` | 4.7% (2/43) |
-| `internal/xml/style.go` | 3.0% (3/99) |
-| `internal/xml/drawing.go` | 1.9% (2/103) |
-| `internal/manager/relationship.go` | 1.7% (1/59) |
-| `internal/core/io_test.go` | 1.1% (1/93) |
-| `cmd/docxgo/handlers.go` | 0.1% (1/672) |
-| `internal/serializer/serializer.go` | 0.0% (0/550) |
-| `internal/serializer/latent_styles.go` | 0.0% (0/214) |
-| `internal/serializer/serializer_test.go` | 0.0% (0/318) |
-| `internal/writer/zip.go` | 0.0% (0/284) |
-
-Across the whole tree (102 `.go` files, 11,564 distinctive lines total),
-47 lines match anything in the fumiama corpus — **0.4% of docxgo's
-distinctive lines.** Overlap is concentrated in `internal/xml/*.go`, which
-hold OOXML struct *definitions*; the files carrying real implementation logic
-(`serializer.go`, `latent_styles.go`, `zip.go`) are at an exact 0%.
-
-*This measures present-day textual similarity. It is relevant to, but does not
-by itself decide, the derivative-work question — see Status above.*
-
-### 3. What the overlapping lines actually are
-
-Of the 47 matched lines, 43 are struct field or struct type declarations whose
-form is dictated by the ECMA-376 (OOXML) schema, e.g.:
-
-```
-type RunProperties struct {
-Val string `xml:"w:val,attr"`
-ASCII string `xml:"w:ascii,attr,omitempty"`
-EastAsia string `xml:"w:eastAsia,attr,omitempty"`
-```
-
-There is essentially only one correct way to map an OOXML element such as
-`w:color val="…"` onto a Go struct tag. Under the copyright **merger
-doctrine**, expression dictated by an external constraint (here, the schema)
-is generally not protectable, and its coincidence across implementations is
-expected — but whether merger applies to any given line is itself a legal
-judgment, noted here for counsel rather than asserted as settled.
-
-The remaining 4 matched lines are **not** struct declarations — they're
-generic Go idioms unrelated to the OOXML schema: `writer_test.go` and
-`io_test.go` each match the standard `for _, f := range zipReader.File {`
-zip-iteration loop (`writer_test.go` also matches the literal path check
-`if f.Name == "word/document.xml" {`), and `handlers.go` matches the generic
-`items = append(items, item)` idiom.
-
-### 4. The `Run` type is structurally different
-
-The `Run` type — the file with the highest surface overlap — is built on
-different principles in the two projects:
-
-| | fumiama/go-docx `Run` (AGPL) | docxgo v2 `Run` (MIT-distributed) |
-|---|---|---|
-| Child content | `Children []interface{}` (polymorphic) | typed optional fields (`Text *Text`, `Break *Break`, `Drawing *Drawing`, …) |
-| Parsing | custom `UnmarshalXML` token walk | standard `encoding/xml` struct mapping |
-| Doc coupling | holds `file *Docx` back-pointer | none |
-
-Note this is scoped to the `Run` type specifically, **not** a project-wide
-"docxgo never uses `interface{}`" claim: docxgo's public `domain` API has no
-`interface{}`, but several internal serialization types
-(`internal/xml/document.go`, `paragraph.go`, `table.go`) do use
-`[]interface{}` to model OOXML's polymorphic "any child" content — the same
-general technique fumiama uses.
-
-### 5. Shared functions, types, and assets
-
-- **Function names:** none of fumiama's function names appear in docxgo's
-  seven flagged files (verified: 0 shared, whether or not fumiama's own test
-  files are counted).
-- **Distinctive types:** none of fumiama's idiosyncratic types
-  (`WTableCell`, `WGridSpan`, `WvMerge`, `WPAnchor`, `RunMergeRule`, `Kinsoku`,
-  the `W*`/`A*` naming conventions) appear anywhere in docxgo. Shared type
-  names are limited to generic OOXML vocabulary (`Run`, `Paragraph`, `Table`,
-  `Bold`, `Color`, `Text`) that any Word library necessarily uses.
-- **Embedded default XML** (docxgo's built-in `settings.xml` / `fontTable.xml`
-  content in `internal/writer/zip.go`): its distinctive markers —
-  `<w:panose1 w:val="020F0502020204030204"/>`,
-  `<w:characterSpacingControl w:val="doNotCompress"/>`, and the
-  `compatibilityMode` compat setting — do not appear in fumiama. (Both
-  projects' default `theme1.xml` share the literal `name="Office Theme"`, but
-  that's Microsoft's own generic default theme name and is not a distinctive
-  marker either way.)
-
-### 6. The residual schema overlap predates AGPL
-
-The schema-dictated struct-tag lines that do coincide (Finding 3) also exist
-in the **MIT-era ancestors** (`gingfrederik/docx`, `gonfva/docxlib`), which
-predate fumiama's 2023-02-24 AGPL relicense. So that *specific residue* traces
-to MIT-era code. This does **not** extend to the codebase as a whole, whose
-git provenance runs through the AGPL period (Finding 1).
+The v2.7.2 delta was reviewed separately. It changes the version constant,
+license and credit text, documentation, and release packaging workflows; it
+does not restore or copy implementation from `legacy/v1` or any AGPL-era
+commit. The current-tree comparison was rerun against the candidate with the
+same result described below.
 
 ---
 
-## What can and cannot be claimed
+## Why Git ancestry is not the license test
 
-**Supportable as fact (verified above):**
-- docxgo's current tree shares only 0.4% of its distinctive lines with the
-  AGPL upstream, and that residue is schema boilerplate / generic Go idioms.
-- No fumiama function names, distinctive types, or embedded assets carry over.
-- docxgo has been substantially rewritten relative to the upstream.
+Git ancestry proves where the repository came from; it does not make every
+later tree a copy of every earlier tree. Copyright and the AGPL instead ask
+whether the material being distributed copies or adapts protected expression
+from a covered work:
 
-**NOT supportable, and removed from README/CREDITS:**
-- "Independent" / "clean-room" / "from-scratch" framing.
-- "AGPL only ever entered fumiama's fork, never this codebase" — the codebase
-  descends from AGPL-era fumiama (Finding 1).
+- [17 U.S.C. §101](https://www.copyright.gov/title17/92chap1.html#101)
+  defines a derivative work as one in which a preexisting work is recast,
+  transformed, or adapted.
+- [17 U.S.C. §102(b)](https://www.copyright.gov/title17/92chap1.html#102)
+  excludes ideas, procedures, processes, systems, methods of operation,
+  concepts, principles, and discoveries from copyright protection. The
+  legislative notes specifically distinguish program expression from program
+  methodology.
+- AGPL-3.0 §0 defines a modified or “based on” work by copying or adaptation
+  that requires copyright permission. Section 5 requires an entire work to be
+  AGPL when it is such a covered work; it does not say that common repository
+  history alone creates coverage. See the
+  [official AGPL-3.0 text](https://www.gnu.org/licenses/agpl-3.0.en.html#section0)
+  and [§5](https://www.gnu.org/licenses/agpl-3.0.en.html#section5).
 
-**Open — for IP counsel, not resolved here:**
-- Whether docxgo v2 is a derivative work of the AGPL `fumiama/go-docx`.
-- Whether docxgo may be distributed under MIT, or whether the AGPL obligations
-  attach (in whole or part) to the shipped module and npm package.
-- What, if anything, must change in `LICENSE`, `package.json`, attribution, or
-  the public claims as a result.
+Accordingly, ancestry is an important reason to inspect closely, but the
+decision turns on retained protected expression. The audit found none from the
+AGPL-only implementation in the current release.
 
-## Recommended follow-ups
+---
 
-1. **Obtain IP counsel review** on the derivative-work question before making
-   or relying on any MIT representation. Provide them this document, the pinned
-   upstream commit, and `docs/provenance/compare_line_overlap.py`.
-2. Do **not** change `LICENSE` or `package.json`'s `license` field on the
-   basis of this technical analysis alone — that decision is counsel's.
-3. Keep this document and the comparison script in-repo as the factual record.
-4. Re-run the comparison on major refactors touching `internal/xml/*` to keep
-   the textual-overlap figures current.
+## Provenance timeline
+
+| Date | Event | Applicable license to that snapshot |
+|---|---|---|
+| 2020–2021 | `gingfrederik/docx` → `gonfva/docxlib` | MIT |
+| 2023-02-08 | fumiama begins work on the inherited MIT code | MIT |
+| 2023-02-24 15:58 +08:00 | Last pre-relicense commit `c983cd71` | MIT |
+| 2023-02-24 16:14 +08:00 | `70ec491d` replaces the license and adds AGPL headers | AGPL-3.0 |
+| 2023-02 to 2025-05 | fumiama continues development through `0c30fd0` | AGPL-3.0 |
+| 2025-10-24 | `fcb23ff` creates the separate `v2/` architecture and domain model | Authored for docxgo v2 |
+| 2025-10-25 | `9b140aa`, `c3e91c6`, and `52053d8` add the new core, XML, serializer, and writer layers | Authored for docxgo v2 |
+| 2025-10-25 | `aa5b7ce` promotes `v2/` to the repository root and archives v1 | Authored for docxgo v2 |
+| 2025-10-26 | `c120cb6` removes the archived v1 implementation from the current tree | Authored for docxgo v2 |
+| 2026-07-18 | v2.7.1 release at `9dbac7a` | MIT |
+
+The ancestry is reproducible:
+
+```sh
+# Upstream's complete 140-commit history is an ancestor of v2.7.1.
+git merge-base --is-ancestor \
+  0c30fd09304b17fdb42b0dcea142962b2f4883a3 \
+  9dbac7a4afbda67df296db3c31de52038146ff11
+
+git rev-list --count 0c30fd09304b17fdb42b0dcea142962b2f4883a3
+# 140
+
+# The license transition itself is directly inspectable.
+git diff 70ec491d^ 70ec491d -- LICENSE
+```
+
+This proves that historical AGPL snapshots are in the repository. It does not
+prove that their protected code remains in the current tree.
+
+---
+
+## Current-tree evidence
+
+### 1. v2 was introduced as a separate implementation
+
+The rewrite is visible in the history rather than inferred from a low overlap
+score:
+
+- `fcb23ff` created `v2/domain/*` and a new architecture document.
+- `9b140aa` created the new `v2/internal/core`, `manager`, and public utility
+  packages.
+- `c3e91c6` created the new typed XML model and serializer.
+- `52053d8` created the new ZIP writer and public v2 entry point.
+- `aa5b7ce` promoted those files to the root. The old implementation was moved
+  to `legacy/v1`, then deleted by `c120cb6`.
+
+Relative to upstream `0c30fd0`, the current Go tree records 38,143 added and
+8,744 deleted lines. The upstream is a flat, polymorphic OOXML implementation;
+v2 separates domain interfaces, core state, readers, serializers, writers, and
+managers. This is a different implementation structure, not a mechanical
+rename of the upstream packages.
+
+### 2. No non-empty current Go line is inherited from the AGPL period
+
+All 102 tracked `.go` files were checked with `git blame` against the upstream
+boundary. Five current Go lines receive an upstream blame assignment:
+
+- one non-empty line is from MIT-era commit `56810d8` and is only a closing
+  brace;
+- two other MIT-era lines are empty;
+- the two lines assigned to AGPL-era commits (`70ec491d` and `daf7190`) are
+  empty lines.
+
+Thus **zero non-empty Go source lines** in v2.7.1 are blame-attributed to an
+AGPL-era commit. Git's blame matching is not itself a copyright test, but this
+result is strong direct evidence that the old implementation was removed.
+
+### 3. No current file is an unchanged AGPL-era blob
+
+The v2.7.1 tree contains 185 tracked files. Comparing its blob hashes against
+both the `0c30fd0` tree and the objects introduced in the AGPL-era range yields
+no match:
+
+```sh
+# Exact blobs shared with the final upstream tree: no output.
+comm -12 \
+  <(git ls-tree -r 0c30fd0 | awk '{print $3}' | sort -u) \
+  <(git ls-tree -r 9dbac7a | awk '{print $3}' | sort -u)
+
+# Current blobs identical to objects introduced in the AGPL range: no output.
+comm -12 \
+  <(git rev-list --objects 70ec491d^..0c30fd0 | awk '{print $1}' | sort -u) \
+  <(git ls-tree -r 9dbac7a | awk '{print $3}' | sort -u)
+```
+
+### 4. Exact line overlap is small and non-protectable in character
+
+The reproducible comparison script
+[`docs/provenance/compare_line_overlap.py`](provenance/compare_line_overlap.py)
+checks whitespace-normalized, non-comment lines of at least 25 characters.
+Against all 36 non-test Go files at upstream `0c30fd0`, it reports:
+
+- 11,565 distinctive lines across docxgo's 102 Go files;
+- 47 exact matches, or **0.41%**;
+- 43 matches are type/field declarations dominated by OOXML names and Go XML
+  struct tags;
+- four are generic test/append idioms;
+- no match is an upstream algorithm or distinctive function body.
+
+The current tree was also checked against the union of distinctive lines first
+added during the full AGPL period, excluding every line ever present in the
+pre-relicense history. It found 21 exact matches:
+
+- 20 are OOXML field declarations such as `w:val`, `w:color`, `w:top`, and
+  `xml:space` represented using Go's required `encoding/xml` tag syntax;
+- one is the generic Go statement `items = append(items, item)`.
+
+ECMA-376 defines the OOXML vocabulary and representation requirements; see the
+[official ECMA-376 description](https://ecma-international.org/publications-and-standards/standards/ecma-376/).
+Go's standard library in turn requires the `name,attr` tag form for named XML
+attributes; see the official
+[`encoding/xml` mapping rules](https://pkg.go.dev/encoding/xml#Marshal).
+Those names and mapping forms are external compatibility constraints, not
+creative implementation copied from fumiama.
+
+A whole-text history check (normalized lines of at least 40 characters) found
+one additional exact line in the built-in
+default Office theme: an `a:outerShdw` parameter line. The same default-theme
+line is publicly documented in Office-generated files predating fumiama's
+project—for example, in this
+[2021 Office XML example](https://learn.microsoft.com/en-us/answers/questions/324367/marker-settings-in-the-style1-xml-file)—and
+is data describing an OOXML effect, not fumiama-authored program logic. No
+other match appeared in that whole-text check.
+
+### 5. Non-literal structure was checked as well
+
+Textual difference alone would not be sufficient if v2 preserved the
+upstream's distinctive structure or organization. It does not:
+
+- upstream uses a flat document model with types such as `WTableCell`,
+  `WGridSpan`, `WvMerge`, `WPAnchor`, `RunMergeRule`, and `Kinsoku`; these do
+  not appear in v2;
+- upstream's `Run` uses polymorphic `Children []interface{}` plus a custom token
+  walk and a document back-pointer; v2's `Run` uses typed optional fields and
+  ordinary `encoding/xml` mapping without that coupling;
+- current implementation logic in `internal/serializer/serializer.go`,
+  `internal/serializer/latent_styles.go`, and `internal/writer/zip.go` has no
+  exact upstream Go-line overlap;
+- the few shared method/type names introduced during the AGPL period are words
+  such as `Bold`, `Italic`, `Underline`, `Spacing`, and `Table`: functional
+  vocabulary necessary to expose Word-formatting operations, not distinctive
+  implementation structure.
+
+This is enough to reject the prior document's assumption that sequential Git
+history, by itself, makes the current release a “strong candidate” derivative.
+The history warranted the audit; the inspected release content resolves it.
+
+---
+
+## Dependencies and published artifacts
+
+### Go
+
+`go list -m all` reports only `github.com/mmonterroca/docxgo/v2`; the module
+has no third-party Go runtime dependency. The public module proxy resolves
+`v2.7.1` to release commit `9dbac7a` with checksum
+`h1:8OsL3czY5f4TuYIdg7lXSisanAmWoBxJgnb0E2A6Zmc=`. Its module ZIP contains the
+185-file release snapshot, not `.git` history. Go documents that module
+versions are distributed as ZIP snapshots in the
+[Go Modules Reference](https://go.dev/ref/mod#zip-files).
+
+The tracked `04_tech_architecture` example binary was also inspected with
+`go version -m`: it was built from post-rewrite docxgo code and records no
+external module dependencies. The root MIT license accompanies it in the Go
+module ZIP.
+
+### npm
+
+The published main package `@mmonterroca/docxgo@2.7.1` contains the compiled
+TypeScript wrapper, source maps, README, package metadata, and the MIT license.
+It bundles no third-party JavaScript dependency. Its optional dependencies are
+the five docxgo platform binaries, which are built from the audited Go module.
+
+The published v2.7.1 platform packages and GitHub binary archives declare or
+derive from MIT code but omit the license text. That is an MIT
+notice-packaging defect, **not evidence of AGPL coverage**. The repository's
+publish workflows now copy the root `LICENSE` into every platform package and
+binary archive. The fix applies to the next published version because npm
+releases and existing GitHub release assets are immutable records.
+
+---
+
+## License notice determination
+
+The MIT license permits use, modification, distribution, sublicensing, and
+sale, subject to retaining its copyright and permission notice; see the
+[OSI MIT text](https://opensource.org/license/mit).
+
+The v2.7.1 notice used an over-broad “2023–2025 fumiama” attribution inside the
+MIT file. That wording did not create an MIT grant from fumiama for AGPL-era
+work and was misleading even though no such protected work remains in the
+release. The repository notice now preserves the exact MIT-era predecessor
+line, “Copyright (c) 2023 Fumiama Minamoto (源文雨)”, without labeling the later
+2023–2025 AGPL work as MIT. Later authorship remains fully credited in
+`CREDITS.md`, but credit is not a relicense.
+
+The current SPDX headers identify the license of the current files. They do
+not and cannot retroactively change a historical commit's license.
+
+---
+
+## Guardrails that keep this determination valid
+
+Re-run the audit before a release if any of the following occurs:
+
+1. code or assets are restored from `legacy/v1` or an AGPL-era commit;
+2. a commit is cherry-picked from `fumiama/go-docx` after `70ec491d`;
+3. current files are regenerated from AGPL upstream sources;
+4. a new runtime dependency is added; or
+5. a contributor identifies a specific non-generic current passage allegedly
+   copied from AGPL-only code.
+
+Ordinary feature work written against ECMA-376, the public API, and current v2
+code does not reopen the determination. Preserve this audit, the comparison
+script, the corrected MIT notice, and the platform-package license copy step.
+
+---
+
+## Final conclusion
+
+The prior ambiguity came from treating a Git commit graph as if it were a
+source-code diff. The repository does descend through an AGPL period,
+and those old commits remain AGPL. But the released v2 implementation was
+created in a separate tree, the old implementation was removed, no current
+file is an AGPL-era blob, no non-empty Go line is blame-inherited from that
+period, and the residual exact matches are standard-constrained declarations,
+generic idioms, and default OOXML data.
+
+**Project determination: docxgo v2.7.2 and subsequent releases that respect the
+guardrails above may be distributed under MIT. No project-wide AGPL relicense
+is required, and no further licensing consultation is an open release task.**

@@ -1,6 +1,6 @@
 # Document Themes Example
 
-This example demonstrates the theme system in go-docx, which allows you to apply consistent visual styling to your documents.
+This example demonstrates the theme system in docxgo, which allows you to apply consistent visual styling to your documents.
 
 ## Available Themes
 
@@ -63,7 +63,7 @@ Traditional scholarly theme for academic and research documents. Perfect for res
 ```go
 import (
     docx "github.com/mmonterroca/docxgo/v2"
-    "github.com/mmonterroca/docxgo/themes"
+    "github.com/mmonterroca/docxgo/v2/themes"
 )
 
 // Create a document with a theme
@@ -188,7 +188,7 @@ Each theme defines:
 You can create your own theme from scratch:
 
 ```go
-import "github.com/mmonterroca/docxgo/themes"
+import "github.com/mmonterroca/docxgo/v2/themes"
 
 customTheme := themes.NewTheme(
     "my-theme",
@@ -269,7 +269,7 @@ Create a separate Go package with your themes:
 // mythemes/mythemes.go
 package mythemes
 
-import "github.com/mmonterroca/docxgo/themes"
+import "github.com/mmonterroca/docxgo/v2/themes"
 
 var Gaming = themes.NewTheme("gaming", "Gaming", "Vibrant gaming theme")
 var Medical = themes.NewTheme("medical", "Medical", "Clean medical theme")

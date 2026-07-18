@@ -78,7 +78,7 @@ func createShowcaseDocument() string {
 	subtitle.SetStyle(domain.StyleIDSubtitle)
 	subtitle.SetAlignment(domain.AlignmentCenter)
 	subtitleRun, _ := subtitle.AddRun()
-	subtitleRun.AddText("This document demonstrates all capabilities of go-docx v2")
+	subtitleRun.AddText("This document demonstrates all capabilities of docxgo v2")
 
 	doc.AddParagraph() // Empty line
 

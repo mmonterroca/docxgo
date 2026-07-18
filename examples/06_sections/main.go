@@ -168,7 +168,7 @@ func main() {
 	psDesc, _ := doc.AddParagraph()
 	psDesc.SetStyle(domain.StyleIDNormal)
 	psDescRun, _ := psDesc.AddRun()
-	psDescRun.AddText("go-docx v2 supports these predefined page sizes:")
+	psDescRun.AddText("docxgo v2 supports these predefined page sizes:")
 
 	sizes := []struct {
 		name string
