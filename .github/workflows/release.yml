@@ -115,4 +115,11 @@ jobs:
           generate_release_notes: true
           files: release-assets/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Must be a real PAT (repo-scoped "Contents: Read and write" is
+          # enough), not the default GITHUB_TOKEN: GitHub does not let events
+          # created by GITHUB_TOKEN trigger other workflows (anti-recursion
+          # protection), so npm-publish.yml's "release: published" trigger
+          # would never fire if this stayed as GITHUB_TOKEN. See
+          # npm-publish.yml's workflow_dispatch fallback for the manual path
+          # this replaces.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
