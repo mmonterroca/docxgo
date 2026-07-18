@@ -22,8 +22,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"regexp"
 	"time"
 
@@ -114,13 +112,13 @@ func main() {
 
 		// Contact info
 		"Contact_FullName":          "Sarah Mitchell",
-		"Contact_Title":            "VP of Sales",
-		"Account_Name":             "Global Enterprises Inc.",
-		"Contact_MailingAddress":   "789 Commerce Blvd",
-		"Contact_MailingCity":      "Chicago",
-		"Contact_MailingState":     "IL",
+		"Contact_Title":             "VP of Sales",
+		"Account_Name":              "Global Enterprises Inc.",
+		"Contact_MailingAddress":    "789 Commerce Blvd",
+		"Contact_MailingCity":       "Chicago",
+		"Contact_MailingState":      "IL",
 		"Contact_MailingPostalCode": "60601",
-		"Contact_FirstName":        "Sarah",
+		"Contact_FirstName":         "Sarah",
 
 		// User (sender) info
 		"User_FullName": "James Rodriguez",
@@ -191,32 +189,32 @@ func main() {
 		{
 			"Org_Name": "TechForward Solutions", "Org_Address": "456 Innovation Drive, Suite 200",
 			"Org_City": "Austin", "Org_State": "TX", "Org_PostalCode": "78701",
-			"Today":                    time.Now().Format("January 2, 2006"),
-			"Contact_FullName":         "Michael Chen",
-			"Contact_Title":            "Sales Director",
-			"Account_Name":             "Pacific Rim Trading Co.",
+			"Today":                     time.Now().Format("January 2, 2006"),
+			"Contact_FullName":          "Michael Chen",
+			"Contact_Title":             "Sales Director",
+			"Account_Name":              "Pacific Rim Trading Co.",
 			"Contact_MailingAddress":    "100 Harbor View",
 			"Contact_MailingCity":       "San Francisco",
 			"Contact_MailingState":      "CA",
 			"Contact_MailingPostalCode": "94105",
 			"Contact_FirstName":         "Michael",
-			"User_FullName": "James Rodriguez", "User_Title": "Director of Training",
+			"User_FullName":             "James Rodriguez", "User_Title": "Director of Training",
 			"User_Company": "TechForward Solutions", "User_Phone": "(512) 555-0147",
 			"User_Fax": "(512) 555-0148", "User_Email": "j.rodriguez@techforward.com",
 		},
 		{
 			"Org_Name": "TechForward Solutions", "Org_Address": "456 Innovation Drive, Suite 200",
 			"Org_City": "Austin", "Org_State": "TX", "Org_PostalCode": "78701",
-			"Today":                    time.Now().Format("January 2, 2006"),
-			"Contact_FullName":         "Emily Watson",
-			"Contact_Title":            "Regional Sales Manager",
-			"Account_Name":             "Midwest Solutions Group",
+			"Today":                     time.Now().Format("January 2, 2006"),
+			"Contact_FullName":          "Emily Watson",
+			"Contact_Title":             "Regional Sales Manager",
+			"Account_Name":              "Midwest Solutions Group",
 			"Contact_MailingAddress":    "2500 Lake Shore Drive",
 			"Contact_MailingCity":       "Minneapolis",
 			"Contact_MailingState":      "MN",
 			"Contact_MailingPostalCode": "55401",
 			"Contact_FirstName":         "Emily",
-			"User_FullName": "James Rodriguez", "User_Title": "Director of Training",
+			"User_FullName":             "James Rodriguez", "User_Title": "Director of Training",
 			"User_Company": "TechForward Solutions", "User_Phone": "(512) 555-0147",
 			"User_Fax": "(512) 555-0148", "User_Email": "j.rodriguez@techforward.com",
 		},
@@ -264,24 +262,4 @@ func sanitizeFilename(name string) string {
 		}
 	}
 	return string(result)
-}
-
-// cleanup removes generated .docx files to keep the example directory clean.
-// It preserves the original template file (reminder_letter.docx).
-func cleanup(singleOutput string, contacts []template.MergeData) {
-	os.Remove(singleOutput)
-	for _, c := range contacts {
-		name := c["Contact_FullName"]
-		os.Remove(fmt.Sprintf("reminder_%s.docx", sanitizeFilename(name)))
-	}
-
-	// Also remove any other generated files, but preserve the template
-	matches, _ := filepath.Glob("reminder_*.docx")
-	for _, m := range matches {
-		base := filepath.Base(m)
-		if base == "reminder_letter.docx" {
-			continue // preserve the original template
-		}
-		os.Remove(m)
-	}
 }

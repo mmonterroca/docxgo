@@ -1,0 +1,4 @@
+# Ignore built binaries (built by CI)
+*/bin/docxgo
+*/bin/docxgo.exe
+*/package.json

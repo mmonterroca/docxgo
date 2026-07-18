@@ -25,12 +25,17 @@ func MergeTemplate(doc domain.Document, data MergeData, opts ...MergeOptions) er
 		opt = opts[0]
 	}
 
-	pattern := buildPattern(opt)
+	pattern := BuildPattern(opt)
 	var missingKeys []string
 
 	err := walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
-		ConsolidateRuns(para)
-		missing := replaceParagraph(para, data, pattern, opt)
+		if err := ConsolidateRuns(para); err != nil {
+			return err
+		}
+		missing, err := replaceParagraph(para, data, pattern, opt)
+		if err != nil {
+			return err
+		}
 		missingKeys = append(missingKeys, missing...)
 		return nil
 	})
@@ -95,8 +100,9 @@ func ValidateTemplate(doc domain.Document, data MergeData, opts ...MergeOptions)
 }
 
 // replaceParagraph replaces all placeholders in a single paragraph.
-// Returns a list of placeholder keys for which no data was found.
-func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Regexp, opt MergeOptions) []string {
+// Returns the placeholder keys for which no data was found, and an error if a
+// run's text could not be written.
+func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Regexp, opt MergeOptions) ([]string, error) {
 	var missing []string
 	runs := para.Runs()
 
@@ -116,7 +122,9 @@ func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Reg
 		})
 
 		if newText != text {
-			run.SetText(newText)
+			if err := run.SetText(newText); err != nil {
+				return missing, fmt.Errorf("template: set run text: %w", err)
+			}
 			// Clear fields on this run if it has any.
 			if len(run.Fields()) > 0 {
 				run.ClearFields()
@@ -133,11 +141,11 @@ func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Reg
 		}
 	}
 
-	return missing
+	return missing, nil
 }
 
-// buildPattern creates a regex pattern from the configured delimiters.
-func buildPattern(opt MergeOptions) *regexp.Regexp {
+// BuildPattern creates a regex pattern from the configured delimiters.
+func BuildPattern(opt MergeOptions) *regexp.Regexp {
 	open := regexp.QuoteMeta(opt.OpenDelimiter)
 	close := regexp.QuoteMeta(opt.CloseDelimiter)
 	return regexp.MustCompile(open + `\.?(\w+(?:\.\w+)*)` + close)
@@ -156,7 +164,7 @@ func extractKey(match string, opt MergeOptions) string {
 
 // placeholderNamesWithOptions returns deduplicated placeholder names using custom options.
 func placeholderNamesWithOptions(doc domain.Document, opt MergeOptions) []string {
-	pattern := buildPattern(opt)
+	pattern := BuildPattern(opt)
 	placeholders := findPlaceholdersWithPattern(doc, pattern)
 
 	seen := make(map[string]struct{})

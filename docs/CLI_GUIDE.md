@@ -8,6 +8,10 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
 - [Execution Modes](#execution-modes)
 - [JSON-RPC Protocol](#json-rpc-protocol)
 - [Methods Reference](#methods-reference)
+  - [system.ping](#systemping)
+  - [system.version](#systemversion)
+  - [system.capabilities](#systemcapabilities)
+  - [system.batch](#systembatch)
   - [document.create](#documentcreate)
   - [document.open](#documentopen)
   - [document.save](#documentsave)
@@ -15,6 +19,17 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
   - [document.inspect](#documentinspect)
   - [document.setMetadata](#documentsetmetadata)
   - [document.setBackgroundColor](#documentsetbackgroundcolor)
+  - [document.setLanguage](#documentsetlanguage)
+  - [document.addContent](#documentaddcontent)
+  - [document.addPageBreak](#documentaddpagebreak)
+  - [document.applyPatch](#documentapplypatch)
+  - [paragraph.add](#paragraphadd)
+  - [paragraph.list](#paragraphlist)
+  - [table.add](#tableadd)
+  - [table.list](#tablelist)
+  - [section.add](#sectionadd)
+  - [template.inspect](#templateinspect)
+  - [template.render](#templaterender)
   - [document.close](#documentclose)
 - [Content Types](#content-types)
   - [Paragraph](#paragraph)
@@ -126,9 +141,140 @@ Ideal for: high-frequency usage, Lambda warm starts, batch processing via `child
 }
 ```
 
+Some methods return enriched errors with a `data` field containing structured context:
+
+```json
+{
+  "id": 1,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "unknown operation \"deleteAll\" at index 2",
+    "operation": "document.applyPatch",
+    "data": {
+      "index": 2,
+      "op": "deleteAll"
+    }
+  }
+}
+```
+
+| `data` field | Type | Description |
+|--------------|------|-------------|
+| `index` | Number | Index of the failing operation (in batch/patch) |
+| `category` | String | Error category (e.g. `"merge"`) |
+| `retryable` | Boolean | Whether the error is retryable |
+| `op` | String | The operation that failed |
+
 ---
 
 ## Methods Reference
+
+### system.ping
+
+Health check — verifies the RPC process is alive and responsive.
+
+**Params:** None (or `{}`).
+
+**Success result:**
+
+```json
+{ "status": "ok" }
+```
+
+---
+
+### system.version
+
+Returns version, protocol version, and platform information.
+
+**Params:** None (or `{}`).
+
+**Success result:**
+
+```json
+{
+  "name": "docxgo",
+  "version": "2.0.0-beta",
+  "protocolVersion": "1.0",
+  "goVersion": "go1.23.0",
+  "platform": "darwin",
+  "arch": "arm64"
+}
+```
+
+---
+
+### system.capabilities
+
+Returns a map of supported features for the current binary.
+
+**Params:** None (or `{}`).
+
+**Success result:**
+
+```json
+{
+  "rpc": true,
+  "template": true,
+  "mailMerge": true,
+  "inspect": true,
+  "validate": true,
+  "batch": true,
+  "applyPatch": true,
+  "setLanguage": true,
+  "streaming": false,
+  "partialUpdate": false
+}
+```
+
+Use this for feature detection before calling advanced methods.
+
+---
+
+### system.batch
+
+Executes multiple RPC requests in a single roundtrip. Each sub-request is processed sequentially. Nested `system.batch` calls are rejected.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `requests` | Array | Yes | Array of `{ method, params? }` objects |
+
+**Success result:**
+
+```json
+{
+  "responses": [
+    { "result": { "status": "ok" } },
+    { "result": { "name": "docxgo", "version": "2.0.0-beta", ... } },
+    { "error": { "code": "NOT_FOUND", "message": "..." } }
+  ]
+}
+```
+
+Each entry in `responses` contains either `result` or `error`, matching the order of the input `requests` array.
+
+**Example:**
+
+```json
+{
+  "id": 1,
+  "method": "system.batch",
+  "params": {
+    "requests": [
+      { "method": "system.ping" },
+      { "method": "document.create", "params": {
+        "content": [{ "type": "paragraph", "runs": [{ "text": "Hello" }] }],
+        "output": "buffer"
+      }},
+      { "method": "document.inspect", "params": { "documentId": "doc-1" } }
+    ]
+  }
+}
+```
+
+---
 
 ### document.create
 
@@ -295,11 +441,12 @@ Extracts metadata, text, and structural information from a document.
     "created": "",
     "modified": ""
   },
-  "backgroundColor": "#E0F0FF"
+  "backgroundColor": "#E0F0FF",
+  "language": { "val": "es-MX", "eastAsia": "", "bidi": "" }
 }
 ```
 
-(`metadata` is omitted when not set; `backgroundColor` is omitted when not set.)
+(`metadata` is omitted when not set; `backgroundColor` is omitted when not set; `language` is omitted when the document has no default proofing language set.)
 
 ---
 
@@ -339,6 +486,474 @@ Sets the page background color for the entire document.
 
 ---
 
+### document.setLanguage
+
+Sets the document's default proofing language, used by Word for spell-check/grammar. Tags are BCP 47 (e.g. `"es-MX"`, `"en-US"`). At least one of `val`, `eastAsia`, or `bidi` is required.
+
+**Only works on documents created via `document.create`.** A document opened via `document.open` has preserved `styles.xml`/`settings.xml` bytes from round-trip, and `SetLanguage` refuses to touch those (the language change could never actually reach the saved file). `document.inspect` still reports the language of an opened document, since the reader hydrates it separately from `styles.xml` when the document is opened.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `val` | String | At least one of `val`/`eastAsia`/`bidi` | Primary language tag, applied to Latin-script text |
+| `eastAsia` | String | At least one of `val`/`eastAsia`/`bidi` | Language tag for East Asian (CJK) script runs |
+| `bidi` | String | At least one of `val`/`eastAsia`/`bidi` | Language tag for right-to-left (bidi) script runs |
+
+**Success result:** `{ "ok": true }`
+
+**Example:**
+
+```json
+{
+  "id": 6,
+  "method": "document.setLanguage",
+  "params": { "documentId": "doc-1", "val": "es-MX" }
+}
+```
+
+---
+
+### document.addContent
+
+Appends content to an existing document session. Accepts the same content array format as `document.create`. This is the primary method for mutating documents that were opened via `document.open`.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `content` | Array | Yes | Ordered list of content items (same format as `document.create`) |
+
+**Success result:** `{ "ok": true }`
+
+**Example:**
+
+```json
+{
+  "id": 5,
+  "method": "document.addContent",
+  "params": {
+    "documentId": "doc-1",
+    "content": [
+      {
+        "type": "paragraph",
+        "runs": [{ "text": "Appended paragraph", "bold": true }]
+      },
+      { "type": "pageBreak" },
+      {
+        "type": "table",
+        "rows": [
+          { "cells": [{ "paragraphs": [{ "runs": [{ "text": "A1" }] }] }] }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+### document.addPageBreak
+
+Adds a page break to an existing document.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+
+**Success result:** `{ "ok": true }`
+
+---
+
+### document.applyPatch
+
+Applies a sequence of patch operations to an existing document sequentially. **This is not atomic.** If any operation fails, subsequent operations are **not** applied and the error includes the failing index plus how many operations succeeded (`applied`) before the failure. Operations applied before the failure remain in effect — there is no rollback, so the document can be left partially patched. Use the `applied` count in the error to decide whether to retry the remaining operations or discard the document.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `operations` | Array | Yes | Array of patch operation objects |
+
+**Supported operations:**
+
+| `op` value | Description | Additional fields |
+|------------|-------------|-------------------|
+| `appendParagraph` | Append a paragraph | Same fields as `paragraph.add` (style, alignment, runs, etc.) |
+| `appendTable` | Append a table | Same fields as `table.add` (rows, style, alignment, width) |
+| `appendSection` | Append a section break | Same fields as `section.add` (breakType, pageSize, orientation, etc.) |
+| `appendPageBreak` | Append a page break | None |
+| `setMetadata` | Set document metadata | Same fields as `document.setMetadata` (title, creator, etc.) |
+| `setBackgroundColor` | Set background color | `color` (hex string) |
+| `setLanguage` | Set proofing language | Same fields as `document.setLanguage` (`val`, `eastAsia`, `bidi`) — fails with the same round-trip guard on documents opened via `document.open` |
+
+**Success result:**
+
+```json
+{ "ok": true, "applied": 3 }
+```
+
+**Error result (with enriched `data`):**
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "unknown operation \"deleteAll\" at index 2",
+  "operation": "document.applyPatch",
+  "data": { "index": 2, "op": "deleteAll", "applied": 2 }
+}
+```
+
+**Example:**
+
+```json
+{
+  "id": 10,
+  "method": "document.applyPatch",
+  "params": {
+    "documentId": "doc-1",
+    "operations": [
+      {
+        "op": "appendParagraph",
+        "style": "Heading1",
+        "runs": [{ "text": "New Section" }]
+      },
+      { "op": "appendPageBreak" },
+      {
+        "op": "appendTable",
+        "rows": [
+          { "cells": [{ "paragraphs": [{ "runs": [{ "text": "A1" }] }] }] }
+        ]
+      },
+      { "op": "setMetadata", "title": "Updated Title" },
+      { "op": "setBackgroundColor", "color": "#F0F8FF" }
+    ]
+  }
+}
+```
+
+---
+
+### paragraph.add
+
+Adds a single paragraph to an existing document. Supports the same paragraph properties as the content array (style, alignment, spacing, runs, etc.).
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `style` | String | No | Paragraph style name |
+| `alignment` | String | No | `left`, `center`, `right`, `justify`, `distribute` |
+| `spacingBefore` | Number | No | Spacing before (twips) |
+| `spacingAfter` | Number | No | Spacing after (twips) |
+| `lineSpacing` | Object | No | `{ "rule": "auto", "value": 360 }` |
+| `indent` | Object | No | `{ "left", "right", "firstLine", "hanging" }` |
+| `numbering` | Object | No | `{ "id": 1, "level": 0 }` |
+| `borders` | Object | No | Paragraph borders |
+| `runs` | Array | No | Text runs (same format as content paragraphs) |
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 3 }
+```
+
+`index` is the zero-based position of the new paragraph.
+
+**Example:**
+
+```json
+{
+  "id": 6,
+  "method": "paragraph.add",
+  "params": {
+    "documentId": "doc-1",
+    "style": "Heading1",
+    "alignment": "center",
+    "runs": [
+      { "text": "New Section Title", "bold": true, "fontSize": 18 }
+    ]
+  }
+}
+```
+
+---
+
+### paragraph.list
+
+Lists all paragraphs in a document with their text and style.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+
+**Success result:**
+
+```json
+{
+  "count": 3,
+  "paragraphs": [
+    { "index": 0, "text": "Introduction", "style": "Heading1" },
+    { "index": 1, "text": "Some body text." },
+    { "index": 2, "text": "" }
+  ]
+}
+```
+
+---
+
+### table.add
+
+Adds a table to an existing document. Uses the same table format as the content array.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `rows` | Array | Yes | Table rows (same format as content tables) |
+| `style` | String | No | Table style name |
+| `alignment` | String | No | Table alignment |
+| `width` | Object | No | `{ "type": "dxa", "value": 9000 }` |
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 0 }
+```
+
+`index` is the zero-based position of the new table.
+
+**Example:**
+
+```json
+{
+  "id": 7,
+  "method": "table.add",
+  "params": {
+    "documentId": "doc-1",
+    "style": "TableGrid",
+    "rows": [
+      {
+        "cells": [
+          { "paragraphs": [{ "runs": [{ "text": "Name", "bold": true }] }] },
+          { "paragraphs": [{ "runs": [{ "text": "Value", "bold": true }] }] }
+        ]
+      },
+      {
+        "cells": [
+          { "paragraphs": [{ "runs": [{ "text": "Score" }] }] },
+          { "paragraphs": [{ "runs": [{ "text": "95" }] }] }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+### table.list
+
+Lists all tables in a document with their dimensions.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+
+**Success result:**
+
+```json
+{
+  "count": 2,
+  "tables": [
+    { "index": 0, "rows": 3, "columns": 2 },
+    { "index": 1, "rows": 5, "columns": 4 }
+  ]
+}
+```
+
+---
+
+### section.add
+
+Adds a new section to an existing document. Supports page size, margins, orientation, columns, and headers/footers.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `breakType` | String | No | `nextPage` (default), `continuous`, `evenPage`, `oddPage` |
+| `pageSize` | String/Object | No | Page size preset or `{width, height}` |
+| `margins` | String/Object | No | Margins preset or `{top, bottom, left, right}` |
+| `orientation` | String | No | `portrait` or `landscape` |
+| `columns` | Number | No | Number of text columns |
+| `headers` | Object | No | Headers by type (`default`, `first`, `even`) |
+| `footers` | Object | No | Footers by type (`default`, `first`, `even`) |
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 1 }
+```
+
+`index` is the zero-based position of the new section.
+
+**Example:**
+
+```json
+{
+  "id": 8,
+  "method": "section.add",
+  "params": {
+    "documentId": "doc-1",
+    "breakType": "nextPage",
+    "pageSize": "A4",
+    "orientation": "landscape",
+    "columns": 2
+  }
+}
+```
+
+---
+
+### template.inspect
+
+Scans a document for template placeholders (default: `{{key}}`) and returns detailed information about each occurrence.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `openDelimiter` | String | No | Custom open delimiter (default: `"{{"`) |
+| `closeDelimiter` | String | No | Custom close delimiter (default: `"}}"`) |
+
+**Success result:**
+
+```json
+{
+  "placeholders": ["Name", "Company", "Role"],
+  "count": 3,
+  "occurrences": 4,
+  "details": [
+    {
+      "name": "Name",
+      "fullMatch": "{{Name}}",
+      "location": "paragraph",
+      "paragraph": 0,
+      "run": 0
+    },
+    {
+      "name": "Company",
+      "fullMatch": "{{Company}}",
+      "location": "tableCell",
+      "paragraph": 0,
+      "run": 0,
+      "table": 0,
+      "row": 1,
+      "cell": 0
+    }
+  ]
+}
+```
+
+| Result field | Type | Description |
+|--------------|------|-------------|
+| `placeholders` | Array\<String\> | Unique placeholder names (first-seen order) |
+| `count` | Number | Number of unique placeholders |
+| `occurrences` | Number | Total number of placeholder instances |
+| `details` | Array | Per-occurrence location details |
+
+**Location types:** `paragraph`, `tableCell`, `header`, `footer`
+
+**Example:**
+
+```json
+{
+  "id": 11,
+  "method": "template.inspect",
+  "params": {
+    "documentId": "doc-1"
+  }
+}
+```
+
+---
+
+### template.render
+
+Replaces template placeholders in the document with the provided data values. Optionally validates all placeholders are covered (strict mode).
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `data` | Object | Yes | Key-value map of replacements (`{ "Name": "Alice" }`) |
+| `strictMode` | Boolean | No | If `true`, fail on missing keys (default: `false`) |
+| `openDelimiter` | String | No | Custom open delimiter (default: `"{{"`) |
+| `closeDelimiter` | String | No | Custom close delimiter (default: `"}}"`) |
+
+**Success result:**
+
+```json
+{ "ok": true }
+```
+
+With validation warnings:
+
+```json
+{
+  "ok": true,
+  "warnings": [
+    { "severity": "warning", "key": "OptionalField", "message": "key OptionalField not found in data" }
+  ]
+}
+```
+
+**Error (strict mode, missing key):**
+
+```json
+{
+  "code": "TEMPLATE_ERROR",
+  "message": "template: missing keys: Code",
+  "operation": "template.render",
+  "data": { "category": "merge", "retryable": false }
+}
+```
+
+**Example:**
+
+```json
+{
+  "id": 12,
+  "method": "template.render",
+  "params": {
+    "documentId": "doc-1",
+    "data": {
+      "Name": "Alice Johnson",
+      "Company": "Acme Corp",
+      "Date": "2025-01-15"
+    },
+    "strictMode": true
+  }
+}
+```
+
+---
+
 ### document.close
 
 Removes a document from the session, freeing associated memory. Should be called when a document is no longer needed in RPC mode.
@@ -355,7 +970,7 @@ Removes a document from the session, freeing associated memory. Should be called
 
 ## Content Types
 
-Content items are passed as an array in `document.create` params. Each item has a `type` field.
+Content items are passed as an array in `document.create` and `document.addContent` params. Each item has a `type` field.
 
 ### Paragraph
 
@@ -698,3 +1313,4 @@ main().catch(console.error);
 | `INTERNAL_ERROR` | Unexpected internal error |
 | `METHOD_NOT_FOUND` | Unknown RPC method |
 | `PARSE_ERROR` | Malformed JSON in the request |
+| `TEMPLATE_ERROR` | Template merge/validation failure |

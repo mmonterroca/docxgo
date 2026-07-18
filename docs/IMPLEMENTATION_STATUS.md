@@ -1,7 +1,7 @@
 # go-docx v2 Implementation Status
 
 **Last Updated**: July 2026
-**Version**: 2.5.0 (Stable)
+**Version**: 2.7.0 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -33,6 +33,8 @@ All development phases have been completed. The library has gone through multipl
 | v2.3.0      | Feb 2026 | Template / mail-merge engine, paragraph mutation APIs |
 | v2.4.0      | Apr 2026 | In-memory image API, merged-cell round-trip fix      |
 | v2.5.0      | Jul 2026 | Cell run formatting (Italic/Color/FontSize/Underline), per-part header/footer relationship fix |
+| v2.6.0      | Jul 2026 | Default proofing language (`WithLanguage`/`WithLanguageEx`) |
+| v2.7.0      | Jul 2026 | JSON-RPC CLI (`cmd/docxgo`) + Node.js wrapper (`@mmonterroca/docxgo`), `document.setLanguage` |
 
 ---
 
@@ -415,5 +417,5 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 ---
 
 **Last Updated**: July 2026
-**Status**: Production Ready (v2.5.0 Stable)
+**Status**: Production Ready (v2.7.0 Stable)
 **Maintained by**: Misael Monterroca ([@mmonterroca](https://github.com/mmonterroca))

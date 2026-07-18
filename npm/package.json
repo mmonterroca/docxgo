@@ -1,0 +1,59 @@
+{
+  "name": "@mmonterroca/docxgo",
+  "version": "2.7.0",
+  "description": "Node.js wrapper for docxgo — create and manipulate Word documents via JSON-RPC",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && node scripts/build-esm.js",
+    "test": "tsx --test src/__tests__/*.test.ts",
+    "lint": "tsc --noEmit",
+    "prepack": "node scripts/copy-license.js && npm run build"
+  },
+  "keywords": [
+    "docx",
+    "word",
+    "document",
+    "office",
+    "openxml"
+  ],
+  "author": "Misael Monterroca",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mmonterroca/docxgo.git",
+    "directory": "npm"
+  },
+  "homepage": "https://github.com/mmonterroca/docxgo#readme",
+  "bugs": {
+    "url": "https://github.com/mmonterroca/docxgo/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  },
+  "optionalDependencies": {
+    "@mmonterroca/docxgo-darwin-arm64": "2.7.0",
+    "@mmonterroca/docxgo-darwin-x64": "2.7.0",
+    "@mmonterroca/docxgo-linux-arm64": "2.7.0",
+    "@mmonterroca/docxgo-linux-x64": "2.7.0",
+    "@mmonterroca/docxgo-win32-x64": "2.7.0"
+  }
+}

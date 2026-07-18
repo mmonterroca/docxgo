@@ -16,7 +16,9 @@ func TestConsolidateRuns_EmptyParagraph(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()
 
-	ConsolidateRuns(para) // should not panic
+	if err := ConsolidateRuns(para); err != nil { // should not panic
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
 
 	if len(para.Runs()) != 0 {
 		t.Errorf("expected 0 runs, got %d", len(para.Runs()))
@@ -30,7 +32,9 @@ func TestConsolidateRuns_SingleRun(t *testing.T) {
 	r.SetText("hello")
 	r.SetBold(true)
 
-	ConsolidateRuns(para)
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
 
 	runs := para.Runs()
 	if len(runs) != 1 {
@@ -56,7 +60,9 @@ func TestConsolidateRuns_IdenticalFormatting(t *testing.T) {
 	r3, _ := para.AddRun()
 	r3.SetText("three")
 
-	ConsolidateRuns(para)
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
 
 	runs := para.Runs()
 	if len(runs) != 1 {
@@ -82,7 +88,9 @@ func TestConsolidateRuns_DifferentFormatting(t *testing.T) {
 	r3.SetText("bold again")
 	r3.SetBold(true)
 
-	ConsolidateRuns(para)
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
 
 	runs := para.Runs()
 	if len(runs) != 3 {
@@ -116,7 +124,9 @@ func TestConsolidateRuns_SplitPlaceholder(t *testing.T) {
 	r3.SetText("}}")
 	r3.SetBold(true)
 
-	ConsolidateRuns(para)
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
 
 	runs := para.Runs()
 	if len(runs) != 1 {
@@ -146,7 +156,9 @@ func TestConsolidateRuns_PreservesFormatting(t *testing.T) {
 	r2.SetItalic(true)
 	r2.SetSize(28)
 
-	ConsolidateRuns(para)
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
 
 	runs := para.Runs()
 	if len(runs) != 1 {
@@ -188,7 +200,9 @@ func TestConsolidateRuns_MixedMergeable(t *testing.T) {
 	r5, _ := para.AddRun()
 	r5.SetText("E")
 
-	ConsolidateRuns(para)
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
 
 	runs := para.Runs()
 	if len(runs) != 3 {
@@ -219,7 +233,9 @@ func TestConsolidateRuns_WithBreaks(t *testing.T) {
 	r3, _ := para.AddRun()
 	r3.SetText("after")
 
-	ConsolidateRuns(para)
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
 
 	runs := para.Runs()
 	if len(runs) != 3 {
@@ -237,8 +253,12 @@ func TestConsolidateRuns_Idempotent(t *testing.T) {
 	r2, _ := para.AddRun()
 	r2.SetText("name}}")
 
-	ConsolidateRuns(para)
-	ConsolidateRuns(para) // second call should be a no-op
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
+	if err := ConsolidateRuns(para); err != nil { // second call should be a no-op
+		t.Fatalf("ConsolidateRuns (second call): %v", err)
+	}
 
 	runs := para.Runs()
 	if len(runs) != 1 {

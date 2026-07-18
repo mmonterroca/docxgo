@@ -1,0 +1,6 @@
+node_modules/
+dist/
+bin/
+*.tgz
+# Copied from ../LICENSE by prepack — kept out of source control so it can't drift.
+LICENSE

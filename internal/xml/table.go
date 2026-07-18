@@ -18,12 +18,12 @@ type Table struct {
 
 // TableProperties represents w:tblPr element.
 type TableProperties struct {
-	XMLName xml.Name            `xml:"w:tblPr"`
-	Style   *TableStyle         `xml:"w:tblStyle,omitempty"`
-	Width   *TableWidth         `xml:"w:tblW,omitempty"`
-	Borders *TableLevelBorders  `xml:"w:tblBorders,omitempty"`
-	Look    *TableLook          `xml:"w:tblLook,omitempty"`
-	Jc      *Justification      `xml:"w:jc,omitempty"`
+	XMLName xml.Name           `xml:"w:tblPr"`
+	Style   *TableStyle        `xml:"w:tblStyle,omitempty"`
+	Width   *TableWidth        `xml:"w:tblW,omitempty"`
+	Borders *TableLevelBorders `xml:"w:tblBorders,omitempty"`
+	Look    *TableLook         `xml:"w:tblLook,omitempty"`
+	Jc      *Justification     `xml:"w:jc,omitempty"`
 }
 
 // TableStyle represents w:tblStyle element.
