@@ -1,3 +1,27 @@
+## [Unreleased] (v2.7.0)
+
+### Added
+
+- **Command-line interface (`cmd/docxgo`)** — a JSON-RPC binary that exposes docxgo over stdin/stdout, so documents can be created and manipulated from any language (Node.js, Python, shell, AWS Lambda), on any platform (Linux/macOS/Windows, arm64/x64), with zero config, ports, or auth (closes #19, PR #24)
+  - Two modes: `exec` (one-shot, ideal for `child_process`) and `rpc` (persistent newline-delimited JSON session, ideal for batch/Lambda usage)
+  - 22 methods across the `system.*`, `document.*`, `paragraph.*`, `table.*`, `section.*`, and `template.*` namespaces, including `document.applyPatch` for multi-operation mutation and `system.batch` for pipelining
+  - File **and** base64/buffer I/O in both directions, so binaries never need to touch the filesystem
+  - Full protocol reference in [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md)
+- **Node.js wrapper — `@mmonterroca/docxgo`** — a TypeScript package (CommonJS + ESM) wrapping the CLI binary with three API levels: `DocxgoExec` (synchronous one-shot), `DocxgoRPC` (low-level persistent client), and `DocumentBuilder` (high-level fluent API). Ships full type definitions and resolves a platform-specific binary via `optionalDependencies`. See [npm/README.md](npm/README.md)
+- **`document.setLanguage` RPC method** — exposes v2.6.0's `WithLanguage`/`WithLanguageEx` through the CLI and npm wrapper. Also available as a `setLanguage` patch operation, and the current language is reported by `document.inspect`. Honors the same round-trip guard as `Document.SetLanguage` (works on documents created via `document.create`, not ones opened via `document.open`)
+- **Release automation** — `.github/workflows/release.yml` builds multi-platform binaries and publishes a GitHub Release on `v*` tags; `.github/workflows/npm-publish.yml` publishes the platform packages and the main npm package with OIDC provenance when a Release is published
+
+### Fixed
+
+- **`docx.Version`** now reports the correct version. It was stale at `2.5.0` (the v2.6.0 release did not bump it), so `docxgo version` and `system.version` reported the wrong value
+- **`template.ConsolidateRuns`** now returns an error and stops at the first run-setter failure instead of silently leaving a paragraph partially rebuilt; `MergeTemplate` and `FindPlaceholders` propagate it
+- **`document.applyPatch`** error responses now include an `applied` count, so callers can tell how many operations succeeded before a mid-sequence failure. `applyPatch` is documented as **not** atomic — there is no rollback
+- **`template.render`** no longer reports `"error"`-severity findings in an otherwise-successful (`ok: true`) response; in non-strict mode all findings that reach a successful response are labeled `"warning"`
+- **npm `DocumentBuilder.create()`/`createToFile()`** now track the new document's ID, so `applyPatch`/`inspect`/`saveToBuffer`/etc. can be chained directly after creating a document — no save-and-reopen round-trip, which would otherwise trip `setLanguage`'s round-trip guard
+- **npm `DocxgoRPC.close()`/`kill()`** now mark the client closed synchronously, closing a race window where a call issued during shutdown could hang
+
+---
+
 ## v2.6.0 — 2026-07-17
 
 ### Added
