@@ -201,9 +201,7 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the dev
 
 ## License & Credits
 
-MIT licensed — free for commercial and private use; see [LICENSE](LICENSE).
-
-docxgo's lineage is [gingfrederik/docx](https://github.com/gingfrederik/docx) (2020, MIT) → [gonfva/docxlib](https://github.com/gonfva/docxlib) (2021–2022, MIT) → [fumiama/go-docx](https://github.com/fumiama/go-docx) (forked 2023; upstream relicensed AGPL-3.0 on 2023-02-24). v2 is a complete, independent clean-architecture rewrite by Misael Monterroca, MIT licensed throughout — AGPL only ever entered fumiama's fork, never this codebase. See [CREDITS.md](CREDITS.md) for the full genealogy and copyright notices.
+docxgo is currently distributed under the MIT license ([LICENSE](LICENSE)). It is a fork of the AGPL-licensed [`fumiama/go-docx`](https://github.com/fumiama/go-docx); its provenance and the resulting open licensing question are documented in **[docs/PROVENANCE_AUDIT.md](docs/PROVENANCE_AUDIT.md)** — the single source of truth for this topic. See [CREDITS.md](CREDITS.md) for authorship and copyright notices.
 
 ## Support
 
