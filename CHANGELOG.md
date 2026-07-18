@@ -1,3 +1,20 @@
+## v2.7.1 — 2026-07-18
+
+### Added
+
+- **The two Tech themes are now discoverable through the public API.** `TechPresentation` and `TechDarkMode` existed but were not resolvable by name; they are now returned by `themes.AllThemes()` (which now yields **7** themes), `themes.ThemeNames()`, and `themes.GetTheme()`, and are accepted by the CLI's theme option and the Node.js `ThemeName` type (PR #56). Consumers that relied on `AllThemes()` returning exactly five themes should be aware of the new count.
+- **`docs/PROVENANCE_AUDIT.md`** — a reproducible code-provenance record for docxgo v2 relative to the AGPL-licensed `fumiama/go-docx` upstream, with an accompanying comparison script (`docs/provenance/compare_line_overlap.py`).
+
+### Fixed
+
+- **Output branding.** Generated documents reported `go-docx/v2` (and a frozen `go-docx v2.0.0`) as the authoring application in `docProps/app.xml`/`core.xml`; they now report `docxgo`.
+
+### Changed
+
+- **Documentation aligned with actual behavior** (no API or generation changes): image support is stated as PNG/JPEG/GIF — the formats that decode end-to-end (see #55 for the previously over-stated set); thread-safety wording clarified (a single `Document` is not thread-safe, the internal managers are); the package godoc version string corrected; and the public README prose tightened. The license/provenance narrative across README, CREDITS, and the godoc now defers to `docs/PROVENANCE_AUDIT.md` as the single source of truth.
+
+---
+
 ## v2.7.0 — 2026-07-17
 
 ### Added

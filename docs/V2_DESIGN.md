@@ -1,8 +1,8 @@
 # go-docx v2.0 - Clean Architecture Design
 
-**Status**: ✅ v2.7.0 Stable
+**Status**: ✅ v2.7.1 Stable
 **Progress**: Production Ready (all core features complete)
-**Latest Release**: v2.7.0 (July 2026)
+**Latest Release**: v2.7.1 (July 2026)
 **Breaking Changes**: Yes (major version bump from original fork)
 
 > **Project Note**: This project is a substantially-rewritten fork of `fumiama/go-docx` (AGPL-3.0), focused on clean architecture, type safety, and modern Go practices. Its provenance and the resulting open licensing question are documented in [PROVENANCE_AUDIT.md](./PROVENANCE_AUDIT.md) — the single source of truth for that topic.
@@ -1345,7 +1345,7 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 ---
 
 **Last Updated**: April 2026
-**Status**: ✅ v2.7.0 Stable
+**Status**: ✅ v2.7.1 Stable
 **Progress**: Production Ready (all core features complete)
 
 **Current State:**
