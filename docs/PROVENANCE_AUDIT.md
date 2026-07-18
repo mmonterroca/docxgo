@@ -33,7 +33,9 @@ That work fixed *labeling*. It did not, by itself, establish that the underlying
 *code* in those files is not derived from the AGPL upstream — swapping a header
 does not change provenance. **This audit closes that gap.**
 
-The six files that carried inherited AGPL/Apache headers (highest-risk set):
+The seven files that carried inherited AGPL/Apache headers — six with an
+AGPL-3.0 header, plus the Apache-2.0 header on `internal/writer/zip.go`
+(highest-risk set):
 
 - `internal/serializer/serializer.go`
 - `internal/serializer/latent_styles.go`
