@@ -30,6 +30,11 @@ import (
 	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
+// consolidateErr wraps a run-rebuild failure with a consistent operation prefix.
+func consolidateErr(err error) error {
+	return fmt.Errorf("template: consolidate runs: %w", err)
+}
+
 // ConsolidateRuns merges adjacent runs with identical formatting in a paragraph.
 // This heals the "split placeholder" problem where Word fragments tokens like
 // {{name}} across multiple <w:r> elements due to spell-check, proofing, or
@@ -84,36 +89,47 @@ func ConsolidateRuns(para domain.Paragraph) error {
 	for _, m := range merged {
 		r, err := para.AddRun()
 		if err != nil {
-			return fmt.Errorf("template: consolidate runs: %w", err)
+			return consolidateErr(err)
 		}
-		// Copy formatting from the source run. Stop at the first failure
+		// Copy formatting from the source run, stopping at the first failure
 		// instead of continuing with a partially-formatted run.
-		setters := []func() error{
-			func() error { return r.SetText(m.text) },
-			func() error { return r.SetFont(m.src.Font()) },
-			func() error { return r.SetColor(m.src.Color()) },
-			func() error { return r.SetSize(m.src.Size()) },
-			func() error { return r.SetBold(m.src.Bold()) },
-			func() error { return r.SetItalic(m.src.Italic()) },
-			func() error { return r.SetUnderline(m.src.Underline()) },
-			func() error { return r.SetStrike(m.src.Strike()) },
-			func() error { return r.SetHighlight(m.src.Highlight()) },
+		if err := r.SetText(m.text); err != nil {
+			return consolidateErr(err)
 		}
-		for _, set := range setters {
-			if err := set(); err != nil {
-				return fmt.Errorf("template: consolidate runs: %w", err)
-			}
+		if err := r.SetFont(m.src.Font()); err != nil {
+			return consolidateErr(err)
+		}
+		if err := r.SetColor(m.src.Color()); err != nil {
+			return consolidateErr(err)
+		}
+		if err := r.SetSize(m.src.Size()); err != nil {
+			return consolidateErr(err)
+		}
+		if err := r.SetBold(m.src.Bold()); err != nil {
+			return consolidateErr(err)
+		}
+		if err := r.SetItalic(m.src.Italic()); err != nil {
+			return consolidateErr(err)
+		}
+		if err := r.SetUnderline(m.src.Underline()); err != nil {
+			return consolidateErr(err)
+		}
+		if err := r.SetStrike(m.src.Strike()); err != nil {
+			return consolidateErr(err)
+		}
+		if err := r.SetHighlight(m.src.Highlight()); err != nil {
+			return consolidateErr(err)
 		}
 
 		// Re-add fields, breaks from the source run (for non-text runs)
 		for _, f := range m.src.Fields() {
 			if err := r.AddField(f); err != nil {
-				return fmt.Errorf("template: consolidate runs: %w", err)
+				return consolidateErr(err)
 			}
 		}
 		for _, b := range m.src.Breaks() {
 			if err := r.AddBreak(b); err != nil {
-				return fmt.Errorf("template: consolidate runs: %w", err)
+				return consolidateErr(err)
 			}
 		}
 	}

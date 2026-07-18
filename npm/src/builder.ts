@@ -261,6 +261,10 @@ export class DocumentBuilder {
       output: 'buffer',
     });
     this.documentId = result.documentId;
+    // The content is now embedded in the created document; clear the queue so
+    // a subsequent saveToBuffer()/saveToFile()/appendContent() doesn't
+    // re-append it and duplicate the body.
+    this.content = [];
     return result;
   }
 
@@ -280,6 +284,8 @@ export class DocumentBuilder {
       filePath,
     });
     this.documentId = result.documentId;
+    // See create(): clear the embedded content so later saves don't duplicate it.
+    this.content = [];
     return result;
   }
 

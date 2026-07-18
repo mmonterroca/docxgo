@@ -1083,7 +1083,11 @@ func (s *server) handleTemplateInspect(req *Request) Response {
 			"paragraph": p.Location.ParagraphIndex,
 			"run":       p.Location.RunIndex,
 		}
-		if p.Location.TableIndex >= 0 {
+		// TableIndex/RowIndex/CellIndex are only meaningful for table-cell
+		// placeholders; for a top-level paragraph, header, or footer they're
+		// left at their zero value, so gate on the location type rather than
+		// on TableIndex >= 0 (which is always true).
+		if p.Location.Type == template.LocationTableCell {
 			loc["table"] = p.Location.TableIndex
 			loc["row"] = p.Location.RowIndex
 			loc["cell"] = p.Location.CellIndex

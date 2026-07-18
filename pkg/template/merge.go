@@ -50,7 +50,10 @@ func MergeTemplate(doc domain.Document, data MergeData, opts ...MergeOptions) er
 		if err := ConsolidateRuns(para); err != nil {
 			return err
 		}
-		missing := replaceParagraph(para, data, pattern, opt)
+		missing, err := replaceParagraph(para, data, pattern, opt)
+		if err != nil {
+			return err
+		}
 		missingKeys = append(missingKeys, missing...)
 		return nil
 	})
@@ -115,8 +118,9 @@ func ValidateTemplate(doc domain.Document, data MergeData, opts ...MergeOptions)
 }
 
 // replaceParagraph replaces all placeholders in a single paragraph.
-// Returns a list of placeholder keys for which no data was found.
-func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Regexp, opt MergeOptions) []string {
+// Returns the placeholder keys for which no data was found, and an error if a
+// run's text could not be written.
+func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Regexp, opt MergeOptions) ([]string, error) {
 	var missing []string
 	runs := para.Runs()
 
@@ -137,7 +141,7 @@ func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Reg
 
 		if newText != text {
 			if err := run.SetText(newText); err != nil {
-				missing = append(missing, fmt.Sprintf("SetText failed: %v", err))
+				return missing, fmt.Errorf("template: set run text: %w", err)
 			}
 			// Clear fields on this run if it has any.
 			if len(run.Fields()) > 0 {
@@ -155,7 +159,7 @@ func replaceParagraph(para domain.Paragraph, data MergeData, pattern *regexp.Reg
 		}
 	}
 
-	return missing
+	return missing, nil
 }
 
 // BuildPattern creates a regex pattern from the configured delimiters.

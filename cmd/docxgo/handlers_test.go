@@ -1731,6 +1731,18 @@ func TestHandleTemplateInspect(t *testing.T) {
 			t.Errorf("expected placeholder %q not found", expected)
 		}
 	}
+
+	// Placeholders in top-level paragraphs must not carry table/row/cell keys.
+	for _, d := range parsed.Details {
+		if d["location"] != "paragraph" {
+			continue
+		}
+		for _, k := range []string{"table", "row", "cell"} {
+			if _, ok := d[k]; ok {
+				t.Errorf("paragraph placeholder %v should not have %q key, got %v", d["name"], k, d[k])
+			}
+		}
+	}
 }
 
 func TestHandleTemplateInspect_NotFound(t *testing.T) {

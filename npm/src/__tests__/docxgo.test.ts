@@ -282,6 +282,20 @@ describe('DocumentBuilder', () => {
     doc.reset();
   });
 
+  it('does not duplicate body content on create() then save', async () => {
+    // create() embeds the queued content; saving right after must NOT
+    // re-append it. Regression guard for the content-not-cleared bug.
+    await doc.addParagraph('Only once').create();
+    await doc.saveToBuffer();
+
+    const info = await doc.inspect();
+    assert.equal(info.paragraphCount, 1);
+    assert.deepEqual(info.text, ['Only once']);
+
+    await doc.closeDocument();
+    doc.reset();
+  });
+
   it('creates a document to file', async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'docxgo-builder-'));
     const filePath = join(tmpDir, 'builder.docx');
