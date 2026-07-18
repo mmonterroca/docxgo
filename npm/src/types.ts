@@ -46,7 +46,14 @@ export interface MarginCustom {
 export type Margins = MarginPreset | MarginCustom;
 
 /** Theme presets. */
-export type ThemeName = 'Corporate' | 'Startup' | 'Modern' | 'Fintech' | 'Academic';
+export type ThemeName =
+  | 'Corporate'
+  | 'Startup'
+  | 'Modern'
+  | 'Fintech'
+  | 'Academic'
+  | 'TechPresentation'
+  | 'TechDarkMode';
 
 /** Document-level options. */
 export interface DocumentOptions {

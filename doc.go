@@ -53,7 +53,7 @@ The builder API provides a more convenient way to create documents:
 	builder := docx.NewDocumentBuilder()
 
 	builder.AddParagraph().
-	    Text("Welcome to go-docx v2!").
+	    Text("Welcome to docxgo!").
 	    Bold().
 	    FontSize(16).
 	    Color(docx.Blue).
