@@ -90,7 +90,7 @@ jobs:
             "os": ["${{ matrix.goos == 'windows' && 'win32' || matrix.goos }}"],
             "cpu": ["${{ matrix.goarch == 'amd64' && 'x64' || matrix.goarch }}"],
             "main": "",
-            "files": ["bin/"],
+            "files": ["bin/", "README.md"],
             "license": "MIT",
             "repository": {
               "type": "git",
@@ -98,6 +98,19 @@ jobs:
               "directory": "npm/platforms/${{ matrix.suffix }}"
             }
           }
+          EOF
+
+      - name: Generate platform README
+        run: |
+          cat > npm/platforms/${{ matrix.suffix }}/README.md << EOF
+          # @mmonterroca/docxgo-${{ matrix.suffix }}
+
+          Platform-specific \`docxgo\` binary for ${{ matrix.suffix }} (${{ matrix.goos }}/${{ matrix.goarch }}).
+
+          Don't install this package directly — it's installed automatically as an
+          \`optionalDependency\` of [\`@mmonterroca/docxgo\`](https://www.npmjs.com/package/@mmonterroca/docxgo),
+          which resolves the right platform package for you. See that package for
+          documentation, usage, and the CLI/JSON-RPC protocol reference.
           EOF
 
       - name: Publish platform package (provenance)
