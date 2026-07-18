@@ -7,9 +7,18 @@ on:
   # GITHUB_TOKEN, and GitHub does not let GITHUB_TOKEN-authored events trigger
   # other workflows (anti-recursion protection) — so "release: published"
   # above never actually fires. Until release.yml is updated to create the
-  # release with a PAT instead, run this manually after each release, picking
-  # the release's tag (e.g. v2.7.0) as the ref to run the workflow from.
+  # release with a PAT instead, run this manually after each release.
+  #
+  # workflow_dispatch is only usable against a ref where the workflow file
+  # itself already declares this trigger, so the release tag (created before
+  # this fallback existed, and every future tag, which is cut before this
+  # workflow can be edited from it) can't be used directly as the dispatch
+  # ref. Run this from the default branch instead and pass the version input.
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 2.7.0, no "v" prefix)'
+        required: true
 
 permissions:
   contents: read
@@ -55,7 +64,12 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build binary
         env:
@@ -107,7 +121,12 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Install dependencies
         run: cd npm && npm ci
