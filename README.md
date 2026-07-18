@@ -151,56 +151,21 @@ Node.js examples live in [`npm/examples/`](npm/examples/).
 
 ## Features
 
-- **Documents** — metadata (title, author, subject, keywords), default proofing language, page layout, background color
-- **Text** — bold, italic, underline, strikethrough; color, size, font; 15 highlight colors; alignment; line spacing; indentation
-- **Tables** — horizontal/vertical cell merging, nested tables, 8 built-in styles, row height, cell width/alignment, borders/shading, full run-level cell formatting
-- **Images** — 7 formats (PNG, JPEG, GIF, BMP, TIFF, SVG, WEBP), inline & floating, in-memory insertion, automatic format detection
-- **Fields** — table of contents, page numbers, hyperlinks, StyleRef, date/time
-- **Headers & footers** — default/first/even-odd, page numbering, per-section customization
-- **Styles** — 40+ built-in paragraph styles, character styles, custom styles with inheritance
-- **Templates** — placeholder detection, data merge, batch generation, external Word templates
-- **Themes** — 5 preset themes
+Documents and metadata, rich text formatting, tables (merging, nesting, styles), images (7 formats, in-memory), fields (TOC, page numbers, hyperlinks), headers/footers, 40+ built-in styles, templates/mail merge, themes, and proofing language.
 
-For the detailed, up-to-date matrix, see [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md).
+For the full, up-to-date feature matrix, see **[docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)**.
 
 ---
 
 ## Architecture
 
-Clean architecture with clear layer boundaries:
-
-```
-domain/      # Public interfaces (Document, Paragraph, Run, Table, Section, Image, Style)
-internal/    # Implementations: core, manager, reader, serializer, writer, xml
-pkg/         # Public utilities: errors, constants, color
-themes/      # Theme system (5 presets)
-cmd/docxgo/  # JSON-RPC CLI binary
-npm/         # Node.js / TypeScript wrapper
-examples/    # 15 usage examples
-```
-
-Design principles: interface segregation, dependency injection (no global state), explicit errors (never silently ignored), defensive copies, strong typing (no `interface{}`), thread-safe concurrent access. See [docs/V2_DESIGN.md](docs/V2_DESIGN.md) for the full rationale.
+Clean architecture with clear layer boundaries — `domain/` (public interfaces), `internal/` (implementations), `pkg/` (utilities), `themes/`, plus the `cmd/docxgo/` CLI binary and `npm/` Node.js wrapper. Interface segregation, dependency injection, explicit errors, strong typing (no `interface{}`), and thread-safe concurrent access throughout. See **[docs/V2_DESIGN.md](docs/V2_DESIGN.md)** for the full rationale.
 
 ---
 
 ## Error Handling
 
-Every operation returns explicit, structured errors carrying operation context and an error code — no silent failures. The fluent builder accumulates errors and surfaces the first one at `Build()`.
-
-```go
-para, err := doc.AddParagraph()
-if err != nil {
-    // e.g. "operation=Document.AddParagraph | code=VALIDATION_ERROR | ..."
-    log.Fatal(err)
-}
-
-var validationErr *errors.ValidationError
-if errors.As(err, &validationErr) {
-    fmt.Printf("field %q failed: %s\n", validationErr.Field, validationErr.Message)
-}
-```
-
-See [docs/ERROR_HANDLING.md](docs/ERROR_HANDLING.md) for the full error system and patterns.
+Every operation returns explicit, structured errors carrying operation context and an error code — no silent failures. The fluent builder accumulates errors and surfaces the first at `Build()`. See **[docs/ERROR_HANDLING.md](docs/ERROR_HANDLING.md)** for the error system and patterns.
 
 ---
 
