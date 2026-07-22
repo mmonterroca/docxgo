@@ -543,7 +543,7 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 	after := para.SpacingAfter()
 	lineSpacing := para.LineSpacing()
 
-	if before != 0 || after != 0 || lineSpacing.Value != constants.DefaultLineSpacing {
+	if true {
 		props.Spacing = &xml.Spacing{
 			Before:   intPtrIfNotZero(before),
 			After:    intPtrIfNotZero(after),
@@ -980,9 +980,6 @@ func intPtr(i int) *int {
 }
 
 func intPtrIfNotZero(i int) *int {
-	if i == 0 {
-		return nil
-	}
 	return &i
 }
 

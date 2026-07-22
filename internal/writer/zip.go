@@ -453,7 +453,11 @@ func (zw *ZipWriter) writeDefaultStyles() error {
         <w:sz w:val="22"/>
       </w:rPr>
     </w:rPrDefault>
-    <w:pPrDefault/>
+	<w:pPrDefault>
+      <w:pPr>
+        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
+      </w:pPr>
+    </w:pPrDefault>
   </w:docDefaults>
 </w:styles>`
 	return zw.writeRaw("word/styles.xml", []byte(styles))
