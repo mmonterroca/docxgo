@@ -3,9 +3,19 @@ name: npm Publish
 on:
   release:
     types: [published]
-  # GitHub does not let GITHUB_TOKEN-authored events trigger other workflows.
-  # release.yml creates the release with RELEASE_PAT so the event above fires
-  # automatically; this dispatch remains an idempotent fallback.
+  # release.yml invokes this workflow directly as a job (see its publish-npm
+  # job), passing the version explicitly, so publishing no longer depends on
+  # the "release: published" event above ever firing — which it doesn't when
+  # RELEASE_PAT is unset, since GitHub does not let GITHUB_TOKEN-authored
+  # events trigger other workflows.
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 2.7.2, no "v" prefix)'
+        required: true
+        type: string
+  # Idempotent manual fallback, usable from the default branch if a release
+  # ever needs to be re-published by hand.
   #
   # workflow_dispatch is only usable against a ref where the workflow file
   # itself already declares this trigger, so the release tag (created before
@@ -51,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
+          ref: ${{ inputs.version != '' && format('refs/tags/v{0}', inputs.version) || github.ref }}
 
       - uses: actions/setup-go@v7
         with:
@@ -66,8 +76,8 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
           else
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           fi
@@ -136,7 +146,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
+          ref: ${{ inputs.version != '' && format('refs/tags/v{0}', inputs.version) || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -146,8 +156,8 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
           else
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           fi
