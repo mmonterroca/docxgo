@@ -8,21 +8,21 @@ Thank you for your interest in contributing to docxgo! This document provides gu
 
 1. **Read the docs**: [README.md](README.md), [V2_DESIGN.md](docs/V2_DESIGN.md)
 2. **Check issues**: Look for `good-first-issue` or `help-wanted` labels
-3. **Follow Git Flow**: Branch from `dev`, PR back to `dev`
+3. **Branch from `master`, PR back to `master`**
 4. **Write tests**: Aim for 95%+ coverage
 5. **Update docs**: Keep README and examples in sync
 
 ---
 
-## Git Flow Workflow
+## Branching Workflow
 
-We use a simplified Git Flow branching strategy to maintain code quality and stability:
+We use trunk-based development: contributions branch directly from `master` and PR back to `master`.
 
 ### Branch Structure
 
-- **`master`**: Production-ready code only. This branch contains stable releases and is tagged with semantic versions (e.g., `v2.5.0`).
-- **`dev`**: Integration branch where features are tested before release. All development work merges here first.
-- **Feature branches**: Short-lived branches for specific features, bug fixes, or improvements. Named with prefixes like `feature/`, `fix/`, `docs/`, etc.
+- **`master`**: Production-ready code. This branch contains stable releases and is tagged with semantic versions (e.g., `v2.5.0`). Protected — all changes land via reviewed pull request.
+- **Feature branches**: Short-lived branches for specific features, bug fixes, or improvements. Named with prefixes like `feature/`, `fix/`, `docs/`, etc. Deleted once merged.
+- **Integration branches** (rare): if two in-flight changes genuinely need to be co-staged before either lands on `master`, cut a short-lived `integration/<topic>` branch for that purpose and delete it once both land. This is the exception, not a standing branch — we do not keep a permanent second long-lived branch, since a branch that isn't part of every contributor's default path drifts stale and misdirects contributions (see [CHANGELOG](CHANGELOG.md) for why we retired the old `dev` integration branch).
 
 ### Contributing Process
 
@@ -48,11 +48,11 @@ git remote -v  # Verify remotes
 
 #### 3. Create Feature Branch
 
-Always branch from `dev`:
+Always branch from `master`:
 
 ```bash
-git checkout dev
-git pull upstream dev  # Get latest changes
+git checkout master
+git pull upstream master  # Get latest changes
 git checkout -b feature/your-feature-name
 ```
 
@@ -116,7 +116,7 @@ git push origin feature/your-feature-name
 
 1. Go to the [original repository](https://github.com/mmonterroca/docxgo)
 2. Click "New Pull Request"
-3. **Important**: Set base branch to `dev` (NOT `master`)
+3. Set base branch to `master`
 4. Set compare branch to your feature branch
 5. Fill in the PR template:
    - Clear description of changes
@@ -129,14 +129,13 @@ git push origin feature/your-feature-name
 - Wait for maintainer review
 - Address feedback by pushing additional commits
 - Engage in discussion if needed
-- Once approved, maintainers will merge to `dev`
+- Once approved, maintainers will merge to `master`
 
 #### 9. Release Process
 
 Periodically, maintainers will:
-1. Merge `dev` → `master`
-2. Tag the release with semantic version
-3. Create GitHub release with changelog
+1. Tag `master` with the next semantic version
+2. Create GitHub release with changelog (this triggers automated binary builds and npm publishing)
 
 ## What We're Looking For
 
