@@ -1,3 +1,23 @@
+## v2.9.1 — 2026-07-27
+
+### Fixed
+
+- **An explicit spacing override no longer clobbers a style's line spacing.** v2.9.0's fix for explicit-zero spacing widened the emit gate to fire whenever `spacingBefore`/`spacingAfter` was explicitly set, but `Line`/`LineRule` were filled into the same `<w:spacing>` element unconditionally — a paragraph that only called `SetSpacingAfter(0)` gained an unintended direct `w:line="240" w:lineRule="auto"`, silently overriding a style's real line spacing (e.g. 1.5 lines rendering as single-spaced). `Line`/`LineRule` are now gated by their own departure-from-default check, independent of before/after.
+- **`FindPlaceholders`'s reported `Location` is now correct for the common, non-split case.** v2.9.0's offset translation used an inclusive comparison for both the start and end of a match; applied to the start, it misattributed a match beginning exactly at a run boundary — the ordinary Word `"Hello "` + `"{{Name}}"` split — to the end of the *previous* run instead of the start of the one actually holding it, so `RunIndex`/`StartOffset` pointed at text that didn't contain the placeholder and slicing it could panic. It also misattributed matches following a leading empty run. `Location`'s doc comment now states the contract explicitly: when `RunIndex == EndRunIndex`, single-run slicing works exactly as it did before v2.9.0.
+
+### Changed
+
+- **CI is now resilient to the npm lock's platform-package gap between releases.** `npm/package-lock.json` is regenerated with `npm install --package-lock-only` during release prep, which necessarily drops the platform-package entries (they don't exist on the registry yet at that point) — but `npm ci` requires every declared `optionalDependency` to have a resolved lock entry, so CI's Node.js Tests job failed on any commit between a release-prep commit and the next lock regeneration. This reproduced identically after both the v2.8.0 and v2.9.0 release commits. CI now uses `npm install`, which reconciles instead of requiring exact pre-sync.
+- **Hardened the release workflows.** `inputs.version` is now bound via `env:` and validated against a semver pattern before use, instead of being interpolated directly into `run:` shell scripts in a job holding `NPM_TOKEN` and `id-token: write`. Dropped the now-redundant `release: types: [published]` trigger from `npm-publish.yml` — `release.yml`'s `publish-npm` job already calls it unconditionally (see v2.9.0), so keeping both would race two `npm publish` calls for the same tag once `RELEASE_PAT` is configured. The `RELEASE_PAT` emptiness check in `release.yml` is also now bound via `env:` rather than expanded directly into a shell condition.
+
+### Compatibility
+
+- No public Go, CLI protocol, or Node.js API changed.
+- Generated output for a paragraph that both carries a style with non-default line spacing *and* explicitly sets only `spacingBefore`/`spacingAfter` (not line spacing) changes back to what v2.9.0 intended: the style's line spacing is inherited again instead of being overridden by an unintended direct `0/240/auto`. Any other paragraph is unaffected.
+- `FindPlaceholders`/`FindPlaceholdersCustom`/`PlaceholderNames`/`ValidateTemplate` report different (corrected) `RunIndex`/`StartOffset` values for matches that sit exactly at a run boundary or follow a leading empty run — a narrow input shape most callers won't have hit, since v2.9.0 shipped hours before this fix.
+
+---
+
 ## v2.9.0 — 2026-07-27
 
 ### Fixed
