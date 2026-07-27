@@ -7,6 +7,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -1104,6 +1105,76 @@ func TestHandleParagraphAdd_WithFormatting(t *testing.T) {
 	}))
 	if resp.Error != nil {
 		t.Fatalf("paragraph.add with formatting failed: %+v", resp.Error)
+	}
+}
+
+// TestHandleParagraphAdd_ExplicitZeroSpacingOnStyledParagraph guards #69
+// through the actual RPC surface: spacingAfter/spacingBefore became *int so a
+// JSON "spacingAfter": 0 can be told apart from omitting the field entirely.
+// Before that change, applyParagraph's `> 0` guard treated an explicit 0
+// exactly like "not provided" and the paragraph silently kept its Heading1
+// style's own spacing instead.
+func TestHandleParagraphAdd_ExplicitZeroSpacingOnStyledParagraph(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	addResp := s.dispatch(makeRequest(2, "paragraph.add", map[string]interface{}{
+		"documentId":   docID,
+		"style":        "Heading1",
+		"spacingAfter": 0,
+		"runs": []interface{}{
+			map[string]interface{}{"text": "Heading"},
+		},
+	}))
+	if addResp.Error != nil {
+		t.Fatalf("paragraph.add failed: %+v", addResp.Error)
+	}
+
+	saveResp := s.dispatch(makeRequest(3, "document.save", map[string]interface{}{
+		"documentId": docID,
+		"output":     "buffer",
+	}))
+	if saveResp.Error != nil {
+		t.Fatalf("document.save failed: %+v", saveResp.Error)
+	}
+
+	result := saveResp.Result.(map[string]interface{})
+	dataStr, _ := result["data"].(string)
+	docxBytes, err := base64.StdEncoding.DecodeString(dataStr)
+	if err != nil {
+		t.Fatalf("failed to decode base64: %v", err)
+	}
+
+	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
+	if err != nil {
+		t.Fatalf("failed to read docx as zip: %v", err)
+	}
+	var docXML []byte
+	for _, f := range zr.File {
+		if f.Name != "word/document.xml" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("failed to open document.xml: %v", err)
+		}
+		defer rc.Close()
+		var buf bytes.Buffer
+		if _, err := buf.ReadFrom(rc); err != nil {
+			t.Fatalf("failed to read document.xml: %v", err)
+		}
+		docXML = buf.Bytes()
+	}
+	if docXML == nil {
+		t.Fatal("word/document.xml not found in saved docx")
+	}
+
+	if !strings.Contains(string(docXML), `w:after="0"`) {
+		t.Errorf(`expected w:after="0" for an explicit spacingAfter:0 on a Heading1 paragraph, got: %s`, docXML)
 	}
 }
 

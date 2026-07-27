@@ -1002,22 +1002,40 @@ func TestParagraphSerializer_ExactLineSpacingAtDefaultValueIsEmitted(t *testing.
 		})
 	}
 
-	// The auto rule at the default value is genuinely "no departure" and must
-	// still stay out of the way of the style.
-	doc := core.NewDocument()
-	para, _ := doc.AddParagraph()
-	if err := para.SetLineSpacing(domain.LineSpacing{
-		Rule:  domain.LineSpacingAuto,
-		Value: 240,
-	}); err != nil {
-		t.Fatalf("SetLineSpacing: %v", err)
-	}
+	// An explicit SetLineSpacing(Auto, 240) is a real call the caller made,
+	// even though it names the default values — since it's distinguishable
+	// from "never called" (see LineSpacingSet, #69), it must still emit, so
+	// it can override a style's own non-auto line spacing rather than being
+	// mistaken for "unset" and silently losing to the style.
+	t.Run("ExplicitAutoAtDefaultIsEmitted", func(t *testing.T) {
+		doc := core.NewDocument()
+		para, _ := doc.AddParagraph()
+		if err := para.SetLineSpacing(domain.LineSpacing{
+			Rule:  domain.LineSpacingAuto,
+			Value: 240,
+		}); err != nil {
+			t.Fatalf("SetLineSpacing: %v", err)
+		}
 
-	ser := serializer.NewParagraphSerializer()
-	xmlPara := ser.Serialize(para)
-	if xmlPara.Properties != nil && xmlPara.Properties.Spacing != nil {
-		t.Errorf("expected no direct w:spacing for auto rule at the default value, got %+v", xmlPara.Properties.Spacing)
-	}
+		ser := serializer.NewParagraphSerializer()
+		xmlPara := ser.Serialize(para)
+		if xmlPara.Properties == nil || xmlPara.Properties.Spacing == nil {
+			t.Fatal("expected direct w:spacing for an explicit SetLineSpacing call, even at default values")
+		}
+	})
+
+	// A paragraph that never calls SetLineSpacing at all is the genuine
+	// "no departure" case and must stay out of the way of the style.
+	t.Run("NeverSetStaysSilent", func(t *testing.T) {
+		doc := core.NewDocument()
+		para, _ := doc.AddParagraph()
+
+		ser := serializer.NewParagraphSerializer()
+		xmlPara := ser.Serialize(para)
+		if xmlPara.Properties != nil && xmlPara.Properties.Spacing != nil {
+			t.Errorf("expected no direct w:spacing when SetLineSpacing was never called, got %+v", xmlPara.Properties.Spacing)
+		}
+	})
 }
 
 func TestParagraphSerializer_PartialIndentOmitsOtherSides(t *testing.T) {
@@ -1048,5 +1066,97 @@ func TestParagraphSerializer_PartialIndentOmitsOtherSides(t *testing.T) {
 	}
 	if ind.Hanging != nil {
 		t.Errorf("ind.Hanging = %v, want omitted (nil)", ind.Hanging)
+	}
+}
+
+// TestParagraphSerializer_ExplicitZeroAfterOnStyledParagraphIsEmitted guards
+// against the #69 bug: SpacingAfter() int can't distinguish "never called"
+// from "explicitly set to 0", so an explicit SetSpacingAfter(0) on a
+// paragraph whose style supplies non-zero spacing used to be silently
+// dropped, and the paragraph inherited the style's value instead of the
+// caller's explicit 0.
+func TestParagraphSerializer_ExplicitZeroAfterOnStyledParagraphIsEmitted(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	if err := para.SetStyle(domain.StyleIDHeading1); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	if err := para.SetSpacingAfter(0); err != nil {
+		t.Fatalf("SetSpacingAfter: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	if xmlPara.Properties == nil || xmlPara.Properties.Spacing == nil {
+		t.Fatal("expected direct w:spacing for an explicit SetSpacingAfter(0) on a styled paragraph")
+	}
+	after := xmlPara.Properties.Spacing.After
+	if after == nil || *after != 0 {
+		t.Errorf("spacing.After = %v, want a pointer to 0", after)
+	}
+	// Before was never set, so it must still be omitted — otherwise the
+	// caller's explicit After:0 would carry an unintended Before:0 with it,
+	// clobbering the style's own before-spacing too.
+	if xmlPara.Properties.Spacing.Before != nil {
+		t.Errorf("spacing.Before = %v, want omitted (nil), since it was never set", xmlPara.Properties.Spacing.Before)
+	}
+}
+
+// TestParagraphSerializer_ExplicitBeforeAndZeroAfterBothEmitted confirms both
+// an explicit non-zero Before and an explicit zero After are emitted
+// together, rather than the zero-value gate hiding one of them.
+func TestParagraphSerializer_ExplicitBeforeAndZeroAfterBothEmitted(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	if err := para.SetStyle(domain.StyleIDHeading1); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	if err := para.SetSpacingBefore(240); err != nil {
+		t.Fatalf("SetSpacingBefore: %v", err)
+	}
+	if err := para.SetSpacingAfter(0); err != nil {
+		t.Fatalf("SetSpacingAfter: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	if xmlPara.Properties == nil || xmlPara.Properties.Spacing == nil {
+		t.Fatal("expected direct w:spacing")
+	}
+	spacing := xmlPara.Properties.Spacing
+	if spacing.Before == nil || *spacing.Before != 240 {
+		t.Errorf("spacing.Before = %v, want a pointer to 240", spacing.Before)
+	}
+	if spacing.After == nil || *spacing.After != 0 {
+		t.Errorf("spacing.After = %v, want a pointer to 0", spacing.After)
+	}
+}
+
+// wrappedParagraph is the plain embedding decorator a third-party consumer
+// would write to add behavior around a domain.Paragraph.
+type wrappedParagraph struct{ domain.Paragraph }
+
+// TestParagraphSerializer_WrappedParagraphDegradesGracefully confirms that a
+// domain.Paragraph implementation which doesn't expose the concrete type's
+// *Set() methods (any third-party or wrapped implementation) neither panics
+// nor gets an explicit zero it never asked for — it falls back to the
+// zero-value gate, exactly like before #69.
+func TestParagraphSerializer_WrappedParagraphDegradesGracefully(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	if err := para.SetStyle(domain.StyleIDHeading1); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	if err := para.SetSpacingAfter(0); err != nil {
+		t.Fatalf("SetSpacingAfter: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(wrappedParagraph{para})
+
+	if xmlPara.Properties != nil && xmlPara.Properties.Spacing != nil {
+		t.Errorf("expected no direct w:spacing through a wrapped domain.Paragraph (degraded behavior), got %+v", xmlPara.Properties.Spacing)
 	}
 }

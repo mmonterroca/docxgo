@@ -343,8 +343,8 @@ type paragraphItem struct {
 	Runs          []runItem       `json:"runs,omitempty"`
 	Style         string          `json:"style,omitempty"`
 	Alignment     string          `json:"alignment,omitempty"`
-	SpacingBefore int             `json:"spacingBefore,omitempty"`
-	SpacingAfter  int             `json:"spacingAfter,omitempty"`
+	SpacingBefore *int            `json:"spacingBefore,omitempty"`
+	SpacingAfter  *int            `json:"spacingAfter,omitempty"`
 	LineSpacing   *lineSpacingDef `json:"lineSpacing,omitempty"`
 	Indent        *indentDef      `json:"indent,omitempty"`
 	Numbering     *numberingDef   `json:"numbering,omitempty"`
@@ -1446,11 +1446,11 @@ func applyParagraph(para domain.Paragraph, item paragraphItem) error {
 			_ = para.SetAlignment(align)
 		}
 	}
-	if item.SpacingBefore > 0 {
-		_ = para.SetSpacingBefore(item.SpacingBefore)
+	if item.SpacingBefore != nil {
+		_ = para.SetSpacingBefore(*item.SpacingBefore)
 	}
-	if item.SpacingAfter > 0 {
-		_ = para.SetSpacingAfter(item.SpacingAfter)
+	if item.SpacingAfter != nil {
+		_ = para.SetSpacingAfter(*item.SpacingAfter)
 	}
 	if item.LineSpacing != nil {
 		_ = para.SetLineSpacing(parseLineSpacing(item.LineSpacing))

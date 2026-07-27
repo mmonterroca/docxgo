@@ -650,8 +650,8 @@ Adds a single paragraph to an existing document. Supports the same paragraph pro
 | `documentId` | String | Yes | Session document ID |
 | `style` | String | No | Paragraph style name |
 | `alignment` | String | No | `left`, `center`, `right`, `justify`, `distribute` |
-| `spacingBefore` | Number | No | Spacing before (twips) |
-| `spacingAfter` | Number | No | Spacing after (twips) |
+| `spacingBefore` | Number | No | Spacing before (twips). Omit to leave unset; `0` is honored as an explicit override, including over a style's own spacing |
+| `spacingAfter` | Number | No | Spacing after (twips). Omit to leave unset; `0` is honored as an explicit override, including over a style's own spacing |
 | `lineSpacing` | Object | No | `{ "rule": "auto", "value": 360 }` |
 | `indent` | Object | No | `{ "left", "right", "firstLine", "hanging" }` |
 | `numbering` | Object | No | `{ "id": 1, "level": 0 }` |

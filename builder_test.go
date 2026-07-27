@@ -10,6 +10,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"io"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -1591,4 +1592,146 @@ func removeZipEntry(t *testing.T, data []byte, name string) []byte {
 		t.Fatalf("failed to finalize ZIP: %v", err)
 	}
 	return out.Bytes()
+}
+
+// headingParagraphXML returns the <w:p>...</w:p> fragment of the first
+// paragraph in document.xml carrying the Heading1 style, for tests that need
+// to inspect a specific paragraph's direct formatting rather than the whole
+// document.
+func headingParagraphXML(t *testing.T, doc domain.Document) string {
+	t.Helper()
+	docXML := readZipPart(t, doc, "word/document.xml")
+
+	paraPattern := regexp.MustCompile(`(?s)<w:p[ >].*?</w:p>`)
+	for _, p := range paraPattern.FindAllString(docXML, -1) {
+		if strings.Contains(p, `w:val="Heading1"`) {
+			return p
+		}
+	}
+	t.Fatal("no Heading1 paragraph found in word/document.xml")
+	return ""
+}
+
+// TestBuilder_HeadingParagraphNoDirectSpacing guards against the #63
+// regression class through the full public pipeline (NewDocumentBuilder ->
+// Build -> WriteTo -> real ZIP), not just the internal serializer unit test:
+// a Heading1 paragraph that never sets its own spacing must not carry direct
+// <w:spacing>, so it inherits the style's own value instead of docDefaults'
+// 0/0.
+func TestBuilder_HeadingParagraphNoDirectSpacing(t *testing.T) {
+	builder := NewDocumentBuilder()
+	builder.AddParagraph().Text("Intro").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	heading, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	if err := heading.SetStyle(domain.StyleIDHeading1); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	if _, err := heading.AddRun(); err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+
+	fragment := headingParagraphXML(t, doc)
+	if strings.Contains(fragment, "<w:spacing") {
+		t.Errorf("expected no direct w:spacing on a Heading1 paragraph that didn't set its own, got: %s", fragment)
+	}
+}
+
+// TestBuilder_ExplicitZeroSpacingOnHeadingIsHonored is the positive
+// counterpart: once the paragraph explicitly asks for SetSpacingAfter(0), it
+// must appear in the generated document.xml, overriding the Heading1 style.
+func TestBuilder_ExplicitZeroSpacingOnHeadingIsHonored(t *testing.T) {
+	builder := NewDocumentBuilder()
+	builder.AddParagraph().Text("Intro").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	heading, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	if err := heading.SetStyle(domain.StyleIDHeading1); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	if err := heading.SetSpacingAfter(0); err != nil {
+		t.Fatalf("SetSpacingAfter: %v", err)
+	}
+	if _, err := heading.AddRun(); err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+
+	fragment := headingParagraphXML(t, doc)
+	if !strings.Contains(fragment, `w:after="0"`) {
+		t.Errorf(`expected w:after="0" on a Heading1 paragraph with an explicit SetSpacingAfter(0), got: %s`, fragment)
+	}
+}
+
+// TestOpenDocument_RoundTripsExplicitZeroSpacing confirms an explicit
+// SetSpacingAfter(0) on a styled paragraph survives a full open+resave round
+// trip: the reader (internal/reader/reconstruct.go) only calls SetSpacingAfter
+// when the source XML actually carries a w:after attribute, so re-opening and
+// re-saving must set the tracking flag again rather than losing it.
+func TestOpenDocument_RoundTripsExplicitZeroSpacing(t *testing.T) {
+	builder := NewDocumentBuilder()
+	builder.AddParagraph().Text("Intro").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	heading, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	if err := heading.SetStyle(domain.StyleIDHeading1); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	if err := heading.SetSpacingAfter(0); err != nil {
+		t.Fatalf("SetSpacingAfter: %v", err)
+	}
+	if _, err := heading.AddRun(); err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	reopened, err := OpenDocumentFromBytes(buf.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes failed: %v", err)
+	}
+
+	var resaved bytes.Buffer
+	if _, err := reopened.WriteTo(&resaved); err != nil {
+		t.Fatalf("WriteTo (resave) failed: %v", err)
+	}
+
+	docXML := string(zipPart(t, resaved.Bytes(), "word/document.xml"))
+	paraPattern := regexp.MustCompile(`(?s)<w:p[ >].*?</w:p>`)
+	var fragment string
+	for _, p := range paraPattern.FindAllString(docXML, -1) {
+		if strings.Contains(p, `w:val="Heading1"`) {
+			fragment = p
+			break
+		}
+	}
+	if fragment == "" {
+		t.Fatal("no Heading1 paragraph found after round trip")
+	}
+	if !strings.Contains(fragment, `w:after="0"`) {
+		t.Errorf(`expected w:after="0" to survive an open+resave round trip, got: %s`, fragment)
+	}
 }
