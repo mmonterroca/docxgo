@@ -289,7 +289,7 @@ This library generates Office Open XML (OOXML) documents compatible with:
 
 # Version
 
-Current version: 2.7.2 (see the Version constant for the authoritative value).
+Current version: 2.8.0 (see the Version constant for the authoritative value).
 
 This is a major rewrite of the original go-docx library with breaking changes.
 See the migration guide in MIGRATION.md for details.

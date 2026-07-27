@@ -1,6 +1,6 @@
 # Migration Guide: v1 → docxgo v2
 
-**Current target:** v2.7.2
+**Current target:** v2.8.0
 **Minimum Go version:** 1.23
 
 This guide covers migration from the historical `fumiama/go-docx` API to the
@@ -27,7 +27,7 @@ For the complete current API, see the [API guide](docs/V2_API_GUIDE.md) and
 ## 1. Update the module
 
 ```bash
-go get github.com/mmonterroca/docxgo/v2@v2.7.2
+go get github.com/mmonterroca/docxgo/v2@v2.8.0
 go mod tidy
 ```
 
