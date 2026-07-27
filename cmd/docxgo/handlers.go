@@ -291,6 +291,10 @@ type tableAddParams struct {
 // tableListParams are the parameters for table.list.
 type tableListParams struct {
 	DocumentID string `json:"documentId"`
+	// IncludeText adds each table's cell texts to the listing, row by row.
+	// Rows report their actual cells, so ragged tables (merged cells) are
+	// represented faithfully rather than padded to columnCount.
+	IncludeText bool `json:"includeText,omitempty"`
 }
 
 // sectionAddParams are the parameters for section.add.
@@ -945,11 +949,30 @@ func (s *server) handleTableList(req *Request) Response {
 	tables := doc.Tables()
 	items := make([]map[string]interface{}, 0, len(tables))
 	for i, t := range tables {
-		items = append(items, map[string]interface{}{
+		item := map[string]interface{}{
 			"index":   i,
 			"rows":    t.RowCount(),
 			"columns": t.ColumnCount(),
-		})
+		}
+		if params.IncludeText {
+			rows := t.Rows()
+			cellRows := make([][]string, 0, len(rows))
+			for _, row := range rows {
+				cells := row.Cells()
+				texts := make([]string, 0, len(cells))
+				for _, cell := range cells {
+					paragraphs := cell.Paragraphs()
+					pTexts := make([]string, 0, len(paragraphs))
+					for _, p := range paragraphs {
+						pTexts = append(pTexts, p.Text())
+					}
+					texts = append(texts, strings.Join(pTexts, "\n"))
+				}
+				cellRows = append(cellRows, texts)
+			}
+			item["cells"] = cellRows
+		}
+		items = append(items, item)
 	}
 
 	return Response{ID: req.ID, Result: map[string]interface{}{

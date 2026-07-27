@@ -883,6 +883,40 @@ func TestHandleTableGetCell(t *testing.T) {
 	}
 }
 
+func TestHandleTableList_IncludeText(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.list", map[string]interface{}{
+		"documentId": docID, "includeText": true,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("table.list failed: %+v", resp.Error)
+	}
+	tables := resp.Result.(map[string]interface{})["tables"].([]map[string]interface{})
+	if len(tables) != 1 {
+		t.Fatalf("table count = %d, want 1", len(tables))
+	}
+	cells, ok := tables[0]["cells"].([][]string)
+	if !ok {
+		t.Fatalf("cells missing or wrong type: %T", tables[0]["cells"])
+	}
+	if len(cells) != 2 || len(cells[0]) != 2 {
+		t.Fatalf("cells shape = %v", cells)
+	}
+	if cells[1][0] != "Do you encrypt data at rest?" || cells[1][1] != "TBD" {
+		t.Errorf("row 1 = %v", cells[1])
+	}
+
+	// Without the flag, cells must be absent.
+	resp = s.dispatch(makeRequest(3, "table.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	tables = resp.Result.(map[string]interface{})["tables"].([]map[string]interface{})
+	if _, present := tables[0]["cells"]; present {
+		t.Error("cells should be absent without includeText")
+	}
+}
+
 func TestHandleTableSetCell_TextShortcut(t *testing.T) {
 	s, docID := newEditTestDoc(t)
 
