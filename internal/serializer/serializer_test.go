@@ -962,6 +962,64 @@ func TestParagraphSerializer_StyledParagraphSpacingNotClobbered(t *testing.T) {
 	}
 }
 
+func TestParagraphSerializer_ExactLineSpacingAtDefaultValueIsEmitted(t *testing.T) {
+	// An Exact/AtLeast line-spacing rule is a real departure from the document
+	// defaults even when its value happens to equal DefaultLineSpacing (240).
+	// If the emit gate looked only at the value, such a paragraph would emit
+	// nothing and silently inherit the lineRule="auto" that w:pPrDefault now
+	// installs — turning a caller's exact 12pt line height into auto spacing.
+	for _, tt := range []struct {
+		name string
+		rule domain.LineSpacingRule
+		want string
+	}{
+		{"Exact", domain.LineSpacingExact, "exact"},
+		{"AtLeast", domain.LineSpacingAtLeast, "atLeast"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := core.NewDocument()
+			para, _ := doc.AddParagraph()
+			if err := para.SetLineSpacing(domain.LineSpacing{
+				Rule:  tt.rule,
+				Value: 240, // deliberately the default value
+			}); err != nil {
+				t.Fatalf("SetLineSpacing: %v", err)
+			}
+
+			ser := serializer.NewParagraphSerializer()
+			xmlPara := ser.Serialize(para)
+
+			if xmlPara.Properties == nil || xmlPara.Properties.Spacing == nil {
+				t.Fatalf("expected direct w:spacing to be emitted for rule %s at the default value", tt.name)
+			}
+			got := xmlPara.Properties.Spacing.LineRule
+			if got == nil {
+				t.Fatalf("lineRule not set, want %q", tt.want)
+			}
+			if *got != tt.want {
+				t.Errorf("lineRule = %q, want %q", *got, tt.want)
+			}
+		})
+	}
+
+	// The auto rule at the default value is genuinely "no departure" and must
+	// still stay out of the way of the style.
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	if err := para.SetLineSpacing(domain.LineSpacing{
+		Rule:  domain.LineSpacingAuto,
+		Value: 240,
+	}); err != nil {
+		t.Fatalf("SetLineSpacing: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+	if xmlPara.Properties != nil && xmlPara.Properties.Spacing != nil {
+		t.Errorf("expected no direct w:spacing for auto rule at the default value, got %+v", xmlPara.Properties.Spacing)
+	}
+}
+
 func TestParagraphSerializer_PartialIndentOmitsOtherSides(t *testing.T) {
 	// A paragraph that only sets Left indent must not emit w:right/
 	// w:firstLine/w:hanging as explicit zero — that would override a style's

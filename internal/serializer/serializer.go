@@ -543,7 +543,15 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 	after := para.SpacingAfter()
 	lineSpacing := para.LineSpacing()
 
-	if before != 0 || after != 0 || lineSpacing.Value != constants.DefaultLineSpacing {
+	// Emit direct spacing only when the paragraph actually departs from the
+	// document defaults, so that a paragraph at those defaults inherits from
+	// its style rather than overriding it. The rule matters as much as the
+	// value here: an exact or at-least rule is a departure even at the
+	// default 240 twips, and without this check it would silently inherit the
+	// lineRule="auto" written into w:pPrDefault.
+	if before != 0 || after != 0 ||
+		lineSpacing.Value != constants.DefaultLineSpacing ||
+		lineSpacing.Rule != domain.LineSpacingAuto {
 		props.Spacing = &xml.Spacing{
 			Before:   intPtrIfNotZero(before),
 			After:    intPtrIfNotZero(after),

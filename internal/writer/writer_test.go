@@ -10,7 +10,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/xml"
-	"regexp"
+	"reflect"
 	"testing"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -222,14 +222,18 @@ func readZipFile(t *testing.T, buf []byte, name string) []byte {
 	return nil
 }
 
-// pPrDefaultAttr extracts one attribute (by local name, ignoring the "w:"
-// prefix) from the <w:pPrDefault>...<w:spacing .../> subtree of a
-// word/styles.xml document. Matching on the raw attribute text rather than
-// decoding through encoding/xml sidesteps namespace-prefix handling, which
-// isn't the point of this test: both code paths must agree on the actual
-// spacing values, not on identical XML encoding.
-func pPrDefaultAttr(t *testing.T, stylesXML []byte, attr string) (string, bool) {
+// pPrDefaultProperties returns every element and attribute inside the
+// <w:pPrDefault> subtree of a word/styles.xml document, keyed as
+// "element/attribute" (e.g. "spacing/before"). Decoding the subtree rather
+// than comparing raw bytes means the two producers are compared on the
+// properties they describe, not on incidental encoding differences
+// (self-closing vs paired tags, attribute order, indentation). Any property
+// present in one producer and absent in the other shows up as a key
+// difference, so this catches drift the test was written to prevent even for
+// defaults nobody thought to enumerate.
+func pPrDefaultProperties(t *testing.T, stylesXML []byte) map[string]string {
 	t.Helper()
+
 	start := bytes.Index(stylesXML, []byte("<w:pPrDefault"))
 	if start < 0 {
 		t.Fatal("no <w:pPrDefault> element found in styles.xml")
@@ -238,64 +242,85 @@ func pPrDefaultAttr(t *testing.T, stylesXML []byte, attr string) (string, bool) 
 	if end < 0 {
 		t.Fatal("no closing </w:pPrDefault> found in styles.xml")
 	}
-	fragment := stylesXML[start : start+end]
+	fragment := stylesXML[start : start+end+len("</w:pPrDefault>")]
 
-	re := regexp.MustCompile(`w:` + attr + `="([^"]*)"`)
-	m := re.FindSubmatch(fragment)
-	if m == nil {
-		return "", false
+	props := make(map[string]string)
+	dec := xml.NewDecoder(bytes.NewReader(fragment))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		se, ok := tok.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		// Skip the wrapper elements themselves; record their contents.
+		if se.Name.Local == "pPrDefault" || se.Name.Local == "pPr" {
+			continue
+		}
+		if len(se.Attr) == 0 {
+			// A valueless element (e.g. <w:keepNext/>) is itself a property.
+			props[se.Name.Local] = ""
+			continue
+		}
+		for _, a := range se.Attr {
+			props[se.Name.Local+"/"+a.Name.Local] = a.Value
+		}
 	}
-	return string(m[1]), true
+
+	if len(props) == 0 {
+		t.Fatalf("no properties decoded from w:pPrDefault subtree: %s", fragment)
+	}
+	return props
 }
 
 // TestWriteDefaultStyles_MatchesSerializedStyleManagerDefaults pins that the
-// w:pPrDefault emitted by the no-style-manager fallback (writeDefaultStyles,
-// hand-written XML string) and the one emitted for a document that does
-// carry a style manager (DocumentSerializer.SerializeStyles, marshaled
-// structs) agree on the actual spacing values. If they drifted, a document
-// would render with different default paragraph spacing purely depending on
-// whether a style manager happened to be attached.
+// w:pPrDefault written by the no-style-manager fallback (writeDefaultStyles'
+// hand-written XML string) and the one written for a document that does carry
+// a style manager (DocumentSerializer.SerializeStyles' marshaled structs)
+// describe the same default paragraph properties. If they drifted, a document
+// would render with different default spacing purely depending on whether a
+// style manager happened to be attached.
+//
+// Both sides go through the real ZipWriter.WriteDocument and are read back out
+// of the resulting archive, so neither is a hand-rolled imitation that could
+// keep passing while the production paths diverge. The whole w:pPrDefault
+// subtree is compared, not a chosen list of attributes, so a default added to
+// one producer and not the other fails here rather than shipping.
 func TestWriteDefaultStyles_MatchesSerializedStyleManagerDefaults(t *testing.T) {
-	// Path A: no style manager -> writeDefaultStyles' raw XML fallback.
-	var bufA bytes.Buffer
-	zwA := NewZipWriter(&bufA)
-	doc := &xmlstructs.Document{
-		XMLnsW: constants.NamespaceMain,
-		XMLnsR: constants.NamespaceRelationships,
-		Body:   &xmlstructs.Body{},
-	}
-	rels := &xmlstructs.Relationships{Xmlns: constants.NamespacePackageRels}
-	if err := zwA.WriteDocument(doc, rels, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
-		t.Fatalf("WriteDocument (no styles): %v", err)
-	}
-	if err := zwA.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-	stylesA := readZipFile(t, bufA.Bytes(), "word/styles.xml")
-
-	// Path B: with a style manager -> SerializeStyles' marshaled structs,
-	// written through the exact same encoder writeStyles uses.
-	sm := manager.NewStyleManager()
-	xmlStyles := serializer.NewDocumentSerializer().SerializeStyles(sm, nil)
-
-	var bufB bytes.Buffer
-	if _, err := bufB.WriteString(xml.Header); err != nil {
-		t.Fatalf("write header: %v", err)
-	}
-	enc := xml.NewEncoder(&bufB)
-	enc.Indent("", "  ")
-	if err := enc.Encode(xmlStyles); err != nil {
-		t.Fatalf("encode styles: %v", err)
-	}
-	stylesB := bufB.Bytes()
-
-	for _, attr := range []string{"before", "after", "line", "lineRule"} {
-		valA, okA := pPrDefaultAttr(t, stylesA, attr)
-		valB, okB := pPrDefaultAttr(t, stylesB, attr)
-		if okA != okB || valA != valB {
-			t.Errorf("w:%s mismatch between paths: no-style-manager=%q(present=%v) vs with-style-manager=%q(present=%v)",
-				attr, valA, okA, valB, okB)
+	writeStylesXML := func(t *testing.T, styles *xmlstructs.Styles) []byte {
+		t.Helper()
+		var buf bytes.Buffer
+		zw := NewZipWriter(&buf)
+		doc := &xmlstructs.Document{
+			XMLnsW: constants.NamespaceMain,
+			XMLnsR: constants.NamespaceRelationships,
+			Body:   &xmlstructs.Body{},
 		}
+		rels := &xmlstructs.Relationships{Xmlns: constants.NamespacePackageRels}
+		if err := zw.WriteDocument(doc, rels, nil, nil, styles, nil, nil, nil, nil, nil, nil); err != nil {
+			t.Fatalf("WriteDocument: %v", err)
+		}
+		if err := zw.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		return readZipFile(t, buf.Bytes(), "word/styles.xml")
+	}
+
+	// Path A: nil styles -> writeDefaultStyles' raw XML fallback.
+	stylesA := writeStylesXML(t, nil)
+
+	// Path B: a real style manager -> SerializeStyles' marshaled structs.
+	sm := manager.NewStyleManager()
+	stylesB := writeStylesXML(t, serializer.NewDocumentSerializer().SerializeStyles(sm, nil))
+
+	defaultsA := pPrDefaultProperties(t, stylesA)
+	defaultsB := pPrDefaultProperties(t, stylesB)
+
+	if !reflect.DeepEqual(defaultsA, defaultsB) {
+		t.Errorf("w:pPrDefault differs between the two styles.xml producers:\n  no-style-manager  = %+v\n  with-style-manager= %+v",
+			defaultsA, defaultsB)
 	}
 }
 
