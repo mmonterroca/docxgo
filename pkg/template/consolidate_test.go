@@ -498,6 +498,69 @@ func TestFindPlaceholders_LocationAcrossSplitRuns(t *testing.T) {
 	}
 }
 
+// TestFindPlaceholders_LocationNotSplitAtRunBoundary pins the off-by-one bug
+// found in code review of #75/#68: a match that is NOT split — it starts
+// exactly at the boundary between two mergeable runs — must resolve its
+// start to the run that actually contains it (the second run), not to the
+// end of the run before it. Before the fix, RunIndex/EndRunIndex disagreed
+// (falsely signaling a split) and runs[loc.RunIndex].Text()[loc.StartOffset:loc.EndOffset]
+// panicked with a slice-bounds error, since StartOffset came from the wrong
+// run's length.
+func TestFindPlaceholders_LocationNotSplitAtRunBoundary(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello ") // 6 chars, same formatting as r2 -> mergeable
+	r2, _ := para.AddRun()
+	r2.SetText("{{Name}}") // whole placeholder starts right at the boundary
+
+	placeholders := FindPlaceholders(doc)
+	if len(placeholders) != 1 {
+		t.Fatalf("expected 1 placeholder, got %d", len(placeholders))
+	}
+
+	loc := placeholders[0].Location
+	if loc.RunIndex != loc.EndRunIndex {
+		t.Fatalf("match is not split across runs, but RunIndex=%d != EndRunIndex=%d", loc.RunIndex, loc.EndRunIndex)
+	}
+	if loc.RunIndex != 1 || loc.StartOffset != 0 {
+		t.Errorf("start = (run %d, offset %d), want (run 1, offset 0)", loc.RunIndex, loc.StartOffset)
+	}
+	if loc.EndOffset != 8 {
+		t.Errorf("EndOffset = %d, want 8", loc.EndOffset)
+	}
+
+	runs := para.Runs()
+	got := runs[loc.RunIndex].Text()[loc.StartOffset:loc.EndOffset]
+	if got != "{{Name}}" {
+		t.Errorf("slicing runs[RunIndex].Text()[StartOffset:EndOffset] = %q, want %q", got, "{{Name}}")
+	}
+}
+
+// TestFindPlaceholders_LocationSkipsLeadingEmptyRun confirms a placeholder
+// starting right after a zero-length run resolves to the run that actually
+// holds the text, not the empty one.
+func TestFindPlaceholders_LocationSkipsLeadingEmptyRun(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("") // empty, same formatting as r2 -> mergeable group
+	r2, _ := para.AddRun()
+	r2.SetText("{{Name}}")
+
+	placeholders := FindPlaceholders(doc)
+	if len(placeholders) != 1 {
+		t.Fatalf("expected 1 placeholder, got %d", len(placeholders))
+	}
+
+	loc := placeholders[0].Location
+	if loc.RunIndex != 1 || loc.StartOffset != 0 {
+		t.Errorf("start = (run %d, offset %d), want (run 1, offset 0) — skipping the empty run", loc.RunIndex, loc.StartOffset)
+	}
+}
+
 // TestFindPlaceholders_HeaderNotMutated confirms the read-only guarantee also
 // holds for header paragraphs, where logos live alongside mergeable text runs.
 func TestFindPlaceholders_HeaderNotMutated(t *testing.T) {

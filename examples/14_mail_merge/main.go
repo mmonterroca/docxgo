@@ -82,7 +82,6 @@ func main() {
 
 	// Step 4: Merge single document
 	fmt.Println("\nStep 4: Merging template with data...")
-	doc, _ = docx.OpenDocument(templatePath)
 	if err := template.MergeTemplate(doc, data); err != nil {
 		log.Fatalf("Merge failed: %v", err)
 	}

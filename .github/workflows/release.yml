@@ -110,8 +110,10 @@ jobs:
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Check RELEASE_PAT is configured
+        env:
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
         run: |
-          if [ -z "${{ secrets.RELEASE_PAT }}" ]; then
+          if [ -z "$RELEASE_PAT" ]; then
             echo "::warning::RELEASE_PAT is empty or missing — this release will be authored by github-actions[bot] instead of a real user. This is now cosmetic: the publish-npm job below invokes npm-publish.yml directly and no longer depends on the 'release: published' event that a bot-authored release can't fire. Still worth fixing so releases show a real author."
           fi
 

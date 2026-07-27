@@ -556,15 +556,27 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 	// spacing: an exact or at-least rule is a departure even at the default
 	// 240 twips, and without this check it would silently inherit the
 	// lineRule="auto" written into w:pPrDefault.
-	if before != 0 || after != 0 || beforeSet || afterSet || lineSet ||
+	//
+	// Before/After and Line/LineRule are gated independently within the same
+	// element: a paragraph that only set spacingBefore/spacingAfter must not
+	// also emit w:line/w:lineRule, since lineSpacingRuleToString never
+	// returns nil and this fix's own beforeSet/afterSet would otherwise stamp
+	// the default 240/auto onto every such paragraph, silently overriding a
+	// style's own line spacing.
+	lineDeparts := lineSet ||
 		lineSpacing.Value != constants.DefaultLineSpacing ||
-		lineSpacing.Rule != domain.LineSpacingAuto {
-		props.Spacing = &xml.Spacing{
-			Before:   spacingAttr(before, beforeSet),
-			After:    spacingAttr(after, afterSet),
-			Line:     spacingAttr(lineSpacing.Value, lineSet),
-			LineRule: s.lineSpacingRuleToString(lineSpacing.Rule),
+		lineSpacing.Rule != domain.LineSpacingAuto
+
+	if before != 0 || after != 0 || beforeSet || afterSet || lineDeparts {
+		spacing := &xml.Spacing{
+			Before: spacingAttr(before, beforeSet),
+			After:  spacingAttr(after, afterSet),
 		}
+		if lineDeparts {
+			spacing.Line = spacingAttr(lineSpacing.Value, lineSet)
+			spacing.LineRule = s.lineSpacingRuleToString(lineSpacing.Rule)
+		}
+		props.Spacing = spacing
 	}
 
 	// Borders
