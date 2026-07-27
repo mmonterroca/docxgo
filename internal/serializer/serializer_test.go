@@ -861,3 +861,192 @@ func TestDocumentSerializer_TableStyleBorders(t *testing.T) {
 		t.Error("expected <w:insideV> border in serialized TableGrid style")
 	}
 }
+
+// ─── Zero paragraph spacing regression tests ───────────────────────────────
+//
+// A paragraph at the domain's own defaults (SpacingBefore/After = 0, single
+// line spacing) never emits a direct <w:spacing> element — that's existing,
+// correct behavior (see serializeProperties). The bug was that nothing backed
+// that omission up: word/styles.xml's w:docDefaults carried no w:pPrDefault
+// spacing, so Word fell back to its own defaults (8pt after, 1.15 line)
+// instead of the 0/0/240 the domain models. These tests pin both halves: the
+// paragraph still omits direct formatting, and the document defaults now
+// actually state 0/0/240 so that omission means what it's supposed to mean.
+
+func TestDocumentSerializer_DocDefaultsStateZeroSpacing(t *testing.T) {
+	doc := core.NewDocument()
+	sm := doc.StyleManager()
+
+	ser := serializer.NewDocumentSerializer()
+	xmlStyles := ser.SerializeStyles(sm, nil)
+
+	if xmlStyles.DocDefaults == nil || xmlStyles.DocDefaults.ParaDefaults == nil {
+		t.Fatal("expected w:docDefaults/w:pPrDefault to be set")
+	}
+	spacing := xmlStyles.DocDefaults.ParaDefaults.Properties.Spacing
+	if spacing == nil {
+		t.Fatal("expected w:pPrDefault to carry a w:spacing element")
+	}
+	if spacing.Before == nil || *spacing.Before != 0 {
+		t.Errorf("docDefaults before = %v, want 0", spacing.Before)
+	}
+	if spacing.After == nil || *spacing.After != 0 {
+		t.Errorf("docDefaults after = %v, want 0", spacing.After)
+	}
+	if spacing.Line == nil || *spacing.Line != 240 {
+		t.Errorf("docDefaults line = %v, want 240", spacing.Line)
+	}
+	if spacing.LineRule != "auto" {
+		t.Errorf("docDefaults lineRule = %q, want %q", spacing.LineRule, "auto")
+	}
+}
+
+func TestParagraphSerializer_DefaultSpacingOmitsDirectFormatting(t *testing.T) {
+	// A paragraph that never touched its spacing must not emit a direct
+	// <w:spacing> element — direct formatting wins over docDefaults/style in
+	// OOXML's cascade, so emitting one unconditionally (the #63 regression)
+	// would make every paragraph opt out of inheriting from its style.
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	if xmlPara.Properties != nil && xmlPara.Properties.Spacing != nil {
+		t.Errorf("expected no direct w:spacing for a paragraph at defaults, got %+v", xmlPara.Properties.Spacing)
+	}
+}
+
+func TestParagraphSerializer_StyledParagraphSpacingNotClobbered(t *testing.T) {
+	// A Heading1 paragraph that never sets its own spacing must not emit
+	// direct <w:spacing>, so it inherits the style's 240/120 rather than
+	// docDefaults' 0/0. Forcing direct 0/0 formatting on every paragraph
+	// (the #63 regression) would silently strip spacing from every heading.
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	if err := para.SetStyle(domain.StyleIDHeading1); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	if xmlPara.Properties != nil && xmlPara.Properties.Spacing != nil {
+		t.Errorf("expected no direct w:spacing on a styled paragraph that didn't set its own, got %+v", xmlPara.Properties.Spacing)
+	}
+
+	// Confirm the style itself still carries its own non-zero spacing —
+	// i.e. there's something real for the paragraph to inherit.
+	sm := doc.StyleManager()
+	docSer := serializer.NewDocumentSerializer()
+	xmlStyles := docSer.SerializeStyles(sm, nil)
+
+	var heading1 *xmlstructs.Style
+	for _, s := range xmlStyles.Styles {
+		if s.StyleID == domain.StyleIDHeading1 {
+			heading1 = s
+			break
+		}
+	}
+	if heading1 == nil {
+		t.Fatal("expected Heading1 style to be present in serialized styles")
+	}
+	if heading1.ParaProps == nil || heading1.ParaProps.Spacing == nil {
+		t.Fatal("expected Heading1 style to carry its own w:spacing")
+	}
+	if heading1.ParaProps.Spacing.Before == nil || *heading1.ParaProps.Spacing.Before != 240 {
+		t.Errorf("Heading1 style before = %v, want 240", heading1.ParaProps.Spacing.Before)
+	}
+	if heading1.ParaProps.Spacing.After == nil || *heading1.ParaProps.Spacing.After != 120 {
+		t.Errorf("Heading1 style after = %v, want 120", heading1.ParaProps.Spacing.After)
+	}
+}
+
+func TestParagraphSerializer_ExactLineSpacingAtDefaultValueIsEmitted(t *testing.T) {
+	// An Exact/AtLeast line-spacing rule is a real departure from the document
+	// defaults even when its value happens to equal DefaultLineSpacing (240).
+	// If the emit gate looked only at the value, such a paragraph would emit
+	// nothing and silently inherit the lineRule="auto" that w:pPrDefault now
+	// installs — turning a caller's exact 12pt line height into auto spacing.
+	for _, tt := range []struct {
+		name string
+		rule domain.LineSpacingRule
+		want string
+	}{
+		{"Exact", domain.LineSpacingExact, "exact"},
+		{"AtLeast", domain.LineSpacingAtLeast, "atLeast"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := core.NewDocument()
+			para, _ := doc.AddParagraph()
+			if err := para.SetLineSpacing(domain.LineSpacing{
+				Rule:  tt.rule,
+				Value: 240, // deliberately the default value
+			}); err != nil {
+				t.Fatalf("SetLineSpacing: %v", err)
+			}
+
+			ser := serializer.NewParagraphSerializer()
+			xmlPara := ser.Serialize(para)
+
+			if xmlPara.Properties == nil || xmlPara.Properties.Spacing == nil {
+				t.Fatalf("expected direct w:spacing to be emitted for rule %s at the default value", tt.name)
+			}
+			got := xmlPara.Properties.Spacing.LineRule
+			if got == nil {
+				t.Fatalf("lineRule not set, want %q", tt.want)
+			}
+			if *got != tt.want {
+				t.Errorf("lineRule = %q, want %q", *got, tt.want)
+			}
+		})
+	}
+
+	// The auto rule at the default value is genuinely "no departure" and must
+	// still stay out of the way of the style.
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	if err := para.SetLineSpacing(domain.LineSpacing{
+		Rule:  domain.LineSpacingAuto,
+		Value: 240,
+	}); err != nil {
+		t.Fatalf("SetLineSpacing: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+	if xmlPara.Properties != nil && xmlPara.Properties.Spacing != nil {
+		t.Errorf("expected no direct w:spacing for auto rule at the default value, got %+v", xmlPara.Properties.Spacing)
+	}
+}
+
+func TestParagraphSerializer_PartialIndentOmitsOtherSides(t *testing.T) {
+	// A paragraph that only sets Left indent must not emit w:right/
+	// w:firstLine/w:hanging as explicit zero — that would override a style's
+	// indentation on those sides instead of leaving them to inherit.
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	if err := para.SetIndent(domain.Indentation{Left: 720}); err != nil {
+		t.Fatalf("SetIndent: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	if xmlPara.Properties == nil || xmlPara.Properties.Indentation == nil {
+		t.Fatal("expected w:ind to be set")
+	}
+	ind := xmlPara.Properties.Indentation
+	if ind.Left == nil || *ind.Left != 720 {
+		t.Errorf("ind.Left = %v, want 720", ind.Left)
+	}
+	if ind.Right != nil {
+		t.Errorf("ind.Right = %v, want omitted (nil)", ind.Right)
+	}
+	if ind.FirstLine != nil {
+		t.Errorf("ind.FirstLine = %v, want omitted (nil)", ind.FirstLine)
+	}
+	if ind.Hanging != nil {
+		t.Errorf("ind.Hanging = %v, want omitted (nil)", ind.Hanging)
+	}
+}

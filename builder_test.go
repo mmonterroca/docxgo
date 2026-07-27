@@ -1358,7 +1358,12 @@ func TestWithLanguageEx_WritesEastAsiaAndBidi(t *testing.T) {
 
 // TestWithoutLanguage_NoRegression guards against the failure mode this
 // feature was built to avoid: language state silently going nowhere. Without
-// WithLanguage, output must stay exactly as before this change existed.
+// WithLanguage, no w:lang/themeFontLang should appear anywhere in the output.
+//
+// w:docDefaults itself is expected regardless of language: it always carries
+// the document's default paragraph spacing (w:pPrDefault, 0/0/240) so that a
+// paragraph without its own spacing renders the same whether or not a
+// language was configured — see the zero-paragraph-spacing fix.
 func TestWithoutLanguage_NoRegression(t *testing.T) {
 	builder := NewDocumentBuilder()
 	builder.AddParagraph().Text("Test").End()
@@ -1369,8 +1374,8 @@ func TestWithoutLanguage_NoRegression(t *testing.T) {
 	}
 
 	styles := readZipPart(t, doc, "word/styles.xml")
-	if strings.Contains(styles, "w:docDefaults") || strings.Contains(styles, "w:lang") {
-		t.Errorf("expected no w:docDefaults/w:lang without WithLanguage, got: %s", styles)
+	if strings.Contains(styles, "w:lang") {
+		t.Errorf("expected no w:lang without WithLanguage, got: %s", styles)
 	}
 
 	settings := readZipPart(t, doc, "word/settings.xml")
