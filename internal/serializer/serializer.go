@@ -1210,6 +1210,29 @@ func (s *DocumentSerializer) DebugPrint(doc domain.Document) {
 		len(doc.Paragraphs()), len(doc.Tables()))
 }
 
+// documentDefaultParagraphProperties returns the w:pPrDefault contents shared
+// by every generated document, regardless of whether it carries a style
+// manager: 0pt before/after spacing and single line spacing (240 twips,
+// auto rule). Without an explicit default, an empty <w:pPr> (or a paragraph
+// that never sets spacing) falls back to Word's own defaults — 8pt after,
+// 1.15 line spacing — instead of the 0/240 the domain model assumes
+// (constants.DefaultParagraphSpacing / DefaultLineSpacing).
+//
+// This must stay in sync with the raw XML in ZipWriter.writeDefaultStyles,
+// which applies the same defaults for documents with no style manager.
+func documentDefaultParagraphProperties() *xml.ParagraphDefaults {
+	return &xml.ParagraphDefaults{
+		Properties: &xml.StyleParagraphProperties{
+			Spacing: &xml.StyleSpacing{
+				Before:   intPtr(0),
+				After:    intPtr(0),
+				Line:     intPtr(constants.DefaultLineSpacing),
+				LineRule: "auto",
+			},
+		},
+	}
+}
+
 // SerializeStyles converts a domain.StyleManager to xml.Styles. When lang is
 // non-nil, it is written as the document's default proofing language
 // (w:docDefaults/w:rPrDefault/w:rPr/w:lang).
@@ -1219,12 +1242,13 @@ func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager, l
 	// Include Word's latent style catalog to avoid auto-added styles during repair
 	xmlStyles.LatentStyles = defaultLatentStyles
 
+	xmlStyles.DocDefaults = &xml.DocDefaults{
+		ParaDefaults: documentDefaultParagraphProperties(),
+	}
 	if lang != nil {
-		xmlStyles.DocDefaults = &xml.DocDefaults{
-			RunDefaults: &xml.RunDefaults{
-				Properties: &xml.RunProperties{
-					Lang: &xml.Language{Val: lang.Val, EastAsia: lang.EastAsia, Bidi: lang.Bidi},
-				},
+		xmlStyles.DocDefaults.RunDefaults = &xml.RunDefaults{
+			Properties: &xml.RunProperties{
+				Lang: &xml.Language{Val: lang.Val, EastAsia: lang.EastAsia, Bidi: lang.Bidi},
 			},
 		}
 	}
