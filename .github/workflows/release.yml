@@ -125,21 +125,8 @@ jobs:
           prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'rc') }}
           generate_release_notes: true
           files: release-assets/*
-          # softprops/action-gh-release's `token` input defaults to
-          # `${{ github.token }}` in its own action.yml, and that default is
-          # resolved by the Actions runtime before the action ever runs — so
-          # the action always sees a non-empty token input regardless of any
-          # env var we set on this step. Passing RELEASE_PAT via `env:
-          # GITHUB_TOKEN` (the previous approach) was silently ignored; it
-          # must be passed as this `with: token:` input to actually override
-          # the default. An empty RELEASE_PAT is treated by the action as
-          # unset and falls back to `github.token` — same degrade-to-bot-
-          # author behavior as before, just via the mechanism that actually
-          # works. No longer load-bearing for npm publishing either way: the
-          # publish-npm job below calls npm-publish.yml directly instead of
-          # relying on the "release: published" event, which a
-          # GITHUB_TOKEN-authored release can't fire (GitHub's anti-recursion
-          # protection).
+          # Must be a `with:` input, not `env:` — the action's `token` input
+          # defaults to `${{ github.token }}`, which wins over any env var.
           token: ${{ secrets.RELEASE_PAT }}
 
   publish-npm:
