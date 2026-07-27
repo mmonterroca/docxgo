@@ -1219,15 +1219,11 @@ func (s *DocumentSerializer) DebugPrint(doc domain.Document) {
 }
 
 // documentDefaultParagraphProperties returns the w:pPrDefault contents shared
-// by every generated document, regardless of whether it carries a style
-// manager: 0pt before/after spacing and single line spacing (240 twips,
-// auto rule). Without an explicit default, an empty <w:pPr> (or a paragraph
-// that never sets spacing) falls back to Word's own defaults — 8pt after,
-// 1.15 line spacing — instead of the 0/240 the domain model assumes
-// (constants.DefaultParagraphSpacing / DefaultLineSpacing).
-//
-// This must stay in sync with the raw XML in ZipWriter.writeDefaultStyles,
-// which applies the same defaults for documents with no style manager.
+// by every generated document: 0pt before/after spacing and single line
+// spacing (240 twips, auto rule). Without an explicit default, an empty
+// <w:pPr> (or a paragraph that never sets spacing) falls back to Word's own
+// defaults — 8pt after, 1.15 line spacing — instead of the 0/240 the domain
+// model assumes (constants.DefaultParagraphSpacing / DefaultLineSpacing).
 func documentDefaultParagraphProperties() *xml.ParagraphDefaults {
 	return &xml.ParagraphDefaults{
 		Properties: &xml.StyleParagraphProperties{

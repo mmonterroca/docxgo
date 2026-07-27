@@ -442,32 +442,13 @@ func (zw *ZipWriter) writeAppProperties(props *xmlstructs.AppProperties) error {
 	return zw.writeXML("docProps/app.xml", props)
 }
 
-// writeDefaultStyles writes minimal word/styles.xml
-func (zw *ZipWriter) writeDefaultStyles() error {
-	styles := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:docDefaults>
-    <w:rPrDefault>
-      <w:rPr>
-        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
-        <w:sz w:val="22"/>
-      </w:rPr>
-    </w:rPrDefault>
-    <w:pPrDefault>
-      <w:pPr>
-        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
-      </w:pPr>
-    </w:pPrDefault>
-  </w:docDefaults>
-</w:styles>`
-	return zw.writeRaw("word/styles.xml", []byte(styles))
-}
-
-// writeStyles writes word/styles.xml from serialized styles.
+// writeStyles writes word/styles.xml from serialized styles. styles must be
+// non-nil: the only production caller (internal/core/document.go) always
+// passes serializer.SerializeStyles's result, which is never nil, so a nil
+// here indicates a caller bug rather than a case to degrade gracefully for.
 func (zw *ZipWriter) writeStyles(styles *xmlstructs.Styles) error {
-	// If no styles provided, use defaults
 	if styles == nil {
-		return zw.writeDefaultStyles()
+		return fmt.Errorf("writer: writeStyles: styles must not be nil")
 	}
 
 	w, err := zw.zipWriter.Create("word/styles.xml")
