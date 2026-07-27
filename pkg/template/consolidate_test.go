@@ -7,10 +7,80 @@
 package template
 
 import (
+	"archive/zip"
+	"bytes"
+	"image"
+	"image/color"
+	"image/png"
+	"os"
+	"strings"
 	"testing"
 
+	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/internal/core"
 )
+
+// createTestPNG writes a minimal PNG to a temp file and returns its path, for
+// tests that need a real image to attach via Paragraph.AddImage.
+func createTestPNG(t *testing.T) string {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			img.Set(x, y, color.RGBA{R: uint8(20 * x), G: uint8(20 * y), B: 200, A: 255})
+		}
+	}
+
+	file, err := os.CreateTemp(t.TempDir(), "img-*.png")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	defer file.Close()
+
+	if err := png.Encode(file, img); err != nil {
+		t.Fatalf("png.Encode: %v", err)
+	}
+
+	return file.Name()
+}
+
+// countImageRuns returns how many of the paragraph's runs carry an image.
+func countImageRuns(para domain.Paragraph) int {
+	n := 0
+	for _, r := range para.Runs() {
+		if r.Image() != nil {
+			n++
+		}
+	}
+	return n
+}
+
+// extractDocumentXML reads word/document.xml out of a serialized .docx
+// (a zip archive) for tests that need to assert on the raw markup.
+func extractDocumentXML(t *testing.T, docxBytes []byte) []byte {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
+	if err != nil {
+		t.Fatalf("zip.NewReader: %v", err)
+	}
+	for _, f := range zr.File {
+		if f.Name != "word/document.xml" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("open word/document.xml: %v", err)
+		}
+		defer rc.Close()
+		var buf bytes.Buffer
+		if _, err := buf.ReadFrom(rc); err != nil {
+			t.Fatalf("read word/document.xml: %v", err)
+		}
+		return buf.Bytes()
+	}
+	t.Fatal("word/document.xml not found in archive")
+	return nil
+}
 
 func TestConsolidateRuns_EmptyParagraph(t *testing.T) {
 	doc := core.NewDocument()
@@ -266,5 +336,163 @@ func TestConsolidateRuns_Idempotent(t *testing.T) {
 	}
 	if runs[0].Text() != "{{name}}" {
 		t.Errorf("expected '{{name}}', got %q", runs[0].Text())
+	}
+}
+
+// ─── Image preservation regression tests ───────────────────────────────────
+//
+// ConsolidateRuns used to rebuild every run via AddRun + the domain.Run
+// setters, which cannot copy a run's image (the interface doesn't expose
+// one). A paragraph mixing mergeable text runs with an image run would
+// silently lose the image the moment consolidation ran. These tests pin the
+// fix: an untouched run (including an image run) is re-attached verbatim,
+// never rebuilt.
+
+func TestConsolidateRuns_PreservesImageWhenOtherRunsMerge(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello ")
+	r2, _ := para.AddRun()
+	r2.SetText("world") // same formatting as r1: these two should merge
+
+	if _, err := para.AddImage(createTestPNG(t)); err != nil {
+		t.Fatalf("AddImage: %v", err)
+	}
+
+	if before := countImageRuns(para); before != 1 {
+		t.Fatalf("setup: expected 1 image run before consolidation, got %d", before)
+	}
+
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
+
+	if got := countImageRuns(para); got != 1 {
+		t.Errorf("image run lost during consolidation: got %d image runs, want 1", got)
+	}
+	if got := para.Text(); got != "Hello world" {
+		t.Errorf("paragraph text = %q, want merged text preserved", got)
+	}
+}
+
+func TestMergeTemplate_PreservesImage(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello {{na")
+	r2, _ := para.AddRun()
+	r2.SetText("me}}") // split placeholder: consolidation must merge these
+
+	if _, err := para.AddImage(createTestPNG(t)); err != nil {
+		t.Fatalf("AddImage: %v", err)
+	}
+
+	if err := MergeTemplate(doc, MergeData{"name": "World"}); err != nil {
+		t.Fatalf("MergeTemplate: %v", err)
+	}
+
+	if got := countImageRuns(para); got != 1 {
+		t.Errorf("image run lost via MergeTemplate: got %d image runs, want 1", got)
+	}
+	if got := para.Text(); got != "Hello World" {
+		t.Errorf("paragraph text = %q, want %q", got, "Hello World")
+	}
+}
+
+func TestFindPlaceholders_PreservesImage(t *testing.T) {
+	// FindPlaceholders is read-only from the caller's perspective, but it
+	// consolidates runs internally to find placeholders split across them.
+	// That consolidation must not mutate away an unrelated image.
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello {{na")
+	r2, _ := para.AddRun()
+	r2.SetText("me}}")
+
+	if _, err := para.AddImage(createTestPNG(t)); err != nil {
+		t.Fatalf("AddImage: %v", err)
+	}
+
+	placeholders := FindPlaceholders(doc)
+	if len(placeholders) != 1 {
+		t.Fatalf("expected 1 placeholder, got %d", len(placeholders))
+	}
+
+	if got := countImageRuns(para); got != 1 {
+		t.Errorf("image run lost via FindPlaceholders: got %d image runs, want 1", got)
+	}
+}
+
+func TestConsolidateRuns_PreservesImageInHeader(t *testing.T) {
+	// Logos live in headers. A replace/merge touching only the body must not
+	// disturb an image sitting in a header paragraph that happens to have
+	// mergeable text runs alongside it.
+	doc := core.NewDocument()
+	if _, err := doc.AddSection(); err != nil {
+		t.Fatalf("AddSection: %v", err)
+	}
+	section := doc.Sections()[0]
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	hp, err := header.AddParagraph()
+	if err != nil {
+		t.Fatalf("header AddParagraph: %v", err)
+	}
+
+	r1, _ := hp.AddRun()
+	r1.SetText("ACME ")
+	r2, _ := hp.AddRun()
+	r2.SetText("Inc.") // same formatting as r1: should merge
+
+	if _, err := hp.AddImage(createTestPNG(t)); err != nil {
+		t.Fatalf("header AddImage: %v", err)
+	}
+
+	if err := ConsolidateRuns(hp); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
+
+	if got := countImageRuns(hp); got != 1 {
+		t.Errorf("header logo lost during consolidation: got %d image runs, want 1", got)
+	}
+	if got := hp.Text(); got != "ACME Inc." {
+		t.Errorf("header text = %q, want %q", got, "ACME Inc.")
+	}
+}
+
+func TestConsolidateRuns_ImageSurvivesSerialization(t *testing.T) {
+	// End-to-end: the image must still be present in the serialized
+	// document.xml (as a <w:drawing>), not just in the in-memory run list.
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Vendor: ")
+	r2, _ := para.AddRun()
+	r2.SetText("ACME Corp")
+
+	if _, err := para.AddImage(createTestPNG(t)); err != nil {
+		t.Fatalf("AddImage: %v", err)
+	}
+
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	xmlBytes := extractDocumentXML(t, buf.Bytes())
+	if got := strings.Count(string(xmlBytes), "<w:drawing>"); got != 1 {
+		t.Errorf("serialized document.xml has %d <w:drawing> elements, want 1", got)
 	}
 }
