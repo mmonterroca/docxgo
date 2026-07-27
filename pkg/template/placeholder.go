@@ -27,6 +27,20 @@ const (
 )
 
 // Location provides structural context for a placeholder occurrence.
+//
+// When RunIndex == EndRunIndex (the common case — the whole match sits in
+// one run), StartOffset and EndOffset are both offsets into that single run,
+// exactly as in releases before v2.9.0: runs[RunIndex].Text()[StartOffset:EndOffset]
+// yields the full match text.
+//
+// When RunIndex != EndRunIndex, Word split the placeholder across multiple
+// runs (a common artifact of spell-check/proofing) and it was found by
+// scanning across them without merging — see FindPlaceholders. StartOffset
+// and EndOffset are then offsets into two *different* runs (RunIndex and
+// EndRunIndex respectively); slicing a single run with both offsets is
+// incorrect. A caller that needs the full match text should use FullMatch,
+// or MergeTemplate to replace it (which does merge split runs, since writing
+// a single replacement value requires it).
 type Location struct {
 	// Type indicates where the placeholder was found.
 	Type LocationType
@@ -128,8 +142,8 @@ func scanParagraph(para domain.Paragraph, pattern *regexp.Regexp, ctx paragraphC
 			fullMatch := g.text[match[0]:match[1]]
 			name := g.text[match[2]:match[3]]
 
-			startRun, startOffset := locateGroupOffset(g.leader, runLens, match[0])
-			endRun, endOffset := locateGroupOffset(g.leader, runLens, match[1])
+			startRun, startOffset := locateGroupOffset(g.leader, runLens, match[0], false)
+			endRun, endOffset := locateGroupOffset(g.leader, runLens, match[1], true)
 
 			loc := Location{
 				Type:           ctx.locationType,
@@ -159,11 +173,23 @@ func scanParagraph(para domain.Paragraph, pattern *regexp.Regexp, ctx paragraphC
 
 // locateGroupOffset translates a byte offset into a run group's concatenated
 // text back to the index (relative to the paragraph's own runs) and local
-// offset of the run that contains it. An offset at or beyond the end of the
-// group's text resolves to the end of its last run.
-func locateGroupOffset(leader int, runLens []int, offset int) (runIndex, runOffset int) {
+// offset of the run that contains it.
+//
+// isEnd distinguishes how a boundary offset — one landing exactly at the
+// junction between two runs — resolves. A match's exclusive end offset
+// belongs to the run it closes out (isEnd=true, "<="): the end of a match
+// that consumes a run's last character lands at that run's own length, not
+// offset 0 of a run that may not even exist. A match's start offset belongs
+// to the run its first character actually starts in (isEnd=false, strict
+// "<"): using "<=" here would misattribute a start landing exactly at a run
+// boundary to the end of the earlier run instead of the start of the next
+// one, which also skips past empty runs (length 0) to the first run that
+// actually has content — the correct behavior for a leading empty run.
+// An offset at or beyond the end of the group's text resolves to the end of
+// its last run.
+func locateGroupOffset(leader int, runLens []int, offset int, isEnd bool) (runIndex, runOffset int) {
 	for i, l := range runLens {
-		if offset <= l {
+		if offset < l || (isEnd && offset == l) {
 			return leader + i, offset
 		}
 		offset -= l

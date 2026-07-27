@@ -1101,6 +1101,65 @@ func TestParagraphSerializer_ExplicitZeroAfterOnStyledParagraphIsEmitted(t *test
 	if xmlPara.Properties.Spacing.Before != nil {
 		t.Errorf("spacing.Before = %v, want omitted (nil), since it was never set", xmlPara.Properties.Spacing.Before)
 	}
+	// Line/LineRule were never set either, so they must also be omitted —
+	// otherwise a paragraph that only set spacingAfter would gain an
+	// unintended direct w:line="240" w:lineRule="auto", overriding the
+	// style's own line spacing (e.g. 1.5 lines) with single-spacing. This
+	// was a real regression: the old code always filled Line/LineRule
+	// whenever the w:spacing element was emitted for any reason.
+	if xmlPara.Properties.Spacing.Line != nil {
+		t.Errorf("spacing.Line = %v, want omitted (nil), since line spacing was never set", xmlPara.Properties.Spacing.Line)
+	}
+	if xmlPara.Properties.Spacing.LineRule != nil {
+		t.Errorf("spacing.LineRule = %v, want omitted (nil), since line spacing was never set", xmlPara.Properties.Spacing.LineRule)
+	}
+}
+
+// TestParagraphSerializer_ExplicitSpacingDoesNotClobberStyleLineSpacing pins
+// the bug found in code review of #77: the emit gate correctly opened the
+// <w:spacing> element on beforeSet/afterSet alone, but Line and LineRule were
+// filled unconditionally inside it — lineSpacingRuleToString never returns
+// nil and a never-touched LineSpacing still carries the constructor's
+// {Auto, 240} defaults, so any paragraph that only set spacingBefore/After
+// silently gained direct w:line="240" w:lineRule="auto", clobbering a
+// style's real line spacing (here, Heading1's own line spacing, simulated by
+// a style with an explicit non-default line spacing).
+func TestParagraphSerializer_ExplicitSpacingDoesNotClobberStyleLineSpacing(t *testing.T) {
+	doc := core.NewDocument()
+	sm := doc.StyleManager()
+	style, err := sm.GetStyle(domain.StyleIDHeading1)
+	if err != nil {
+		t.Fatalf("GetStyle: %v", err)
+	}
+	paraStyle, ok := style.(domain.ParagraphStyle)
+	if !ok {
+		t.Fatal("Heading1 style does not implement domain.ParagraphStyle")
+	}
+	// Give the style a non-default line spacing (1.5 lines) so an
+	// unintended direct override on the paragraph is observable.
+	if err := paraStyle.SetLineSpacing(360); err != nil {
+		t.Fatalf("style SetLineSpacing: %v", err)
+	}
+
+	para, _ := doc.AddParagraph()
+	if err := para.SetStyle(domain.StyleIDHeading1); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	if err := para.SetSpacingAfter(0); err != nil {
+		t.Fatalf("SetSpacingAfter: %v", err)
+	}
+	// The paragraph's own LineSpacing was never touched.
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	if xmlPara.Properties == nil || xmlPara.Properties.Spacing == nil {
+		t.Fatal("expected direct w:spacing for the explicit SetSpacingAfter(0)")
+	}
+	if xmlPara.Properties.Spacing.Line != nil || xmlPara.Properties.Spacing.LineRule != nil {
+		t.Errorf("got direct w:line=%v w:lineRule=%v, want both omitted so the paragraph inherits the style's 1.5-line spacing",
+			xmlPara.Properties.Spacing.Line, xmlPara.Properties.Spacing.LineRule)
+	}
 }
 
 // TestParagraphSerializer_ExplicitBeforeAndZeroAfterBothEmitted confirms both
