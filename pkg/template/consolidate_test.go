@@ -467,6 +467,58 @@ func TestConsolidateRuns_PreservesImageInHeader(t *testing.T) {
 	}
 }
 
+// decoratedParagraph is the plain embedding decorator a consumer would write
+// to add logging, instrumentation, or a test double over a paragraph. It is a
+// domain.Paragraph but not internal/core's concrete type — consolidation must
+// work on it through the exported interface alone, with no type assertion on
+// an unexported implementation.
+type decoratedParagraph struct{ domain.Paragraph }
+
+func TestConsolidateRuns_WorksThroughDomainInterfaceOnly(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello {{na")
+	r2, _ := para.AddRun()
+	r2.SetText("me}}")
+
+	if err := ConsolidateRuns(decoratedParagraph{para}); err != nil {
+		t.Fatalf("ConsolidateRuns on a wrapped domain.Paragraph: %v", err)
+	}
+
+	if got := para.Text(); got != "Hello {{name}}" {
+		t.Errorf("paragraph text = %q, want %q", got, "Hello {{name}}")
+	}
+	if got := len(para.Runs()); got != 1 {
+		t.Errorf("run count = %d, want 1 (the split placeholder should have merged)", got)
+	}
+}
+
+func TestMergeTemplate_WorksThroughDomainInterfaceOnly(t *testing.T) {
+	// The failure this guards against is silent: a consolidation error inside
+	// MergeTemplate aborts substitution, so the output keeps the raw
+	// {{placeholder}} instead of the merged value.
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello {{na")
+	r2, _ := para.AddRun()
+	r2.SetText("me}}")
+
+	if err := ConsolidateRuns(decoratedParagraph{para}); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
+	if err := MergeTemplate(doc, MergeData{"name": "World"}); err != nil {
+		t.Fatalf("MergeTemplate: %v", err)
+	}
+
+	if got := para.Text(); got != "Hello World" {
+		t.Errorf("paragraph text = %q, want %q", got, "Hello World")
+	}
+}
+
 func TestConsolidateRuns_ImageSurvivesSerialization(t *testing.T) {
 	// End-to-end: the image must still be present in the serialized
 	// document.xml (as a <w:drawing>), not just in the in-memory run list.

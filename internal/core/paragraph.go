@@ -554,19 +554,6 @@ func (p *paragraph) ClearRuns() {
 	p.runs = p.runs[:0]
 }
 
-// AppendRun re-attaches an existing run to the end of the paragraph, verbatim.
-// Unlike AddRun (which allocates a fresh, empty run), AppendRun preserves
-// everything on the given run, including content the domain.Run interface
-// cannot copy field-by-field (images). It exists for run-consolidation
-// passes that rebuild the run list and must not lose that content.
-func (p *paragraph) AppendRun(r domain.Run) error {
-	if r == nil {
-		return errors.InvalidArgument("Paragraph.AppendRun", "run", r, "run cannot be nil")
-	}
-	p.runs = append(p.runs, r)
-	return nil
-}
-
 // RemoveRun removes the run at the given index.
 func (p *paragraph) RemoveRun(index int) error {
 	if index < 0 || index >= len(p.runs) {
