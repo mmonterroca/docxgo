@@ -83,6 +83,8 @@ jobs:
     name: Create GitHub Release
     needs: [build, test]
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -107,6 +109,12 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Check RELEASE_PAT is configured
+        run: |
+          if [ -z "${{ secrets.RELEASE_PAT }}" ]; then
+            echo "::warning::RELEASE_PAT is empty or missing — this release will be authored by github-actions[bot] instead of a real user. This is now cosmetic: the publish-npm job below invokes npm-publish.yml directly and no longer depends on the 'release: published' event that a bot-authored release can't fire. Still worth fixing so releases show a real author."
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -116,11 +124,23 @@ jobs:
           generate_release_notes: true
           files: release-assets/*
         env:
-          # Must be a real PAT (repo-scoped "Contents: Read and write" is
-          # enough), not the default GITHUB_TOKEN: GitHub does not let events
-          # created by GITHUB_TOKEN trigger other workflows (anti-recursion
-          # protection), so npm-publish.yml's "release: published" trigger
-          # would never fire if this stayed as GITHUB_TOKEN. See
-          # npm-publish.yml's workflow_dispatch fallback for the manual path
-          # this replaces.
+          # Ideally a real PAT (repo-scoped "Contents: Read and write" is
+          # enough) so the release shows a real author instead of
+          # github-actions[bot] — see the RELEASE_PAT check above. No longer
+          # load-bearing for npm publishing: the publish-npm job below calls
+          # npm-publish.yml directly instead of relying on the "release:
+          # published" event, which a GITHUB_TOKEN-authored release can't
+          # fire (GitHub's anti-recursion protection).
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    uses: ./.github/workflows/npm-publish.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
