@@ -5,9 +5,12 @@ permissions:
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, 'integration/**' ]
   pull_request:
-    branches: [ master ]
+    # Filters on the BASE branch, so integration/** is listed to keep PRs that
+    # co-stage work on a short-lived integration branch under CI (see the
+    # branching section of CONTRIBUTING.md).
+    branches: [ master, 'integration/**' ]
 
 jobs:
   lint-and-test:

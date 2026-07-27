@@ -186,7 +186,7 @@ Coverage varies by package — `domain` and `pkg/errors` are at 100%, `internal/
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow (feature branches → `dev` → `master`), testing requirements, and PR process. In short: fork, branch, add tests, run `go test ./...`, and open a PR against `dev`.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow (feature branches → `master`), testing requirements, and PR process. In short: fork, branch from `master`, add tests, run `go test ./...`, and open a PR against `master`.
 
 ---
 

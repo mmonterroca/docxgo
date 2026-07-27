@@ -1,3 +1,11 @@
+## Unreleased
+
+### Changed
+
+- **The `dev` integration branch has been retired; contributions now branch from and target `master`.** `dev` was introduced as a Git Flow integration branch, but since ~v2.4 its only traffic had been `master → dev` sync merges — it had stopped being a real integration point while still being the branch `CONTRIBUTING.md` told contributors to use. That cost real contributions: [#35](https://github.com/mmonterroca/docxgo/pull/35) targeted `dev`, went stale there, and had to be re-shipped through `master` as [#39](https://github.com/mmonterroca/docxgo/pull/39); [#57](https://github.com/mmonterroca/docxgo/pull/57) was closed; and the author of [#64](https://github.com/mmonterroca/docxgo/pull/64) declined to target `dev` at all because it was behind `master` and doing so would have pulled unrelated history into the diff. Releases are cut by tagging `master`, so the branch was never the release gate either. Short-lived `integration/<topic>` branches remain available for the rare case where two in-flight changes must be co-staged before either lands.
+
+---
+
 ## v2.7.2 — 2026-07-18
 
 ### Compliance
