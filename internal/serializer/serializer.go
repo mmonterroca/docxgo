@@ -542,20 +542,27 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 	before := para.SpacingBefore()
 	after := para.SpacingAfter()
 	lineSpacing := para.LineSpacing()
+	beforeSet, afterSet, lineSet := spacingSetFlags(para)
 
-	// Emit direct spacing only when the paragraph actually departs from the
-	// document defaults, so that a paragraph at those defaults inherits from
-	// its style rather than overriding it. The rule matters as much as the
-	// value here: an exact or at-least rule is a departure even at the
-	// default 240 twips, and without this check it would silently inherit the
+	// Emit direct spacing when the paragraph departs from the document
+	// defaults, OR when the caller explicitly set a value — even one that
+	// happens to equal a default, like SetSpacingAfter(0) on a paragraph
+	// whose style supplies non-zero spacing. Paragraph.SpacingBefore() int
+	// can't distinguish "never set" from "explicitly set to 0" on its own;
+	// beforeSet/afterSet/lineSet come from the concrete type's *Set() methods
+	// (see spacingSetFlags) and degrade to false for any domain.Paragraph
+	// implementation that doesn't expose them, falling back to the
+	// zero-value gate below. The rule matters as much as the value for line
+	// spacing: an exact or at-least rule is a departure even at the default
+	// 240 twips, and without this check it would silently inherit the
 	// lineRule="auto" written into w:pPrDefault.
-	if before != 0 || after != 0 ||
+	if before != 0 || after != 0 || beforeSet || afterSet || lineSet ||
 		lineSpacing.Value != constants.DefaultLineSpacing ||
 		lineSpacing.Rule != domain.LineSpacingAuto {
 		props.Spacing = &xml.Spacing{
-			Before:   intPtrIfNotZero(before),
-			After:    intPtrIfNotZero(after),
-			Line:     intPtrIfNotZero(lineSpacing.Value),
+			Before:   spacingAttr(before, beforeSet),
+			After:    spacingAttr(after, afterSet),
+			Line:     spacingAttr(lineSpacing.Value, lineSet),
 			LineRule: s.lineSpacingRuleToString(lineSpacing.Rule),
 		}
 	}
@@ -985,6 +992,38 @@ func boolPtr(b bool) *bool {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+// spacingSetter exposes whether a paragraph's spacing setters were ever
+// called, letting the serializer emit an explicit 0 instead of treating it as
+// "unset". Implemented by the concrete paragraph type in internal/core; see
+// serializeProperties.
+type spacingSetter interface {
+	SpacingBeforeSet() bool
+	SpacingAfterSet() bool
+	LineSpacingSet() bool
+}
+
+// spacingSetFlags returns whether para's spacing-before, spacing-after, and
+// line-spacing were explicitly set, degrading to all-false for any
+// domain.Paragraph implementation that doesn't expose spacingSetter.
+func spacingSetFlags(para domain.Paragraph) (beforeSet, afterSet, lineSet bool) {
+	if p, ok := para.(spacingSetter); ok {
+		return p.SpacingBeforeSet(), p.SpacingAfterSet(), p.LineSpacingSet()
+	}
+	return false, false, false
+}
+
+// spacingAttr returns a pointer to value for XML serialization: present
+// whenever the caller explicitly set the property, even at zero, so it
+// overrides a style's own spacing instead of being mistaken for "unset".
+// Otherwise it falls back to omitting zero, letting docDefaults or the
+// paragraph's style supply the value.
+func spacingAttr(value int, explicitlySet bool) *int {
+	if explicitlySet {
+		return intPtr(value)
+	}
+	return intPtrIfNotZero(value)
 }
 
 func intPtrIfNotZero(i int) *int {

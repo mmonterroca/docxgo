@@ -37,13 +37,24 @@ type paragraph struct {
 	spacingBefore int
 	spacingAfter  int
 	lineSpacing   domain.LineSpacing
-	numbering     *domain.NumberingReference
-	borders       domain.ParagraphBorders
-	idGen         IDGenerator
-	relManager    *manager.RelationshipManager
-	bookmarkID    string // ID for bookmark (if this paragraph needs one for TOC)
-	bookmarkName  string // Name for bookmark (e.g., "_Toc123456")
-	mediaManager  *manager.MediaManager
+	// *Set track whether the caller ever called the corresponding setter, so
+	// the serializer can tell "never set" from "explicitly set to a value
+	// that happens to equal the default" — most importantly, an explicit 0
+	// on a paragraph whose style supplies a non-zero spacing. The domain
+	// getters (SpacingBefore, SpacingAfter, LineSpacing) can't express this
+	// distinction themselves without changing their public return types, so
+	// it's exposed on the concrete type only, the same pattern StyleName()
+	// uses for the serializer's style-name access.
+	spacingBeforeSet bool
+	spacingAfterSet  bool
+	lineSpacingSet   bool
+	numbering        *domain.NumberingReference
+	borders          domain.ParagraphBorders
+	idGen            IDGenerator
+	relManager       *manager.RelationshipManager
+	bookmarkID       string // ID for bookmark (if this paragraph needs one for TOC)
+	bookmarkName     string // Name for bookmark (e.g., "_Toc123456")
+	mediaManager     *manager.MediaManager
 }
 
 // NewParagraph creates a new Paragraph.
@@ -428,7 +439,14 @@ func (p *paragraph) SetSpacingBefore(twips int) error {
 			"spacing must be between 0 and 31680 twips (0 to 22 inches)")
 	}
 	p.spacingBefore = twips
+	p.spacingBeforeSet = true
 	return nil
+}
+
+// SpacingBeforeSet reports whether SetSpacingBefore was ever called, so the
+// serializer can distinguish an explicit 0 from a value that was never set.
+func (p *paragraph) SpacingBeforeSet() bool {
+	return p.spacingBeforeSet
 }
 
 // SpacingAfter returns spacing after the paragraph (in twips).
@@ -443,7 +461,14 @@ func (p *paragraph) SetSpacingAfter(twips int) error {
 			"spacing must be between 0 and 31680 twips (0 to 22 inches)")
 	}
 	p.spacingAfter = twips
+	p.spacingAfterSet = true
 	return nil
+}
+
+// SpacingAfterSet reports whether SetSpacingAfter was ever called, so the
+// serializer can distinguish an explicit 0 from a value that was never set.
+func (p *paragraph) SpacingAfterSet() bool {
+	return p.spacingAfterSet
 }
 
 // LineSpacing returns the line spacing setting.
@@ -462,7 +487,15 @@ func (p *paragraph) SetLineSpacing(spacing domain.LineSpacing) error {
 			"line spacing value must be between 0 and 31680 twips")
 	}
 	p.lineSpacing = spacing
+	p.lineSpacingSet = true
 	return nil
+}
+
+// LineSpacingSet reports whether SetLineSpacing was ever called, so the
+// serializer can distinguish an explicit auto/240 (the default values) from
+// line spacing that was never set at all.
+func (p *paragraph) LineSpacingSet() bool {
+	return p.lineSpacingSet
 }
 
 // Numbering returns the numbering reference applied to the paragraph, if any.
