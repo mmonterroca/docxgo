@@ -403,9 +403,9 @@ func TestMergeTemplate_PreservesImage(t *testing.T) {
 }
 
 func TestFindPlaceholders_PreservesImage(t *testing.T) {
-	// FindPlaceholders is read-only from the caller's perspective, but it
-	// consolidates runs internally to find placeholders split across them.
-	// That consolidation must not mutate away an unrelated image.
+	// FindPlaceholders is read-only: it must not mutate the paragraph at all
+	// (see #68), so an unrelated image is untouched by construction, not by
+	// surviving a consolidation the read-only path used to perform.
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()
 
@@ -417,6 +417,7 @@ func TestFindPlaceholders_PreservesImage(t *testing.T) {
 	if _, err := para.AddImage(createTestPNG(t)); err != nil {
 		t.Fatalf("AddImage: %v", err)
 	}
+	runsBefore := len(para.Runs())
 
 	placeholders := FindPlaceholders(doc)
 	if len(placeholders) != 1 {
@@ -425,6 +426,121 @@ func TestFindPlaceholders_PreservesImage(t *testing.T) {
 
 	if got := countImageRuns(para); got != 1 {
 		t.Errorf("image run lost via FindPlaceholders: got %d image runs, want 1", got)
+	}
+	if got := len(para.Runs()); got != runsBefore {
+		t.Errorf("FindPlaceholders mutated run count: got %d runs, want %d (unchanged)", got, runsBefore)
+	}
+}
+
+// TestFindPlaceholders_DoesNotMergeRuns pins that scanning for placeholders
+// never rewrites the paragraph's runs, even when it finds one split across
+// several of them — the mutation ConsolidateRuns performs is reserved for
+// MergeTemplate, which actually needs the merge to write replacement text.
+func TestFindPlaceholders_DoesNotMergeRuns(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello {{")
+	r2, _ := para.AddRun()
+	r2.SetText("Name")
+	r3, _ := para.AddRun()
+	r3.SetText("}}!")
+
+	placeholders := FindPlaceholders(doc)
+	if len(placeholders) != 1 {
+		t.Fatalf("expected 1 placeholder, got %d", len(placeholders))
+	}
+	if placeholders[0].Name != "Name" {
+		t.Errorf("expected 'Name', got %q", placeholders[0].Name)
+	}
+
+	if got := len(para.Runs()); got != 3 {
+		t.Fatalf("FindPlaceholders merged runs: got %d runs, want 3 (unchanged)", got)
+	}
+	if got := para.Runs()[0].Text(); got != "Hello {{" {
+		t.Errorf("run 0 text changed: got %q, want %q", got, "Hello {{")
+	}
+	if got := para.Runs()[1].Text(); got != "Name" {
+		t.Errorf("run 1 text changed: got %q, want %q", got, "Name")
+	}
+	if got := para.Runs()[2].Text(); got != "}}!" {
+		t.Errorf("run 2 text changed: got %q, want %q", got, "}}!")
+	}
+}
+
+// TestFindPlaceholders_LocationAcrossSplitRuns pins the Location reported for
+// a placeholder split across runs: RunIndex/StartOffset point at the run and
+// offset where the match starts, EndRunIndex/EndOffset at where it ends, both
+// relative to the paragraph's own unmodified runs.
+func TestFindPlaceholders_LocationAcrossSplitRuns(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello {{") // 8 chars, "{{" at offset 6-8
+	r2, _ := para.AddRun()
+	r2.SetText("Name") // 4 chars
+	r3, _ := para.AddRun()
+	r3.SetText("}}!") // "}}" at offset 0-2
+
+	placeholders := FindPlaceholders(doc)
+	if len(placeholders) != 1 {
+		t.Fatalf("expected 1 placeholder, got %d", len(placeholders))
+	}
+
+	loc := placeholders[0].Location
+	if loc.RunIndex != 0 || loc.StartOffset != 6 {
+		t.Errorf("start = (run %d, offset %d), want (run 0, offset 6)", loc.RunIndex, loc.StartOffset)
+	}
+	if loc.EndRunIndex != 2 || loc.EndOffset != 2 {
+		t.Errorf("end = (run %d, offset %d), want (run 2, offset 2)", loc.EndRunIndex, loc.EndOffset)
+	}
+}
+
+// TestFindPlaceholders_HeaderNotMutated confirms the read-only guarantee also
+// holds for header paragraphs, where logos live alongside mergeable text runs.
+func TestFindPlaceholders_HeaderNotMutated(t *testing.T) {
+	doc := core.NewDocument()
+	if _, err := doc.AddSection(); err != nil {
+		t.Fatalf("AddSection: %v", err)
+	}
+	section := doc.Sections()[0]
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	para, _ := header.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello {{")
+	r2, _ := para.AddRun()
+	r2.SetText("Name}}")
+
+	placeholders := FindPlaceholders(doc)
+	if len(placeholders) != 1 {
+		t.Fatalf("expected 1 placeholder, got %d", len(placeholders))
+	}
+	if got := len(para.Runs()); got != 2 {
+		t.Errorf("FindPlaceholders merged header runs: got %d runs, want 2 (unchanged)", got)
+	}
+}
+
+// TestValidateTemplate_DoesNotMutate confirms ValidateTemplate, which scans
+// via FindPlaceholders internally, does not merge runs either.
+func TestValidateTemplate_DoesNotMutate(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello {{")
+	r2, _ := para.AddRun()
+	r2.SetText("Name}}")
+
+	_ = ValidateTemplate(doc, MergeData{"Name": "World"})
+
+	if got := len(para.Runs()); got != 2 {
+		t.Errorf("ValidateTemplate merged runs: got %d runs, want 2 (unchanged)", got)
 	}
 }
 

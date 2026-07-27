@@ -17,6 +17,47 @@ func consolidateErr(err error) error {
 	return fmt.Errorf("template: consolidate runs: %w", err)
 }
 
+// runGroup is a maximal sequence of adjacent text-only runs with identical
+// formatting, over the original run indices of a paragraph. leader is the
+// index of the first run in the group; count is how many runs, starting at
+// leader, belong to it. text is their concatenated content.
+type runGroup struct {
+	text   string
+	leader int
+	count  int
+}
+
+// runGroups partitions a paragraph's runs into runGroups. It is the single
+// definition of "which adjacent runs represent one logical span of text",
+// shared by ConsolidateRuns (which merges each group in place) and the
+// placeholder scanner (which reads across a group without merging it) so the
+// two can never drift on what counts as mergeable.
+func runGroups(runs []domain.Run) []runGroup {
+	if len(runs) == 0 {
+		return nil
+	}
+
+	groups := make([]runGroup, 0, len(runs))
+	groups = append(groups, runGroup{text: runs[0].Text(), leader: 0, count: 1})
+
+	for i := 1; i < len(runs); i++ {
+		prev := runs[i-1]
+		curr := runs[i]
+
+		// Merge if both are text-only and have identical formatting
+		if isTextOnly(prev) && isTextOnly(curr) && formatsEqual(prev, curr) {
+			// Absorb this run's text into the current group
+			groups[len(groups)-1].text += curr.Text()
+			groups[len(groups)-1].count++
+		} else {
+			// Start a new group
+			groups = append(groups, runGroup{text: curr.Text(), leader: i, count: 1})
+		}
+	}
+
+	return groups
+}
+
 // ConsolidateRuns merges adjacent runs with identical formatting in a paragraph.
 // This heals the "split placeholder" problem where Word fragments tokens like
 // {{name}} across multiple <w:r> elements due to spell-check, proofing, or
@@ -34,39 +75,16 @@ func consolidateErr(err error) error {
 // mutation fails partway through, it stops immediately and returns that error
 // rather than silently continuing with a partially consolidated paragraph.
 //
-// It is called automatically by MergeTemplate and FindPlaceholders.
+// It is called automatically by MergeTemplate, where merging split
+// placeholders across runs is necessary to replace them. FindPlaceholders
+// scans for split placeholders without calling this — see runGroups.
 func ConsolidateRuns(para domain.Paragraph) error {
 	runs := para.Runs()
 	if len(runs) <= 1 {
 		return nil
 	}
 
-	// Build merge groups over the original run indices. Each group is a
-	// sequence of adjacent text-only runs with identical formatting; leader is
-	// the index of the run that survives and receives the combined text.
-	type mergeGroup struct {
-		text   string
-		leader int
-		count  int
-	}
-
-	groups := make([]mergeGroup, 0, len(runs))
-	groups = append(groups, mergeGroup{text: runs[0].Text(), leader: 0, count: 1})
-
-	for i := 1; i < len(runs); i++ {
-		prev := runs[i-1]
-		curr := runs[i]
-
-		// Merge if both are text-only and have identical formatting
-		if isTextOnly(prev) && isTextOnly(curr) && formatsEqual(prev, curr) {
-			// Absorb this run's text into the current group
-			groups[len(groups)-1].text += curr.Text()
-			groups[len(groups)-1].count++
-		} else {
-			// Start a new group
-			groups = append(groups, mergeGroup{text: curr.Text(), leader: i, count: 1})
-		}
-	}
+	groups := runGroups(runs)
 
 	// If nothing was merged, there is nothing to rewrite.
 	if len(groups) == len(runs) {

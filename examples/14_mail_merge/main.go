@@ -71,8 +71,6 @@ func main() {
 		"grand_total":     "$9,072.00",
 	}
 
-	// Re-open for validation (FindPlaceholders modifies runs via consolidation)
-	doc, _ = docx.OpenDocument(templatePath)
 	validationErrors := template.ValidateTemplate(doc, data)
 	if len(validationErrors) == 0 {
 		fmt.Println("  All placeholders have matching data keys!")

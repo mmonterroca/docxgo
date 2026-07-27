@@ -32,11 +32,18 @@ type Location struct {
 	Type LocationType
 	// ParagraphIndex is the paragraph index within its container.
 	ParagraphIndex int
-	// RunIndex is the run index within the paragraph.
+	// RunIndex is the index of the run containing the start of the
+	// placeholder, in the paragraph's own (unmodified) run list.
 	RunIndex int
-	// StartOffset is the byte offset of the placeholder start within the run text.
+	// EndRunIndex is the index of the run containing the end of the
+	// placeholder. Equal to RunIndex unless Word split the placeholder across
+	// multiple runs, in which case it is the last run the match spans.
+	EndRunIndex int
+	// StartOffset is the byte offset of the placeholder start within the run
+	// at RunIndex.
 	StartOffset int
-	// EndOffset is the byte offset after the placeholder end within the run text.
+	// EndOffset is the byte offset after the placeholder end within the run
+	// at EndRunIndex.
 	EndOffset int
 	// TableIndex, RowIndex, CellIndex are set when Type == LocationTableCell.
 	TableIndex int
@@ -63,8 +70,12 @@ type Placeholder struct {
 // defaultPattern matches {{key}} where key is one or more word characters or dots.
 var defaultPattern = regexp.MustCompile(`\{\{\.?(\w+(?:\.\w+)*)\}\}`)
 
-// FindPlaceholders scans the entire document and returns all placeholder occurrences.
-// It consolidates runs in each paragraph before scanning to heal split placeholders.
+// FindPlaceholders scans the entire document and returns all placeholder
+// occurrences. It does not modify the document: placeholders that Word split
+// across multiple runs are found by scanning across the run group they would
+// merge into (see runGroups), without actually merging it. Use MergeTemplate
+// to replace placeholders, which does merge split runs since that is
+// necessary to write the replacement text.
 func FindPlaceholders(doc domain.Document) []Placeholder {
 	return findPlaceholdersWithPattern(doc, defaultPattern)
 }
@@ -79,15 +90,6 @@ func findPlaceholdersWithPattern(doc domain.Document, pattern *regexp.Regexp) []
 	var results []Placeholder
 
 	_ = walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
-		// Consolidate runs to heal split placeholders. FindPlaceholders /
-		// FindPlaceholdersCustom don't return an error, and this is a
-		// read-only scan, so consolidation is best-effort: a rare failure just
-		// means this paragraph is scanned without healing (possibly missing a
-		// split placeholder) rather than aborting the whole scan and returning
-		// a truncated list. The mutating path (MergeTemplate) propagates the
-		// error instead.
-		_ = ConsolidateRuns(para)
-
 		found := scanParagraph(para, pattern, ctx)
 		results = append(results, found...)
 		return nil
@@ -96,14 +98,25 @@ func findPlaceholdersWithPattern(doc domain.Document, pattern *regexp.Regexp) []
 	return results
 }
 
-// scanParagraph searches all runs in a paragraph for placeholders.
+// scanParagraph searches a paragraph for placeholders without mutating it.
+// It groups runs the same way ConsolidateRuns would (see runGroups) so a
+// placeholder split across several runs by Word is still found, then matches
+// against each group's concatenated text and translates offsets back to the
+// paragraph's actual, unmodified runs.
 func scanParagraph(para domain.Paragraph, pattern *regexp.Regexp, ctx paragraphContext) []Placeholder {
 	var results []Placeholder
 	runs := para.Runs()
 
-	for ri, run := range runs {
-		text := run.Text()
-		matches := pattern.FindAllStringSubmatchIndex(text, -1)
+	for _, g := range runGroups(runs) {
+		matches := pattern.FindAllStringSubmatchIndex(g.text, -1)
+		if len(matches) == 0 {
+			continue
+		}
+
+		runLens := make([]int, g.count)
+		for i := 0; i < g.count; i++ {
+			runLens[i] = len(runs[g.leader+i].Text())
+		}
 
 		for _, match := range matches {
 			// Ensure there is at least one capturing group before indexing.
@@ -112,15 +125,19 @@ func scanParagraph(para domain.Paragraph, pattern *regexp.Regexp, ctx paragraphC
 				continue
 			}
 			// match[0:2] is full match, match[2:4] is first capture group
-			fullMatch := text[match[0]:match[1]]
-			name := text[match[2]:match[3]]
+			fullMatch := g.text[match[0]:match[1]]
+			name := g.text[match[2]:match[3]]
+
+			startRun, startOffset := locateGroupOffset(g.leader, runLens, match[0])
+			endRun, endOffset := locateGroupOffset(g.leader, runLens, match[1])
 
 			loc := Location{
 				Type:           ctx.locationType,
 				ParagraphIndex: ctx.paraIdx,
-				RunIndex:       ri,
-				StartOffset:    match[0],
-				EndOffset:      match[1],
+				RunIndex:       startRun,
+				EndRunIndex:    endRun,
+				StartOffset:    startOffset,
+				EndOffset:      endOffset,
 				TableIndex:     ctx.tableIdx,
 				RowIndex:       ctx.rowIdx,
 				CellIndex:      ctx.cellIdx,
@@ -138,6 +155,21 @@ func scanParagraph(para domain.Paragraph, pattern *regexp.Regexp, ctx paragraphC
 	}
 
 	return results
+}
+
+// locateGroupOffset translates a byte offset into a run group's concatenated
+// text back to the index (relative to the paragraph's own runs) and local
+// offset of the run that contains it. An offset at or beyond the end of the
+// group's text resolves to the end of its last run.
+func locateGroupOffset(leader int, runLens []int, offset int) (runIndex, runOffset int) {
+	for i, l := range runLens {
+		if offset <= l {
+			return leader + i, offset
+		}
+		offset -= l
+	}
+	last := len(runLens) - 1
+	return leader + last, runLens[last]
 }
 
 // PlaceholderNames returns the deduplicated set of placeholder names found in the document.
