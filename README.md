@@ -2,6 +2,8 @@
 
 A Go library for creating and editing Microsoft Word (`.docx` / OOXML) documents, with a JSON-RPC CLI and Node.js wrapper for use from other languages.
 
+**🌐 Official Website:** [docxgo.dev](https://docxgo.dev/)
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/mmonterroca/docxgo/v2.svg)](https://pkg.go.dev/github.com/mmonterroca/docxgo/v2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mmonterroca/docxgo)](https://goreportcard.com/report/github.com/mmonterroca/docxgo)
@@ -186,7 +188,7 @@ Coverage varies by package — `domain` and `pkg/errors` are at 100%, `internal/
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow (feature branches → `dev` → `master`), testing requirements, and PR process. In short: fork, branch, add tests, run `go test ./...`, and open a PR against `dev`.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow (feature branches → `master`), testing requirements, and PR process. In short: fork, branch from `master`, add tests, run `go test ./...`, and open a PR against `master`.
 
 ---
 
