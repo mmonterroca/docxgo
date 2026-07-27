@@ -23,12 +23,16 @@ func consolidateErr(err error) error {
 // editing history boundaries.
 //
 // Only text-only runs (no fields, breaks, or images) are eligible for merging.
-// The merged run retains the formatting of the first run in each merge group.
+// Each merge group keeps its own first run — the group's combined text is
+// written onto that run and the runs it absorbed are removed. Nothing is ever
+// copied into a freshly created run, so a run's formatting and any content the
+// domain.Run interface cannot express field-by-field (namely images) is
+// preserved by construction rather than by an explicit copy that has to be
+// kept in sync with the interface.
 //
-// This function modifies the paragraph in place via ClearRuns/RemoveRun. If a
-// run setter fails partway through the rebuild, it stops immediately and
-// returns that error rather than silently continuing with a partially
-// rebuilt paragraph.
+// This function modifies the paragraph in place via SetText/RemoveRun. If a
+// mutation fails partway through, it stops immediately and returns that error
+// rather than silently continuing with a partially consolidated paragraph.
 //
 // It is called automatically by MergeTemplate and FindPlaceholders.
 func ConsolidateRuns(para domain.Paragraph) error {
@@ -37,15 +41,17 @@ func ConsolidateRuns(para domain.Paragraph) error {
 		return nil
 	}
 
-	// Build merged groups: each group is a sequence of adjacent text-only runs
-	// with identical formatting that will be combined into a single run.
-	type mergedRun struct {
-		text string
-		src  domain.Run // first run in the group (provides formatting)
+	// Build merge groups over the original run indices. Each group is a
+	// sequence of adjacent text-only runs with identical formatting; leader is
+	// the index of the run that survives and receives the combined text.
+	type mergeGroup struct {
+		text   string
+		leader int
+		count  int
 	}
 
-	merged := make([]mergedRun, 0, len(runs))
-	merged = append(merged, mergedRun{text: runs[0].Text(), src: runs[0]})
+	groups := make([]mergeGroup, 0, len(runs))
+	groups = append(groups, mergeGroup{text: runs[0].Text(), leader: 0, count: 1})
 
 	for i := 1; i < len(runs); i++ {
 		prev := runs[i-1]
@@ -53,66 +59,42 @@ func ConsolidateRuns(para domain.Paragraph) error {
 
 		// Merge if both are text-only and have identical formatting
 		if isTextOnly(prev) && isTextOnly(curr) && formatsEqual(prev, curr) {
-			// Append text to the current merge group
-			merged[len(merged)-1].text += curr.Text()
+			// Absorb this run's text into the current group
+			groups[len(groups)-1].text += curr.Text()
+			groups[len(groups)-1].count++
 		} else {
 			// Start a new group
-			merged = append(merged, mergedRun{text: curr.Text(), src: curr})
+			groups = append(groups, mergeGroup{text: curr.Text(), leader: i, count: 1})
 		}
 	}
 
-	// If nothing was merged, skip the rebuild
-	if len(merged) == len(runs) {
+	// If nothing was merged, there is nothing to rewrite.
+	if len(groups) == len(runs) {
 		return nil
 	}
 
-	// Rebuild the paragraph's runs
-	para.ClearRuns()
-	for _, m := range merged {
-		r, err := para.AddRun()
-		if err != nil {
+	// Write each multi-run group's combined text onto its leader. Groups of
+	// one are left completely untouched — their text is already correct.
+	absorbed := make([]bool, len(runs))
+	for _, g := range groups {
+		if g.count == 1 {
+			continue
+		}
+		if err := runs[g.leader].SetText(g.text); err != nil {
 			return consolidateErr(err)
 		}
-		// Copy formatting from the source run, stopping at the first failure
-		// instead of continuing with a partially-formatted run.
-		if err := r.SetText(m.text); err != nil {
-			return consolidateErr(err)
+		for i := g.leader + 1; i < g.leader+g.count; i++ {
+			absorbed[i] = true
 		}
-		if err := r.SetFont(m.src.Font()); err != nil {
-			return consolidateErr(err)
-		}
-		if err := r.SetColor(m.src.Color()); err != nil {
-			return consolidateErr(err)
-		}
-		if err := r.SetSize(m.src.Size()); err != nil {
-			return consolidateErr(err)
-		}
-		if err := r.SetBold(m.src.Bold()); err != nil {
-			return consolidateErr(err)
-		}
-		if err := r.SetItalic(m.src.Italic()); err != nil {
-			return consolidateErr(err)
-		}
-		if err := r.SetUnderline(m.src.Underline()); err != nil {
-			return consolidateErr(err)
-		}
-		if err := r.SetStrike(m.src.Strike()); err != nil {
-			return consolidateErr(err)
-		}
-		if err := r.SetHighlight(m.src.Highlight()); err != nil {
-			return consolidateErr(err)
-		}
+	}
 
-		// Re-add fields, breaks from the source run (for non-text runs)
-		for _, f := range m.src.Fields() {
-			if err := r.AddField(f); err != nil {
-				return consolidateErr(err)
-			}
+	// Drop the absorbed runs, highest index first so earlier indices stay valid.
+	for i := len(runs) - 1; i >= 0; i-- {
+		if !absorbed[i] {
+			continue
 		}
-		for _, b := range m.src.Breaks() {
-			if err := r.AddBreak(b); err != nil {
-				return consolidateErr(err)
-			}
+		if err := para.RemoveRun(i); err != nil {
+			return consolidateErr(err)
 		}
 	}
 
