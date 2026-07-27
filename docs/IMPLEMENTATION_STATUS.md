@@ -1,7 +1,7 @@
 # docxgo v2 Implementation Status
 
 **Last Updated**: July 2026
-**Version**: 2.8.0 (Stable)
+**Version**: 2.9.0 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -37,6 +37,7 @@ All development phases have been completed. The library has gone through multipl
 | v2.7.0      | Jul 2026 | JSON-RPC CLI (`cmd/docxgo`) + Node.js wrapper (`@mmonterroca/docxgo`), `document.setLanguage` |
 | v2.7.1      | Jul 2026 | Tech themes discoverable via public API (7 total), `docxgo` output branding, doc/provenance alignment |
 | v2.8.0      | Jul 2026 | Final MIT provenance determination, corrected notices, license-complete release artifacts |
+| v2.9.0      | Jul 2026 | Fixed npm-publish cascade, read-only `FindPlaceholders`, explicit zero spacing on styled paragraphs |
 
 ---
 
@@ -417,5 +418,5 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 ---
 
 **Last Updated**: July 2026
-**Status**: Production Ready (v2.8.0 Stable)
+**Status**: Production Ready (v2.9.0 Stable)
 **Maintained by**: Misael Monterroca ([@mmonterroca](https://github.com/mmonterroca))

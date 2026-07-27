@@ -1,6 +1,6 @@
 {
   "name": "@mmonterroca/docxgo",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "Node.js wrapper for docxgo — create and manipulate Word documents via JSON-RPC",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -50,10 +50,10 @@
     "typescript": "^5.4.0"
   },
   "optionalDependencies": {
-    "@mmonterroca/docxgo-darwin-arm64": "2.8.0",
-    "@mmonterroca/docxgo-darwin-x64": "2.8.0",
-    "@mmonterroca/docxgo-linux-arm64": "2.8.0",
-    "@mmonterroca/docxgo-linux-x64": "2.8.0",
-    "@mmonterroca/docxgo-win32-x64": "2.8.0"
+    "@mmonterroca/docxgo-darwin-arm64": "2.9.0",
+    "@mmonterroca/docxgo-darwin-x64": "2.9.0",
+    "@mmonterroca/docxgo-linux-arm64": "2.9.0",
+    "@mmonterroca/docxgo-linux-x64": "2.9.0",
+    "@mmonterroca/docxgo-win32-x64": "2.9.0"
   }
 }
