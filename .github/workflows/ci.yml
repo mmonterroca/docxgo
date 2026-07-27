@@ -66,8 +66,19 @@ jobs:
       - name: Build Go binary
         run: go build -o npm/bin/docxgo ./cmd/docxgo/
 
+      # npm ci requires package-lock.json to already have resolved entries
+      # for every optionalDependency in package.json. Right after a release
+      # commit bumps npm/package.json's optionalDependencies to a version
+      # not yet on the npm registry, the lock (regenerated with
+      # `npm install --package-lock-only`, which necessarily drops those
+      # unresolvable platform-package entries — see release.yml) has no such
+      # entries, and `npm ci` fails EUSAGE even though the manifest and lock
+      # otherwise agree. `npm install` reconciles instead of requiring exact
+      # pre-sync, which is what CI actually needs here: correctness of the
+      # wrapper's own tests, not lockfile reproducibility for a case the repo's
+      # own release process intentionally produces every cycle.
       - name: Install npm dependencies
-        run: cd npm && npm ci
+        run: cd npm && npm install
 
       - name: Run Node.js tests
         run: cd npm && npx tsx --test src/__tests__/*.test.ts
