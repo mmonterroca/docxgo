@@ -1,3 +1,26 @@
+## v2.9.0 — 2026-07-27
+
+### Fixed
+
+- **npm publish no longer depends on the GitHub release event.** `release.yml` authors the GitHub Release with a `RELEASE_PAT` so the `release: published` event fires `npm-publish.yml` automatically — but when that secret is empty or expired, the release silently falls back to being authored by `github-actions[bot]`, and GitHub's anti-recursion rule means a `GITHUB_TOKEN`-authored event can never trigger another workflow. Every release since at least v2.7.2 had to be published to npm by hand via `workflow_dispatch`, with `release.yml` reporting success regardless. `release.yml` now invokes `npm-publish.yml` directly as a `workflow_call` job, passing the version it already computed, so publishing no longer depends on that event firing at all. The `RELEASE_PAT` check is now a build warning instead of the only thing standing between "released" and "published to npm".
+- **`FindPlaceholders`, `FindPlaceholdersCustom`, `PlaceholderNames`, and `ValidateTemplate` no longer mutate the document they scan.** All four read as pure queries but called `ConsolidateRuns` internally to heal placeholders Word split across runs — v2.8.0 removed the worst consequence of that (silently dropped images), but the mutation itself remained: a caller who scanned a template to preview its placeholders got their in-memory document restructured as a side effect. The run-grouping logic `ConsolidateRuns` uses to decide what's mergeable is now shared with a new scan path that matches against each group's concatenated text and reports offsets back against the paragraph's real, unmodified runs — nothing merges unless `MergeTemplate` actually needs to write replacement text. `Location` gains `EndRunIndex` so a match spanning multiple runs can report where it ends, not just where it starts.
+- **An explicit zero spacing (or line spacing) is now honored on a paragraph carrying a style.** v2.8.0 fixed the *unstyled* case: a paragraph with no style and no explicit spacing correctly inherits `0` from the new `w:pPrDefault`. It did not fix the styled case, because `Paragraph.SpacingBefore()`/`SpacingAfter() int` can't distinguish "never set" from "explicitly set to 0" — so `SetSpacingAfter(0)` on a paragraph with a style supplying non-zero spacing was silently dropped, and the style's value won instead of the caller's explicit zero. The same gap applied to line spacing: an explicit `SetLineSpacing(Auto, 240)` meant to override a style's non-auto rule back to single-spacing was indistinguishable from never calling it, since `Auto`/`240` are also the defaults. The concrete paragraph type now tracks whether each setter was ever called and the serializer honors an explicit value even at zero. **Indentation has the identical gap** but needs a different fix shape — tracked in [#76](https://github.com/mmonterroca/docxgo/issues/76).
+
+### Changed
+
+- **Removed the unreachable no-style-manager `styles.xml` fallback.** `ZipWriter.writeDefaultStyles` wrote a hand-maintained raw XML string, reachable only when `writeStyles` received a `nil` `*Styles` — which never happens from the one production caller. It was a second, independent source of truth for default paragraph properties that had to be kept in sync by hand with the serializer; `writeStyles` now returns an error on `nil` instead of degrading to it.
+- **CLI:** `paragraph.add`'s `spacingBefore`/`spacingAfter` fields become nullable (`*int` server-side) so a JSON `"spacingAfter": 0` can be told apart from omitting the field — otherwise the spacing fix above would only reach the Go API, not the CLI or Node.js wrapper.
+- Refreshed `npm/package-lock.json` for the version bump; this incidentally restores `npm ci` in CI, which had been broken since the v2.8.0 release commit landed with an unrelated lockfile desync (unrelated to any fix in this release).
+
+### Compatibility
+
+- **No public Go interface changed.** `domain.Paragraph` is unchanged; the new `SpacingBeforeSet()`/`SpacingAfterSet()`/`LineSpacingSet()` methods are exposed only on the concrete internal type, read by the serializer via a type assertion that degrades gracefully for any other `domain.Paragraph` implementation (third-party, wrapped) — see `TestParagraphSerializer_WrappedParagraphDegradesGracefully`.
+- **`template.Location`** gains a new field, `EndRunIndex` (additive). `RunIndex`/`StartOffset` now point at the paragraph's own run and offset rather than a post-consolidation run that no longer exists for scans — no non-test consumer of these fields exists in this repo, and no `RunIndex`/`StartOffset`/`EndOffset` semantics changed for the common case of a match inside a single run.
+- **CLI JSON-RPC:** `spacingBefore`/`spacingAfter` remain optional integer fields; omitting them is unchanged, but `0` now behaves differently (honored, rather than ignored) when the paragraph carries a style.
+- Generated output changes as described under **Fixed** for paragraphs that explicitly set spacing to 0 on a styled paragraph.
+
+---
+
 ## v2.8.0 — 2026-07-27
 
 ### Fixed
