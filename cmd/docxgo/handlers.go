@@ -314,19 +314,28 @@ type replaceTextParams struct {
 // the body-paragraph index as reported by paragraph.list; the embedded
 // paragraphItem carries the new content (text or runs) and any style fields
 // to apply.
+//
+// Index is a pointer so an omitted field is distinguishable from an
+// explicit 0: this method replaces the paragraph's content, so a client
+// that forgets index must not have its request silently resolve to the
+// first paragraph.
 type paragraphSetTextParams struct {
 	DocumentID string `json:"documentId"`
-	Index      int    `json:"index"`
+	Index      *int   `json:"index"`
 	paragraphItem
 }
 
 // tableCellRef addresses a single cell, shared by table.getCell and
 // table.setCell. Indices follow table.list ordering.
+//
+// The indices are pointers for the same reason as paragraphSetTextParams.Index:
+// an omitted coordinate must be rejected rather than defaulting to 0 and
+// silently addressing the first table/row/column.
 type tableCellRef struct {
 	DocumentID  string `json:"documentId"`
-	TableIndex  int    `json:"tableIndex"`
-	RowIndex    int    `json:"rowIndex"`
-	ColumnIndex int    `json:"columnIndex"`
+	TableIndex  *int   `json:"tableIndex"`
+	RowIndex    *int   `json:"rowIndex"`
+	ColumnIndex *int   `json:"columnIndex"`
 }
 
 // tableSetCellParams are the parameters for table.setCell. Text is a shortcut
@@ -1020,8 +1029,11 @@ func (s *server) handleParagraphSetText(req *Request) Response {
 	const op = "paragraph.setText"
 
 	var params paragraphSetTextParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	if err := decodeStrict(req.Params, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+	if params.Index == nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "index is required", op)
 	}
 
 	doc, ok := s.getDoc(params.DocumentID)
@@ -1031,10 +1043,11 @@ func (s *server) handleParagraphSetText(req *Request) Response {
 	}
 
 	paragraphs := doc.Paragraphs()
-	if params.Index < 0 || params.Index >= len(paragraphs) {
+	index := *params.Index
+	if index < 0 || index >= len(paragraphs) {
 		return errorResponse(req.ID, errors.ErrCodeValidation,
 			fmt.Sprintf("paragraph index %d out of range (document has %d paragraphs)",
-				params.Index, len(paragraphs)), op)
+				index, len(paragraphs)), op)
 	}
 
 	// Validate before clearing: this method replaces the paragraph's content,
@@ -1044,7 +1057,7 @@ func (s *server) handleParagraphSetText(req *Request) Response {
 		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
 	}
 
-	para := paragraphs[params.Index]
+	para := paragraphs[index]
 	para.ClearRuns()
 	if err := applyParagraph(para, params.paragraphItem); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeInternal,
@@ -1053,8 +1066,23 @@ func (s *server) handleParagraphSetText(req *Request) Response {
 
 	return Response{ID: req.ID, Result: map[string]interface{}{
 		"ok":    true,
-		"index": params.Index,
+		"index": index,
 	}}
+}
+
+// decodeStrict decodes data into v, rejecting a literal null and any field v
+// does not declare. Plain json.Unmarshal accepts both silently: a misspelled
+// field name or a null array element would otherwise decode to a zero value
+// indistinguishable from a deliberately minimal request, which for
+// paragraph.setText and table.setCell means content gets silently cleared
+// instead of the request being rejected.
+func decodeStrict(data []byte, v interface{}) error {
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		return fmt.Errorf("must not be null")
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
 }
 
 // validateParagraphItem reports whether applyParagraph would accept item,
@@ -1079,18 +1107,23 @@ func validateParagraphItem(item paragraphItem) error {
 
 // resolveCell resolves a tableCellRef to a cell, with range-checked indices.
 func resolveCell(doc domain.Document, ref tableCellRef) (domain.TableCell, error) {
+	if ref.TableIndex == nil || ref.RowIndex == nil || ref.ColumnIndex == nil {
+		return nil, fmt.Errorf("tableIndex, rowIndex, and columnIndex are all required")
+	}
+	tableIndex, rowIndex, columnIndex := *ref.TableIndex, *ref.RowIndex, *ref.ColumnIndex
+
 	tables := doc.Tables()
-	if ref.TableIndex < 0 || ref.TableIndex >= len(tables) {
+	if tableIndex < 0 || tableIndex >= len(tables) {
 		return nil, fmt.Errorf("table index %d out of range (document has %d tables)",
-			ref.TableIndex, len(tables))
+			tableIndex, len(tables))
 	}
-	row, err := tables[ref.TableIndex].Row(ref.RowIndex)
+	row, err := tables[tableIndex].Row(rowIndex)
 	if err != nil {
-		return nil, fmt.Errorf("row %d: %w", ref.RowIndex, err)
+		return nil, fmt.Errorf("row %d: %w", rowIndex, err)
 	}
-	cell, err := row.Cell(ref.ColumnIndex)
+	cell, err := row.Cell(columnIndex)
 	if err != nil {
-		return nil, fmt.Errorf("column %d: %w", ref.ColumnIndex, err)
+		return nil, fmt.Errorf("column %d: %w", columnIndex, err)
 	}
 	return cell, nil
 }
@@ -1162,7 +1195,17 @@ func (s *server) handleTableSetCell(req *Request) Response {
 		return errorResponse(req.ID, errors.ErrCodeValidation,
 			fmt.Sprintf("cell (%d,%d) is covered by a horizontal merge and is not written to the document; "+
 				"target the leading cell of the merged region instead",
-				params.RowIndex, params.ColumnIndex), op)
+				*params.RowIndex, *params.ColumnIndex), op)
+	}
+
+	// A vertical-merge continuation cell is serialized, but Word ignores its
+	// content and renders the vMerge-restart cell above it instead — writing
+	// here would report success while remaining invisible.
+	if cell.VMerge() == domain.VMergeContinue {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			fmt.Sprintf("cell (%d,%d) is a continuation of a vertical merge and its content is not displayed; "+
+				"target the topmost cell of the merged region instead",
+				*params.RowIndex, *params.ColumnIndex), op)
 	}
 
 	rawItems := params.Paragraphs
@@ -1181,7 +1224,7 @@ func (s *server) handleTableSetCell(req *Request) Response {
 	items := make([]paragraphItem, 0, len(rawItems))
 	for i, raw := range rawItems {
 		var pItem paragraphItem
-		if err := json.Unmarshal(raw, &pItem); err != nil {
+		if err := decodeStrict(raw, &pItem); err != nil {
 			return errorResponse(req.ID, errors.ErrCodeValidation,
 				fmt.Sprintf("invalid paragraph at index %d: %v", i, err), op)
 		}
