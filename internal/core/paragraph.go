@@ -84,6 +84,7 @@ func (p *paragraph) AddRun() (domain.Run, error) {
 }
 
 // AddField adds a field to the paragraph.
+//
 // Deprecated: Use AddRun() and run.AddField() instead for better control.
 func (p *paragraph) AddField(_ domain.FieldType) (domain.Field, error) {
 	return nil, errors.Unsupported("Paragraph.AddField", "use AddRun() and run.AddField() instead")
