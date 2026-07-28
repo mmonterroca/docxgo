@@ -160,6 +160,8 @@ export interface ParagraphBordersDef {
 /** A paragraph content item. */
 export interface ParagraphItem {
   type: 'paragraph';
+  /** Plain-text shortcut for a single unformatted run. Ignored when `runs` is given. */
+  text?: string;
   style?: string;
   alignment?: Alignment;
   spacingBefore?: number;
@@ -451,6 +453,8 @@ export interface TableInfo {
   index: number;
   rows: number;
   columns: number;
+  /** Present only when table.list was called with `includeText: true`. */
+  cells?: string[][];
 }
 
 export interface TableListResult {

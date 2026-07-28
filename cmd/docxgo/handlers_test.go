@@ -14,6 +14,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/mmonterroca/docxgo/v2/domain"
 )
 
 // ─── Protocol tests ───────────────────────────────────────────────────────────
@@ -1060,6 +1062,122 @@ func TestHandleTableSetCell_InvalidItemLeavesCellIntact(t *testing.T) {
 	}
 	if got := cellText(t, s, docID, 0, 1, 1); got != before {
 		t.Errorf("cell text = %q, want %q (unchanged)", got, before)
+	}
+}
+
+// TestHandleParagraphSetText_MissingIndexIsRejected covers an omitted index
+// field. Index is a Go int, so an omitted field used to decode to 0 and
+// silently rewrite the first body paragraph instead of being rejected.
+func TestHandleParagraphSetText_MissingIndexIsRejected(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+	before := paragraphText(t, s, docID, 0)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.setText", map[string]interface{}{
+		"documentId": docID, "text": "clobbered",
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	if got := paragraphText(t, s, docID, 0); got != before {
+		t.Errorf("paragraph text = %q, want %q (unchanged)", got, before)
+	}
+}
+
+// TestHandleTableSetCell_MissingCoordinateIsRejected covers an omitted
+// rowIndex/columnIndex/tableIndex. Each is a Go int, so an omitted field used
+// to decode to 0 and silently address (or overwrite) the first table's first
+// cell instead of being rejected.
+func TestHandleTableSetCell_MissingCoordinateIsRejected(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+	before := cellText(t, s, docID, 0, 0, 0)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1,
+		"text": "clobbered",
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	if got := cellText(t, s, docID, 0, 0, 0); got != before {
+		t.Errorf("cell (0,0) text = %q, want %q (unchanged)", got, before)
+	}
+}
+
+// TestHandleTableSetCell_MisspelledContentFieldIsRejected covers a paragraph
+// item whose content field is misspelled (or the wrong shape) rather than
+// omitted entirely. json.Unmarshal drops unknown fields and accepts null
+// silently, so {"value":"Yes"} used to decode to an empty paragraphItem, pass
+// validateParagraphItem trivially (there is nothing invalid about an empty
+// item), and then clear the cell instead of reporting the typo.
+func TestHandleTableSetCell_MisspelledContentFieldIsRejected(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+	before := cellText(t, s, docID, 0, 1, 1)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"paragraphs": []interface{}{
+			map[string]interface{}{"value": "Yes"},
+		},
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	if got := cellText(t, s, docID, 0, 1, 1); got != before {
+		t.Errorf("cell text = %q, want %q (unchanged)", got, before)
+	}
+}
+
+// TestHandleTableSetCell_NullParagraphIsRejected covers a null element in the
+// paragraphs array. json.Unmarshal leaves the destination at its zero value
+// for a null source, so a null item used to decode to an empty paragraphItem
+// and silently clear the cell for the same reason as the misspelled-field
+// case above.
+func TestHandleTableSetCell_NullParagraphIsRejected(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+	before := cellText(t, s, docID, 0, 1, 1)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"paragraphs": []interface{}{nil},
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	if got := cellText(t, s, docID, 0, 1, 1); got != before {
+		t.Errorf("cell text = %q, want %q (unchanged)", got, before)
+	}
+}
+
+// TestHandleTableSetCell_RejectsVerticalMergeContinuation covers a cell that
+// is a vertical-merge continuation. Such a cell is still serialized (unlike a
+// horizontal-merge continuation), but Word renders the vMerge-restart cell's
+// content instead of its own, so a write there used to report success while
+// remaining invisible to the reader.
+func TestHandleTableSetCell_RejectsVerticalMergeContinuation(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	doc, ok := s.getDoc(docID)
+	if !ok {
+		t.Fatal("document not found")
+	}
+	row, err := doc.Tables()[0].Row(1)
+	if err != nil {
+		t.Fatalf("row: %v", err)
+	}
+	cell, err := row.Cell(1)
+	if err != nil {
+		t.Fatalf("cell: %v", err)
+	}
+	if err := cell.SetVMerge(domain.VMergeContinue); err != nil {
+		t.Fatalf("SetVMerge: %v", err)
+	}
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"text": "clobbered",
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
 	}
 }
 

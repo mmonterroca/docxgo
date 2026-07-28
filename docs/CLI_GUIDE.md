@@ -763,7 +763,7 @@ Lists all paragraphs in a document with their text and style.
 
 Replaces a body paragraph's content by index (the same index reported by `paragraph.list`). This clears all of the paragraph's existing runs before writing the new content, so it is a full replacement, not an append.
 
-Accepts the same content fields as `paragraph.add`. Passing only `style` (no `text` and no `runs`) clears the paragraph's runs and writes nothing back — the paragraph is emptied, not left unchanged. This method only addresses paragraphs in the document body; paragraphs inside table cells or headers/footers are not reachable by index here — use `table.setCell` for cell content.
+Accepts the same content fields as `paragraph.add`, but decoded strictly: an unrecognized field or a `null` value is rejected rather than silently treated as absent, since a typo in a request that replaces content must not read as "clear it". Passing only `style` (no `text` and no `runs`) clears the paragraph's runs and writes nothing back — the paragraph is emptied, not left unchanged. This method only addresses paragraphs in the document body; paragraphs inside table cells or headers/footers are not reachable by index here — use `table.setCell` for cell content.
 
 **Params:**
 
@@ -923,9 +923,11 @@ Replaces a single cell's content by table, row, and column index.
 
 Provide exactly one of `text` (a shortcut that writes one plain paragraph) or `paragraphs` (rich paragraph items, same shape as `paragraph.add`). Supplying **both** is rejected, and so is supplying **neither** — this method replaces the cell's content, so a request that names no content at all (a misspelled field, say) is an error rather than a silent wipe. To empty a cell, pass `"paragraphs": []` or `"text": ""`.
 
-The whole request is validated before the cell is touched: if any paragraph item is malformed or rejected, the call fails and the cell keeps its original content.
+The whole request is validated before the cell is touched: if any paragraph item is malformed or rejected, the call fails and the cell keeps its original content. Unlike `paragraph.add`, each paragraph item here is decoded strictly — an unrecognized field or a `null` item is rejected rather than silently treated as an empty paragraph, since a typo in a request that replaces content must not read as "clear it".
 
 Writes to a cell covered by a horizontal merge are rejected. Such a cell is never written to the file, so accepting the write would report success and then silently drop the content on save — target the leading cell of the merged region instead.
+
+Writes to a vertical-merge continuation cell are rejected too. Unlike a horizontal-merge continuation, this cell is still written to the file, but Word renders the vertical-merge-restart cell's content in its place, so the write would report success while remaining invisible — target the topmost cell of the merged region instead.
 
 The cell can grow to fit more paragraphs than it had, but it cannot shrink: paragraphs beyond the new content are left in place as empty paragraphs, since `domain.TableCell` only exposes adding paragraphs, not removing them. `paragraphCount` in the result reflects the cell's paragraph count after the write, which may be larger than the number of items you provided.
 
