@@ -316,6 +316,87 @@ func TestReplaceText_ReplacesInSingleRunCarryingABreak(t *testing.T) {
 	}
 }
 
+// TestReplaceText_SkipsMergefieldCarriedOnAnEmptyRun covers the shape Word
+// uses for a mail-merge field: an empty run holding the MERGEFIELD followed
+// by a separate run holding its display text. The field run carries no match
+// text of its own, so a naive overlap test never sees it — but replacing the
+// display text while the field survives leaves the saved document with both
+// the field and the replacement, and a field update in Word reverts the
+// visible text while the replacement lingers. merge.go handles this shape
+// explicitly; replace.go must at least refuse it.
+func TestReplaceText_SkipsMergefieldCarriedOnAnEmptyRun(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	mergeField := core.NewField(domain.FieldTypeCustom)
+	if err := mergeField.SetCode("MERGEFIELD Name"); err != nil {
+		t.Fatalf("SetCode: %v", err)
+	}
+	fieldRun, _ := para.AddRun()
+	if err := fieldRun.AddField(mergeField); err != nil {
+		t.Fatalf("AddField: %v", err)
+	}
+	// The field run carries the field but no text of its own.
+	if err := fieldRun.SetText(""); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	textRun, _ := para.AddRun()
+	if err := textRun.SetText("«Name»"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	result, err := ReplaceText(doc, "«Name»", "Alice")
+	if err != nil {
+		t.Fatalf("ReplaceText: %v", err)
+	}
+	if result.Replaced != 0 || result.Skipped != 1 {
+		t.Errorf("result = %+v, want 0 replaced / 1 skipped", result)
+	}
+	if got := textRun.Text(); got != "«Name»" {
+		t.Errorf("display text = %q, want unchanged", got)
+	}
+	if len(fieldRun.Fields()) != 1 {
+		t.Errorf("field was dropped from the run")
+	}
+}
+
+// TestReplaceText_SkipsBreakOnAnEmptyRunBetweenMatchedRuns covers the
+// standalone <w:r><w:br/></w:r> shape the reader produces. The break run
+// carries no match text, so it is not part of the spliced span — but it sits
+// between two runs that are, and it survives the replacement stranded in the
+// middle of the text that replaced them.
+func TestReplaceText_SkipsBreakOnAnEmptyRunBetweenMatchedRuns(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("Hello")
+
+	breakRun, _ := para.AddRun()
+	if err := breakRun.AddBreak(domain.BreakTypeLine); err != nil {
+		t.Fatalf("AddBreak: %v", err)
+	}
+	breakRun.SetText("")
+
+	r3, _ := para.AddRun()
+	r3.SetText("World")
+
+	result, err := ReplaceText(doc, "HelloWorld", "Hi")
+	if err != nil {
+		t.Fatalf("ReplaceText: %v", err)
+	}
+	if result.Replaced != 0 || result.Skipped != 1 {
+		t.Errorf("result = %+v, want 0 replaced / 1 skipped", result)
+	}
+	if got := para.Text(); got != "HelloWorld" {
+		t.Errorf("paragraph text = %q, want unchanged", got)
+	}
+	if len(breakRun.Breaks()) != 1 {
+		t.Errorf("break count = %d, want 1", len(breakRun.Breaks()))
+	}
+}
+
 // TestReplaceText_DeletionMatchesStdlibSemantics fixes the deletion
 // semantics as intentional, matching strings.ReplaceAll's non-overlapping
 // left-to-right scan: a match created by an earlier deletion, starting
