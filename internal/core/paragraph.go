@@ -48,13 +48,23 @@ type paragraph struct {
 	spacingBeforeSet bool
 	spacingAfterSet  bool
 	lineSpacingSet   bool
-	numbering        *domain.NumberingReference
-	borders          domain.ParagraphBorders
-	idGen            IDGenerator
-	relManager       *manager.RelationshipManager
-	bookmarkID       string // ID for bookmark (if this paragraph needs one for TOC)
-	bookmarkName     string // Name for bookmark (e.g., "_Toc123456")
-	mediaManager     *manager.MediaManager
+	// indent*Set mirror the spacing flags above, but per side rather than per
+	// call: SetIndent takes the whole domain.Indentation struct at once, so a
+	// single "was SetIndent ever called" flag couldn't tell "Left was set"
+	// from "Right was set" -- which the reader needs, since it must mark only
+	// the sides actually present in a source <w:ind> element (see
+	// SetIndentLeft and friends below).
+	indentLeftSet      bool
+	indentRightSet     bool
+	indentFirstLineSet bool
+	indentHangingSet   bool
+	numbering          *domain.NumberingReference
+	borders            domain.ParagraphBorders
+	idGen              IDGenerator
+	relManager         *manager.RelationshipManager
+	bookmarkID         string // ID for bookmark (if this paragraph needs one for TOC)
+	bookmarkName       string // Name for bookmark (e.g., "_Toc123456")
+	mediaManager       *manager.MediaManager
 }
 
 // NewParagraph creates a new Paragraph.
@@ -424,8 +434,86 @@ func (p *paragraph) SetIndent(indent domain.Indentation) error {
 			"cannot have both first line indent and hanging indent")
 	}
 
+	// SetIndent replaces the whole struct in one call and deliberately does
+	// not touch the indent*Set flags: a zero-valued side in the struct is
+	// indistinguishable from a side the caller didn't intend to set, so
+	// marking all four here would claim explicit intent SetIndent's signature
+	// cannot actually express. Callers that need one side's zero value to
+	// override a style explicitly must use SetIndentLeft/Right/FirstLine/
+	// Hanging instead, each of which marks only its own side.
 	p.indent = indent
 	return nil
+}
+
+// SetIndentLeft sets only the left indentation, leaving the other three
+// sides and their set-flags untouched. Unlike SetIndent, an explicit 0 here
+// is distinguishable from a side that was never set, so the serializer can
+// emit it even when it overrides a style's own non-zero value.
+func (p *paragraph) SetIndentLeft(twips int) error {
+	if twips < constants.MinIndent || twips > constants.MaxIndent {
+		return errors.InvalidArgument("Paragraph.SetIndentLeft", "twips", twips,
+			"left indent must be between -31680 and 31680 twips (-22 to 22 inches)")
+	}
+	p.indent.Left = twips
+	p.indentLeftSet = true
+	return nil
+}
+
+// IndentLeftSet reports whether SetIndentLeft was ever called.
+func (p *paragraph) IndentLeftSet() bool {
+	return p.indentLeftSet
+}
+
+// SetIndentRight is SetIndentLeft's counterpart for the right side.
+func (p *paragraph) SetIndentRight(twips int) error {
+	if twips < constants.MinIndent || twips > constants.MaxIndent {
+		return errors.InvalidArgument("Paragraph.SetIndentRight", "twips", twips,
+			"right indent must be between -31680 and 31680 twips (-22 to 22 inches)")
+	}
+	p.indent.Right = twips
+	p.indentRightSet = true
+	return nil
+}
+
+// IndentRightSet reports whether SetIndentRight was ever called.
+func (p *paragraph) IndentRightSet() bool {
+	return p.indentRightSet
+}
+
+// SetIndentFirstLine is SetIndentLeft's counterpart for the first-line
+// indent. Setting it does not clear an existing hanging indent -- the
+// mutual-exclusivity check lives in SetIndent, which sees the whole struct
+// at once; a caller using the per-side setters is responsible for not
+// setting both.
+func (p *paragraph) SetIndentFirstLine(twips int) error {
+	if twips < 0 || twips > constants.MaxIndent {
+		return errors.InvalidArgument("Paragraph.SetIndentFirstLine", "twips", twips,
+			"first line indent must be between 0 and 31680 twips (0 to 22 inches)")
+	}
+	p.indent.FirstLine = twips
+	p.indentFirstLineSet = true
+	return nil
+}
+
+// IndentFirstLineSet reports whether SetIndentFirstLine was ever called.
+func (p *paragraph) IndentFirstLineSet() bool {
+	return p.indentFirstLineSet
+}
+
+// SetIndentHanging is SetIndentLeft's counterpart for the hanging indent.
+func (p *paragraph) SetIndentHanging(twips int) error {
+	if twips < 0 || twips > constants.MaxIndent {
+		return errors.InvalidArgument("Paragraph.SetIndentHanging", "twips", twips,
+			"hanging indent must be between 0 and 31680 twips (0 to 22 inches)")
+	}
+	p.indent.Hanging = twips
+	p.indentHangingSet = true
+	return nil
+}
+
+// IndentHangingSet reports whether SetIndentHanging was ever called.
+func (p *paragraph) IndentHangingSet() bool {
+	return p.indentHangingSet
 }
 
 // SpacingBefore returns spacing before the paragraph (in twips).

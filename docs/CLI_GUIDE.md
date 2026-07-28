@@ -702,7 +702,7 @@ Adds a single paragraph to an existing document. Supports the same paragraph pro
 | `spacingBefore` | Number | No | Spacing before (twips). Omit to leave unset; `0` is honored as an explicit override, including over a style's own spacing |
 | `spacingAfter` | Number | No | Spacing after (twips). Omit to leave unset; `0` is honored as an explicit override, including over a style's own spacing |
 | `lineSpacing` | Object | No | `{ "rule": "auto", "value": 360 }` |
-| `indent` | Object | No | `{ "left", "right", "firstLine", "hanging" }` |
+| `indent` | Object | No | `{ "left", "right", "firstLine", "hanging" }`. Each side is independent: omit a side to leave it unset, or set it to `0` to explicitly override a style's own value on just that side |
 | `numbering` | Object | No | `{ "id": 1, "level": 0 }` |
 | `borders` | Object | No | Paragraph borders |
 | `runs` | Array | No | Text runs (same format as content paragraphs) |

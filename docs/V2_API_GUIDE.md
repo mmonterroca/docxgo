@@ -297,6 +297,29 @@ run, _ := para.AddRun()
 run.SetText("Centered text")
 ```
 
+#### Paragraph Indentation
+
+```go
+para, _ := doc.AddParagraph()
+
+// SetIndent replaces all four sides at once. A side left at its zero value
+// is indistinguishable from a side you didn't intend to touch.
+para.SetIndent(domain.Indentation{Left: 720, FirstLine: 240})
+
+// To set exactly one side -- including to 0, to override a style's own
+// value on just that side without affecting the others -- use the
+// per-side setters instead:
+para.SetIndentLeft(720)
+para.SetIndentRight(0)
+para.SetIndentFirstLine(240)
+para.SetIndentHanging(0)
+```
+
+`SetIndentFirstLine` and `SetIndentHanging` don't enforce the mutual
+exclusivity that `SetIndent` does (a paragraph can't have both a first-line
+and a hanging indent) -- each is independent, so a caller using both is
+responsible for not setting both.
+
 #### Text Formatting
 
 Available methods (both APIs):

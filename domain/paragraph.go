@@ -66,8 +66,29 @@ type Paragraph interface {
 	// Indent returns the paragraph's indentation settings.
 	Indent() Indentation
 
-	// SetIndent sets the paragraph's indentation.
+	// SetIndent sets the paragraph's indentation. All four sides are set
+	// together, so a side left at its zero value is indistinguishable from
+	// one the caller didn't intend to touch — to set one side explicitly
+	// (including to zero, overriding a style's own value on just that side)
+	// without affecting the others, use SetIndentLeft/Right/FirstLine/Hanging.
 	SetIndent(indent Indentation) error
+
+	// SetIndentLeft sets only the left indentation, leaving the other three
+	// sides untouched — unlike SetIndent, an explicit 0 here is distinguishable
+	// from a side that was never set.
+	SetIndentLeft(twips int) error
+
+	// SetIndentRight is SetIndentLeft's counterpart for the right side.
+	SetIndentRight(twips int) error
+
+	// SetIndentFirstLine is SetIndentLeft's counterpart for the first-line
+	// indent. It does not clear an existing hanging indent; SetIndent's
+	// mutual-exclusivity check does not apply here, so a caller using both
+	// this and SetIndentHanging is responsible for not setting both.
+	SetIndentFirstLine(twips int) error
+
+	// SetIndentHanging is SetIndentLeft's counterpart for the hanging indent.
+	SetIndentHanging(twips int) error
 
 	// SpacingBefore returns spacing before the paragraph (in twips).
 	SpacingBefore() int

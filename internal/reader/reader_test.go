@@ -7,11 +7,13 @@
 package reader
 
 import (
+	"archive/zip"
 	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -20,6 +22,34 @@ import (
 	"github.com/mmonterroca/docxgo/v2/internal/core"
 	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
+
+// documentXML unzips a .docx buffer and returns the raw word/document.xml
+// bytes, so tests can assert on what was actually serialized rather than on
+// in-memory accessor values that can diverge from it.
+func documentXML(t *testing.T, docxBytes []byte) string {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
+	if err != nil {
+		t.Fatalf("zip.NewReader: %v", err)
+	}
+	for _, f := range zr.File {
+		if f.Name != "word/document.xml" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("open word/document.xml: %v", err)
+		}
+		defer rc.Close()
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatalf("read word/document.xml: %v", err)
+		}
+		return string(data)
+	}
+	t.Fatalf("word/document.xml not found in package")
+	return ""
+}
 
 func TestLoadPackageFromBytes(t *testing.T) {
 	doc := core.NewDocument()
@@ -893,5 +923,153 @@ func TestReconstructDocumentTable(t *testing.T) {
 		if got := paras[0].Text(); got != expected {
 			t.Fatalf("unexpected text in cell %d: %q", idx, got)
 		}
+	}
+}
+
+// indElementXML returns the self-closing <w:ind .../> tag from a
+// word/document.xml string. Page margins (<w:pgMar>) also carry
+// left/right/header/footer attributes, so callers must not grep the whole
+// document for these attribute names — only this element's own text.
+func indElementXML(t *testing.T, docXML string) string {
+	t.Helper()
+	idx := strings.Index(docXML, "<w:ind ")
+	if idx == -1 {
+		t.Fatalf("no <w:ind> element found in document.xml: %s", docXML)
+	}
+	end := strings.Index(docXML[idx:], ">")
+	if end == -1 {
+		t.Fatalf("malformed <w:ind> element in document.xml")
+	}
+	return docXML[idx : idx+end+1]
+}
+
+// TestApplyParagraphIndentation_ExplicitZeroSideSurvivesRoundTrip pins the
+// defect #76 describes: a source <w:ind> that explicitly names a side (even
+// with value 0, e.g. to override an inherited style) must come back out with
+// that side explicit, not silently dropped because 0 looks the same as
+// "never set". Before the per-side setters, applyParagraphIndentation read
+// the attribute into a merged domain.Indentation and called SetIndent once,
+// which cannot distinguish "right was 0 in the source" from "right was never
+// mentioned" — both look like the zero value and only the explicit-set path
+// added here tells them apart on serialization.
+func TestApplyParagraphIndentation_ExplicitZeroSideSurvivesRoundTrip(t *testing.T) {
+	doc := core.NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("indent sample"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	props, err := parseXMLTree([]byte(
+		`<w:pPr xmlns:w="` + constants.NamespaceMain + `"><w:ind w:left="720" w:right="0"/></w:pPr>`,
+	))
+	if err != nil {
+		t.Fatalf("parseXMLTree: %v", err)
+	}
+	if err := applyParagraphIndentation(para, props); err != nil {
+		t.Fatalf("applyParagraphIndentation: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	indXML := indElementXML(t, documentXML(t, buf.Bytes()))
+	if !strings.Contains(indXML, `w:left="720"`) {
+		t.Fatalf("expected explicit left=720, got %s", indXML)
+	}
+	if !strings.Contains(indXML, `w:right="0"`) {
+		t.Fatalf("expected explicit right=0 to survive round-trip, got %s", indXML)
+	}
+}
+
+// TestApplyParagraphIndentation_OmittedSidesStayOmitted is the mirror guard:
+// a source <w:ind> that names only "left" must not cause the other three
+// sides to be written as explicit zero, which would clobber a style's own
+// non-zero indentation on a side this element never touched.
+func TestApplyParagraphIndentation_OmittedSidesStayOmitted(t *testing.T) {
+	doc := core.NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("indent sample"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	props, err := parseXMLTree([]byte(
+		`<w:pPr xmlns:w="` + constants.NamespaceMain + `"><w:ind w:left="720"/></w:pPr>`,
+	))
+	if err != nil {
+		t.Fatalf("parseXMLTree: %v", err)
+	}
+	if err := applyParagraphIndentation(para, props); err != nil {
+		t.Fatalf("applyParagraphIndentation: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	indXML := indElementXML(t, documentXML(t, buf.Bytes()))
+	if !strings.Contains(indXML, `w:left="720"`) {
+		t.Fatalf("expected explicit left=720, got %s", indXML)
+	}
+	for _, attr := range []string{"w:right=", "w:firstLine=", "w:hanging="} {
+		if strings.Contains(indXML, attr) {
+			t.Fatalf("expected %s to stay omitted, got %s", attr, indXML)
+		}
+	}
+}
+
+// TestApplyParagraphIndentation_AllowsFirstLineAndHangingBothPresent pins a
+// deliberate, previously-untested behavior change: SetIndent rejects a
+// struct with both FirstLine and Hanging set (they are mutually exclusive in
+// Word's model), so a source <w:ind> naming both used to fail the whole
+// document load. The per-side setters apply independently and carry no such
+// cross-field check, so a document reader is now more tolerant of documents
+// where both attributes are present in the source XML.
+func TestApplyParagraphIndentation_AllowsFirstLineAndHangingBothPresent(t *testing.T) {
+	doc := core.NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("indent sample"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	props, err := parseXMLTree([]byte(
+		`<w:pPr xmlns:w="` + constants.NamespaceMain + `"><w:ind w:firstLine="360" w:hanging="720"/></w:pPr>`,
+	))
+	if err != nil {
+		t.Fatalf("parseXMLTree: %v", err)
+	}
+	if err := applyParagraphIndentation(para, props); err != nil {
+		t.Fatalf("applyParagraphIndentation: %v, expected both attributes to apply independently", err)
+	}
+
+	indent := para.Indent()
+	if indent.FirstLine != 360 {
+		t.Fatalf("expected FirstLine=360, got %d", indent.FirstLine)
+	}
+	if indent.Hanging != 720 {
+		t.Fatalf("expected Hanging=720, got %d", indent.Hanging)
 	}
 }

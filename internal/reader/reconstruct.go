@@ -331,22 +331,28 @@ func applyParagraphAlignment(para domain.Paragraph, props *Element) error {
 	return nil
 }
 
+// applyParagraphIndentation applies each attribute present in a source
+// <w:ind> element via its own SetIndentLeft/Right/FirstLine/Hanging call,
+// one per attribute actually present. A single merged SetIndent call would
+// mark all four sides as explicitly set (see SetIndent's doc comment) even
+// for the three this element never mentioned, and on re-serialization that
+// would emit e.g. right="0" for a paragraph whose source <w:ind> only ever
+// specified left, clobbering a style's own right indentation on a side this
+// element never touched.
 func applyParagraphIndentation(para domain.Paragraph, props *Element) error {
 	ind := findChild(props, "ind")
 	if ind == nil {
 		return nil
 	}
 
-	current := para.Indent()
-	changed := false
-
 	if val, ok := getAttr(ind, "left"); ok && val != "" {
 		twips, err := strconv.Atoi(val)
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphIndent, map[string]interface{}{"attr": "left", "value": val})
 		}
-		current.Left = twips
-		changed = true
+		if err := para.SetIndentLeft(twips); err != nil {
+			return errors.Wrap(err, opApplyParagraphIndent)
+		}
 	}
 
 	if val, ok := getAttr(ind, "right"); ok && val != "" {
@@ -354,8 +360,9 @@ func applyParagraphIndentation(para domain.Paragraph, props *Element) error {
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphIndent, map[string]interface{}{"attr": "right", "value": val})
 		}
-		current.Right = twips
-		changed = true
+		if err := para.SetIndentRight(twips); err != nil {
+			return errors.Wrap(err, opApplyParagraphIndent)
+		}
 	}
 
 	if val, ok := getAttr(ind, "firstLine"); ok && val != "" {
@@ -363,8 +370,9 @@ func applyParagraphIndentation(para domain.Paragraph, props *Element) error {
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphIndent, map[string]interface{}{"attr": "firstLine", "value": val})
 		}
-		current.FirstLine = twips
-		changed = true
+		if err := para.SetIndentFirstLine(twips); err != nil {
+			return errors.Wrap(err, opApplyParagraphIndent)
+		}
 	}
 
 	if val, ok := getAttr(ind, "hanging"); ok && val != "" {
@@ -372,12 +380,7 @@ func applyParagraphIndentation(para domain.Paragraph, props *Element) error {
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphIndent, map[string]interface{}{"attr": "hanging", "value": val})
 		}
-		current.Hanging = twips
-		changed = true
-	}
-
-	if changed {
-		if err := para.SetIndent(current); err != nil {
+		if err := para.SetIndentHanging(twips); err != nil {
 			return errors.Wrap(err, opApplyParagraphIndent)
 		}
 	}

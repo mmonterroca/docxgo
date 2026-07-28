@@ -1022,6 +1022,43 @@ func TestHandleTableSetCell_ShrinksParagraphCount(t *testing.T) {
 	}
 }
 
+// TestHandleParagraphAdd_IndentSideCanBeSetExplicitlyToZero covers the CLI
+// side of #76: indentDef fields used to be plain ints, so an explicit
+// "right": 0 from a JSON caller was indistinguishable from omitting "right"
+// altogether -- both produced Left/Right/FirstLine/Hanging{0,0,0,0} fed to
+// a single SetIndent call, and the serializer dropped the zero side rather
+// than emitting it. Pointer fields let the handler call SetIndentRight only
+// when the caller actually sent "right", preserving the explicit zero.
+func TestHandleParagraphAdd_IndentSideCanBeSetExplicitlyToZero(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.add", map[string]interface{}{
+		"documentId": docID,
+		"text":       "indented",
+		"indent":     map[string]interface{}{"left": 720, "right": 0},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("paragraph.add failed: %+v", resp.Error)
+	}
+
+	xml := string(documentSavedXML(t, s, docID))
+	idx := strings.Index(xml, "<w:ind ")
+	if idx == -1 {
+		t.Fatalf("no <w:ind> element found in saved document.xml: %s", xml)
+	}
+	end := strings.Index(xml[idx:], ">")
+	if end == -1 {
+		t.Fatalf("malformed <w:ind> element")
+	}
+	indTag := xml[idx : idx+end+1]
+	if !strings.Contains(indTag, `w:left="720"`) {
+		t.Errorf("expected explicit left=720, got %s", indTag)
+	}
+	if !strings.Contains(indTag, `w:right="0"`) {
+		t.Errorf("expected explicit right=0 to survive, got %s", indTag)
+	}
+}
+
 func TestHandleTableSetCell_TextAndParagraphsConflict(t *testing.T) {
 	s, docID := newEditTestDoc(t)
 
