@@ -649,7 +649,12 @@ Applies a sequence of patch operations to an existing document sequentially. **T
 
 Replaces every occurrence of a literal string with another, across body paragraphs, table cells, headers, and footers.
 
-Matching is case-sensitive. Text fragmented across runs with identical formatting is matched as if it were one run; a match spanning runs with *different* formatting is still replaced, taking the formatting of the first run it touches — which flattens that formatting. For example, replacing `": PENDING ("` with `": DONE ("` in `"Status: **PENDING** (review)"` produces `"Status: DONE (review)"` with the bold lost, because the match spans the plain/bold boundary. A match that touches a run containing a field (page number, TOC, MERGEFIELD, hyperlink), a break, or an image is left untouched and counted in `skipped` instead — rewriting that run's text would corrupt or silently discard the non-text content.
+Matching is case-sensitive. Text fragmented across runs with identical formatting is matched as if it were one run; a match spanning runs with *different* formatting is still replaced, taking the formatting of the first run it touches — which flattens that formatting. For example, replacing `": PENDING ("` with `": DONE ("` in `"Status: **PENDING** (review)"` produces `"Status: DONE (review)"` with the bold lost, because the match spans the plain/bold boundary.
+
+Some matches are reported in `skipped` instead of being replaced:
+
+- A match touching a run that carries a **field** (page number, TOC, MERGEFIELD, hyperlink) is always skipped. Word regenerates a field's displayed text when it opens the document, so replacing it would report a change that never appears.
+- A match spanning **several** runs is also skipped when any of them carries a line/page break or an image, because collapsing those runs would leave that content stranded in the middle of the replacement. A match that fits inside a *single* run carrying a break or image is replaced normally, and the break or image is preserved.
 
 This does not reach into tables nested inside other tables, or into tables placed inside a header or footer — the same traversal limits as `template.render`/`template.inspect`, which share the underlying paragraph walk.
 

@@ -18,8 +18,8 @@ type ReplaceResult struct {
 	// Replaced is the number of occurrences that were replaced.
 	Replaced int
 	// Skipped is the number of occurrences that were found but left
-	// untouched because the match spans a run with non-text content
-	// (fields, breaks, or images).
+	// untouched because replacing them would not survive serialization.
+	// See ReplaceText for exactly which run contents cause a skip.
 	Skipped int
 }
 
@@ -31,8 +31,15 @@ type ReplaceResult struct {
 // consolidated (see ConsolidateRuns), so text fragmented across runs with
 // identical formatting is matched. A match that spans runs with different
 // formatting is replaced too: the replacement takes the formatting of the
-// first spanned run. Matches that span a run containing fields, breaks, or
-// images are skipped and counted in ReplaceResult.Skipped.
+// first spanned run.
+//
+// A match touching a run that carries a field is always skipped and counted
+// in ReplaceResult.Skipped — such a run's text is never serialized, so
+// rewriting it would report a replacement Word does not make. A match
+// spanning several runs is likewise skipped when any of them carries a break
+// or an image, since blanking a spanned run would strand that content in the
+// middle of the replacement. A match confined to a single run carrying a
+// break or an image is replaced, and the break or image is preserved.
 func ReplaceText(doc domain.Document, find, replace string) (ReplaceResult, error) {
 	if find == "" {
 		return ReplaceResult{}, fmt.Errorf("template: find text must not be empty")
@@ -116,11 +123,8 @@ func paragraphSpans(para domain.Paragraph) ([]runSpan, string) {
 }
 
 // replaceSpan writes replace over the byte range [start, end) of the
-// paragraph text. A match is replaceable only if every run it spans —
-// whether that's one run or several — is text-only; a match touching a run
-// with a field, break, or image is skipped, since rewriting that run's text
-// would corrupt or silently discard the non-text content. Returns false
-// (and no error) when the match must be skipped.
+// paragraph text, subject to the run-content rules documented on
+// ReplaceText. Returns false (and no error) when the match must be skipped.
 func replaceSpan(spans []runSpan, start, end int, replace string) (bool, error) {
 	var spanned []runSpan
 	for _, s := range spans {
@@ -133,9 +137,28 @@ func replaceSpan(spans []runSpan, start, end int, replace string) (bool, error) 
 		return false, nil
 	}
 
+	// A field-bearing run's text is never serialized: the paragraph
+	// serializer routes it through expandRunWithFields, which emits the
+	// field's own result instead. Rewriting that run's text would report a
+	// replacement Word never makes, so skip the match however few runs it
+	// spans.
 	for _, s := range spanned {
-		if !isTextOnly(s.run) {
+		if len(s.run.Fields()) > 0 {
 			return false, nil
+		}
+	}
+
+	// Breaks and images are the opposite case: a run carrying one still has
+	// its text serialized normally, and SetText leaves the break or image
+	// alone, so a match confined to that single run is safely replaceable.
+	// Across several runs it is not — blanking a spanned middle run's text
+	// would strand its break or image in the middle of the replacement — so
+	// only the multi-run path applies the stricter test.
+	if len(spanned) > 1 {
+		for _, s := range spanned {
+			if !isTextOnly(s.run) {
+				return false, nil
+			}
 		}
 	}
 

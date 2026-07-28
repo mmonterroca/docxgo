@@ -285,6 +285,37 @@ func TestReplaceText_SkipsFieldInSingleRun(t *testing.T) {
 	}
 }
 
+// TestReplaceText_ReplacesInSingleRunCarryingABreak pins the other half of
+// the run-content rule. Unlike a field, a break's run still has its text
+// serialized normally, and SetText leaves the break itself alone — so a
+// match confined to that one run is replaceable, and skipping it would lose
+// a legitimate replacement rather than prevent a bad one.
+func TestReplaceText_ReplacesInSingleRunCarryingABreak(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	r, _ := para.AddRun()
+	if err := r.SetText("Line one and TODO"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+	if err := r.AddBreak(domain.BreakTypeLine); err != nil {
+		t.Fatalf("AddBreak: %v", err)
+	}
+
+	result, err := ReplaceText(doc, "TODO", "done")
+	if err != nil {
+		t.Fatalf("ReplaceText: %v", err)
+	}
+	if result.Replaced != 1 || result.Skipped != 0 {
+		t.Errorf("result = %+v, want 1 replaced / 0 skipped", result)
+	}
+	if got := para.Text(); got != "Line one and done" {
+		t.Errorf("paragraph text = %q", got)
+	}
+	if len(r.Breaks()) != 1 {
+		t.Errorf("break count = %d, want 1 (preserved)", len(r.Breaks()))
+	}
+}
+
 // TestReplaceText_DeletionMatchesStdlibSemantics fixes the deletion
 // semantics as intentional, matching strings.ReplaceAll's non-overlapping
 // left-to-right scan: a match created by an earlier deletion, starting
