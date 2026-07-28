@@ -60,6 +60,13 @@ type runSpan struct {
 // scan resumes just past the inserted replacement, so a replacement that
 // itself contains find is never re-matched.
 func replaceInParagraph(para domain.Paragraph, find, replace string) (replaced, skipped int, err error) {
+	// Consolidation never changes a paragraph's concatenated text, only run
+	// boundaries — so a paragraph with no match anywhere must be left
+	// untouched rather than restructured as a side effect of searching it.
+	if _, full := paragraphSpans(para); !strings.Contains(full, find) {
+		return 0, 0, nil
+	}
+
 	if err := ConsolidateRuns(para); err != nil {
 		return 0, 0, err
 	}
