@@ -109,6 +109,8 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleAddPageBreak(req)
 	case "document.applyPatch":
 		return s.handleApplyPatch(req)
+	case "document.replaceText":
+		return s.handleReplaceText(req)
 	case "document.close":
 		return s.handleClose(req)
 	// paragraph.*
@@ -116,11 +118,17 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleParagraphAdd(req)
 	case "paragraph.list":
 		return s.handleParagraphList(req)
+	case "paragraph.setText":
+		return s.handleParagraphSetText(req)
 	// table.*
 	case "table.add":
 		return s.handleTableAdd(req)
 	case "table.list":
 		return s.handleTableList(req)
+	case "table.getCell":
+		return s.handleTableGetCell(req)
+	case "table.setCell":
+		return s.handleTableSetCell(req)
 	// section.*
 	case "section.add":
 		return s.handleSectionAdd(req)
@@ -283,12 +291,50 @@ type tableAddParams struct {
 // tableListParams are the parameters for table.list.
 type tableListParams struct {
 	DocumentID string `json:"documentId"`
+	// IncludeText adds each table's cell texts to the listing, row by row.
+	// Rows report their actual cells, so ragged tables (merged cells) are
+	// represented faithfully rather than padded to columnCount.
+	IncludeText bool `json:"includeText,omitempty"`
 }
 
 // sectionAddParams are the parameters for section.add.
 type sectionAddParams struct {
 	DocumentID string `json:"documentId"`
 	sectionItem
+}
+
+// replaceTextParams are the parameters for document.replaceText.
+type replaceTextParams struct {
+	DocumentID string `json:"documentId"`
+	Find       string `json:"find"`
+	Replace    string `json:"replace"`
+}
+
+// paragraphSetTextParams are the parameters for paragraph.setText. Index is
+// the body-paragraph index as reported by paragraph.list; the embedded
+// paragraphItem carries the new content (text or runs) and any style fields
+// to apply.
+type paragraphSetTextParams struct {
+	DocumentID string `json:"documentId"`
+	Index      int    `json:"index"`
+	paragraphItem
+}
+
+// tableCellRef addresses a single cell, shared by table.getCell and
+// table.setCell. Indices follow table.list ordering.
+type tableCellRef struct {
+	DocumentID  string `json:"documentId"`
+	TableIndex  int    `json:"tableIndex"`
+	RowIndex    int    `json:"rowIndex"`
+	ColumnIndex int    `json:"columnIndex"`
+}
+
+// tableSetCellParams are the parameters for table.setCell. Text is a shortcut
+// for a single plain paragraph; Paragraphs carries rich content items.
+type tableSetCellParams struct {
+	tableCellRef
+	Text       string            `json:"text,omitempty"`
+	Paragraphs []json.RawMessage `json:"paragraphs,omitempty"`
 }
 
 // applyPatchParams are the parameters for document.applyPatch.
@@ -903,16 +949,214 @@ func (s *server) handleTableList(req *Request) Response {
 	tables := doc.Tables()
 	items := make([]map[string]interface{}, 0, len(tables))
 	for i, t := range tables {
-		items = append(items, map[string]interface{}{
+		item := map[string]interface{}{
 			"index":   i,
 			"rows":    t.RowCount(),
 			"columns": t.ColumnCount(),
-		})
+		}
+		if params.IncludeText {
+			rows := t.Rows()
+			cellRows := make([][]string, 0, len(rows))
+			for _, row := range rows {
+				cells := row.Cells()
+				texts := make([]string, 0, len(cells))
+				for _, cell := range cells {
+					paragraphs := cell.Paragraphs()
+					pTexts := make([]string, 0, len(paragraphs))
+					for _, p := range paragraphs {
+						pTexts = append(pTexts, p.Text())
+					}
+					texts = append(texts, strings.Join(pTexts, "\n"))
+				}
+				cellRows = append(cellRows, texts)
+			}
+			item["cells"] = cellRows
+		}
+		items = append(items, item)
 	}
 
 	return Response{ID: req.ID, Result: map[string]interface{}{
 		"tables": items,
 		"count":  len(items),
+	}}
+}
+
+func (s *server) handleReplaceText(req *Request) Response {
+	const op = "document.replaceText"
+
+	var params replaceTextParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if params.Find == "" {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "find is required and must not be empty", op)
+	}
+
+	result, err := template.ReplaceText(doc, params.Find, params.Replace)
+	if err != nil {
+		return errorResponse(req.ID, errors.ErrCodeInternal, "replace failed: "+err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"replaced": result.Replaced,
+		"skipped":  result.Skipped,
+	}}
+}
+
+func (s *server) handleParagraphSetText(req *Request) Response {
+	const op = "paragraph.setText"
+
+	var params paragraphSetTextParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	paragraphs := doc.Paragraphs()
+	if params.Index < 0 || params.Index >= len(paragraphs) {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			fmt.Sprintf("paragraph index %d out of range (document has %d paragraphs)",
+				params.Index, len(paragraphs)), op)
+	}
+
+	para := paragraphs[params.Index]
+	para.ClearRuns()
+	if err := applyParagraph(para, params.paragraphItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":    true,
+		"index": params.Index,
+	}}
+}
+
+// resolveCell resolves a tableCellRef to a cell, with range-checked indices.
+func resolveCell(doc domain.Document, ref tableCellRef) (domain.TableCell, error) {
+	tables := doc.Tables()
+	if ref.TableIndex < 0 || ref.TableIndex >= len(tables) {
+		return nil, fmt.Errorf("table index %d out of range (document has %d tables)",
+			ref.TableIndex, len(tables))
+	}
+	row, err := tables[ref.TableIndex].Row(ref.RowIndex)
+	if err != nil {
+		return nil, fmt.Errorf("row %d: %w", ref.RowIndex, err)
+	}
+	cell, err := row.Cell(ref.ColumnIndex)
+	if err != nil {
+		return nil, fmt.Errorf("column %d: %w", ref.ColumnIndex, err)
+	}
+	return cell, nil
+}
+
+func (s *server) handleTableGetCell(req *Request) Response {
+	const op = "table.getCell"
+
+	var params tableCellRef
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	cell, err := resolveCell(doc, params)
+	if err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	paragraphs := cell.Paragraphs()
+	texts := make([]string, 0, len(paragraphs))
+	for _, p := range paragraphs {
+		texts = append(texts, p.Text())
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"text":           strings.Join(texts, "\n"),
+		"paragraphs":     texts,
+		"paragraphCount": len(paragraphs),
+	}}
+}
+
+func (s *server) handleTableSetCell(req *Request) Response {
+	const op = "table.setCell"
+
+	var params tableSetCellParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if params.Text != "" && len(params.Paragraphs) > 0 {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			"provide either text or paragraphs, not both", op)
+	}
+
+	cell, err := resolveCell(doc, params.tableCellRef)
+	if err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	items := params.Paragraphs
+	if params.Text != "" {
+		item, err := json.Marshal(paragraphItem{Text: params.Text})
+		if err != nil {
+			return errorResponse(req.ID, errors.ErrCodeInternal, "encoding text item: "+err.Error(), op)
+		}
+		items = []json.RawMessage{item}
+	}
+
+	// Replace the cell's content: clear every existing paragraph, then write
+	// the new items into existing paragraphs (reusing their slots) and append
+	// paragraphs for any overflow. Cells cannot drop paragraphs, so leftover
+	// paragraphs beyond the new content stay as empty paragraphs.
+	existing := cell.Paragraphs()
+	for _, p := range existing {
+		p.ClearRuns()
+	}
+	for i, raw := range items {
+		var pItem paragraphItem
+		if err := json.Unmarshal(raw, &pItem); err != nil {
+			return errorResponse(req.ID, errors.ErrCodeValidation,
+				fmt.Sprintf("invalid paragraph at index %d: %v", i, err), op)
+		}
+		var para domain.Paragraph
+		if i < len(existing) {
+			para = existing[i]
+		} else {
+			para, err = cell.AddParagraph()
+			if err != nil {
+				return errorResponse(req.ID, errors.ErrCodeInternal, "failed to add paragraph: "+err.Error(), op)
+			}
+		}
+		if err := applyParagraph(para, pItem); err != nil {
+			return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+		}
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":             true,
+		"paragraphCount": len(cell.Paragraphs()),
 	}}
 }
 

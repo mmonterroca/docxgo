@@ -709,6 +709,357 @@ func TestIntegration_CreateOpenInspectSave(t *testing.T) {
 	}
 }
 
+// ─── Edit handler tests ───────────────────────────────────────────────────────
+
+// newEditTestDoc creates an in-memory document with one paragraph and a 2x2
+// question/answer table, returning the server and documentId.
+func newEditTestDoc(t *testing.T) (*server, string) {
+	t.Helper()
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{
+					map[string]interface{}{"text": "Vendor: ACME Corp"},
+				},
+			},
+			map[string]interface{}{
+				"type": "table",
+				"rows": []interface{}{
+					map[string]interface{}{"cells": []interface{}{
+						map[string]interface{}{"paragraphs": []interface{}{
+							map[string]interface{}{"runs": []interface{}{map[string]interface{}{"text": "Question", "bold": true}}},
+						}},
+						map[string]interface{}{"paragraphs": []interface{}{
+							map[string]interface{}{"runs": []interface{}{map[string]interface{}{"text": "Answer", "bold": true}}},
+						}},
+					}},
+					map[string]interface{}{"cells": []interface{}{
+						map[string]interface{}{"paragraphs": []interface{}{
+							map[string]interface{}{"runs": []interface{}{map[string]interface{}{"text": "Do you encrypt data at rest?"}}},
+						}},
+						map[string]interface{}{"paragraphs": []interface{}{
+							map[string]interface{}{"runs": []interface{}{map[string]interface{}{"text": "TBD"}}},
+						}},
+					}},
+				},
+			},
+		},
+		"output": "buffer",
+	}))
+	if resp.Error != nil {
+		t.Fatalf("create failed: %+v", resp.Error)
+	}
+	docID := resp.Result.(map[string]interface{})["documentId"].(string)
+	return s, docID
+}
+
+func TestHandleReplaceText(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "document.replaceText", map[string]interface{}{
+		"documentId": docID,
+		"find":       "ACME Corp",
+		"replace":    "Reindeer AI",
+	}))
+	if resp.Error != nil {
+		t.Fatalf("replaceText failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["replaced"] != 1 {
+		t.Errorf("replaced = %v, want 1", result["replaced"])
+	}
+
+	listResp := s.dispatch(makeRequest(3, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	paras := listResp.Result.(map[string]interface{})["paragraphs"].([]map[string]interface{})
+	if paras[0]["text"] != "Vendor: Reindeer AI" {
+		t.Errorf("paragraph text = %q", paras[0]["text"])
+	}
+}
+
+func TestHandleReplaceText_ReachesTableCells(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "document.replaceText", map[string]interface{}{
+		"documentId": docID,
+		"find":       "TBD",
+		"replace":    "Yes, AES-256",
+	}))
+	if resp.Error != nil {
+		t.Fatalf("replaceText failed: %+v", resp.Error)
+	}
+	if got := resp.Result.(map[string]interface{})["replaced"]; got != 1 {
+		t.Errorf("replaced = %v, want 1", got)
+	}
+
+	cellResp := s.dispatch(makeRequest(3, "table.getCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+	}))
+	if cellResp.Error != nil {
+		t.Fatalf("getCell failed: %+v", cellResp.Error)
+	}
+	if got := cellResp.Result.(map[string]interface{})["text"]; got != "Yes, AES-256" {
+		t.Errorf("cell text = %q", got)
+	}
+}
+
+func TestHandleReplaceText_Validation(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "document.replaceText", map[string]interface{}{
+		"documentId": docID, "find": "", "replace": "x",
+	}))
+	if resp.Error == nil {
+		t.Error("expected error for empty find")
+	}
+
+	resp = s.dispatch(makeRequest(3, "document.replaceText", map[string]interface{}{
+		"documentId": "doc-999", "find": "a", "replace": "b",
+	}))
+	if resp.Error == nil || resp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND for unknown doc, got %+v", resp.Error)
+	}
+}
+
+func TestHandleParagraphSetText(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.setText", map[string]interface{}{
+		"documentId": docID,
+		"index":      0,
+		"runs": []interface{}{
+			map[string]interface{}{"text": "Completed by ", "italic": true},
+			map[string]interface{}{"text": "Reindeer", "bold": true},
+		},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("setText failed: %+v", resp.Error)
+	}
+
+	listResp := s.dispatch(makeRequest(3, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	paras := listResp.Result.(map[string]interface{})["paragraphs"].([]map[string]interface{})
+	if paras[0]["text"] != "Completed by Reindeer" {
+		t.Errorf("paragraph text = %q", paras[0]["text"])
+	}
+}
+
+func TestHandleParagraphSetText_IndexOutOfRange(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.setText", map[string]interface{}{
+		"documentId": docID, "index": 99, "text": "x",
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+}
+
+func TestHandleTableGetCell(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.getCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 0,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("getCell failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["text"] != "Do you encrypt data at rest?" {
+		t.Errorf("cell text = %q", result["text"])
+	}
+	if result["paragraphCount"] != 1 {
+		t.Errorf("paragraphCount = %v, want 1", result["paragraphCount"])
+	}
+
+	resp = s.dispatch(makeRequest(3, "table.getCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 5, "rowIndex": 0, "columnIndex": 0,
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR for bad table index, got %+v", resp.Error)
+	}
+}
+
+func TestHandleTableList_IncludeText(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.list", map[string]interface{}{
+		"documentId": docID, "includeText": true,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("table.list failed: %+v", resp.Error)
+	}
+	tables := resp.Result.(map[string]interface{})["tables"].([]map[string]interface{})
+	if len(tables) != 1 {
+		t.Fatalf("table count = %d, want 1", len(tables))
+	}
+	cells, ok := tables[0]["cells"].([][]string)
+	if !ok {
+		t.Fatalf("cells missing or wrong type: %T", tables[0]["cells"])
+	}
+	if len(cells) != 2 || len(cells[0]) != 2 {
+		t.Fatalf("cells shape = %v", cells)
+	}
+	if cells[1][0] != "Do you encrypt data at rest?" || cells[1][1] != "TBD" {
+		t.Errorf("row 1 = %v", cells[1])
+	}
+
+	// Without the flag, cells must be absent.
+	resp = s.dispatch(makeRequest(3, "table.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	tables = resp.Result.(map[string]interface{})["tables"].([]map[string]interface{})
+	if _, present := tables[0]["cells"]; present {
+		t.Error("cells should be absent without includeText")
+	}
+}
+
+func TestHandleTableSetCell_TextShortcut(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"text": "Yes — AES-256 at rest, TLS 1.3 in transit.",
+	}))
+	if resp.Error != nil {
+		t.Fatalf("setCell failed: %+v", resp.Error)
+	}
+
+	cellResp := s.dispatch(makeRequest(3, "table.getCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+	}))
+	if got := cellResp.Result.(map[string]interface{})["text"]; got != "Yes — AES-256 at rest, TLS 1.3 in transit." {
+		t.Errorf("cell text = %q", got)
+	}
+}
+
+func TestHandleTableSetCell_RichParagraphs(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"paragraphs": []interface{}{
+			map[string]interface{}{"runs": []interface{}{map[string]interface{}{"text": "Yes.", "bold": true}}},
+			map[string]interface{}{"runs": []interface{}{map[string]interface{}{"text": "See SOC 2 report, section 4."}}},
+		},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("setCell failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["paragraphCount"] != 2 {
+		t.Errorf("paragraphCount = %v, want 2", result["paragraphCount"])
+	}
+
+	cellResp := s.dispatch(makeRequest(3, "table.getCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+	}))
+	if got := cellResp.Result.(map[string]interface{})["text"]; got != "Yes.\nSee SOC 2 report, section 4." {
+		t.Errorf("cell text = %q", got)
+	}
+}
+
+func TestHandleTableSetCell_TextAndParagraphsConflict(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 0, "columnIndex": 0,
+		"text":       "x",
+		"paragraphs": []interface{}{map[string]interface{}{"text": "y"}},
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+}
+
+// TestIntegration_EditRoundTrip exercises the questionnaire flow: open a saved
+// document, replace text, fill an answer cell, rewrite a paragraph, save, then
+// reopen and verify all edits survived serialization.
+func TestIntegration_EditRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	docPath := dir + "/questionnaire.docx"
+	editedPath := dir + "/questionnaire-filled.docx"
+
+	s, docID := newEditTestDoc(t)
+	saveResp := s.dispatch(makeRequest(2, "document.save", map[string]interface{}{
+		"documentId": docID, "output": "file", "filePath": docPath,
+	}))
+	if saveResp.Error != nil {
+		t.Fatalf("save failed: %+v", saveResp.Error)
+	}
+
+	openResp := s.dispatch(makeRequest(3, "document.open", map[string]interface{}{
+		"filePath": docPath,
+	}))
+	if openResp.Error != nil {
+		t.Fatalf("open failed: %+v", openResp.Error)
+	}
+	openedID := openResp.Result.(map[string]interface{})["documentId"].(string)
+
+	for i, req := range []map[string]interface{}{
+		{"documentId": openedID, "find": "ACME Corp", "replace": "Reindeer AI"},
+	} {
+		resp := s.dispatch(makeRequest(10+i, "document.replaceText", req))
+		if resp.Error != nil {
+			t.Fatalf("replaceText failed: %+v", resp.Error)
+		}
+		if got := resp.Result.(map[string]interface{})["replaced"]; got != 1 {
+			t.Fatalf("replaced = %v, want 1", got)
+		}
+	}
+	setCellResp := s.dispatch(makeRequest(20, "table.setCell", map[string]interface{}{
+		"documentId": openedID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"text": "Yes — AES-256.",
+	}))
+	if setCellResp.Error != nil {
+		t.Fatalf("setCell failed: %+v", setCellResp.Error)
+	}
+	setParaResp := s.dispatch(makeRequest(21, "paragraph.setText", map[string]interface{}{
+		"documentId": openedID, "index": 0, "text": "Vendor: Reindeer AI (reviewed)",
+	}))
+	if setParaResp.Error != nil {
+		t.Fatalf("paragraph.setText failed: %+v", setParaResp.Error)
+	}
+
+	saveResp = s.dispatch(makeRequest(22, "document.save", map[string]interface{}{
+		"documentId": openedID, "output": "file", "filePath": editedPath,
+	}))
+	if saveResp.Error != nil {
+		t.Fatalf("save edited failed: %+v", saveResp.Error)
+	}
+
+	// Reopen and verify the edits survived the round trip.
+	reopenResp := s.dispatch(makeRequest(23, "document.open", map[string]interface{}{
+		"filePath": editedPath,
+	}))
+	if reopenResp.Error != nil {
+		t.Fatalf("reopen failed: %+v", reopenResp.Error)
+	}
+	reopenedID := reopenResp.Result.(map[string]interface{})["documentId"].(string)
+
+	listResp := s.dispatch(makeRequest(24, "paragraph.list", map[string]interface{}{
+		"documentId": reopenedID,
+	}))
+	paras := listResp.Result.(map[string]interface{})["paragraphs"].([]map[string]interface{})
+	if paras[0]["text"] != "Vendor: Reindeer AI (reviewed)" {
+		t.Errorf("reopened paragraph text = %q", paras[0]["text"])
+	}
+
+	cellResp := s.dispatch(makeRequest(25, "table.getCell", map[string]interface{}{
+		"documentId": reopenedID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+	}))
+	if cellResp.Error != nil {
+		t.Fatalf("getCell after reopen failed: %+v", cellResp.Error)
+	}
+	if got := cellResp.Result.(map[string]interface{})["text"]; got != "Yes — AES-256." {
+		t.Errorf("reopened cell text = %q", got)
+	}
+}
+
 // ─── runExec tests ────────────────────────────────────────────────────────────
 
 func TestRunExec_WithRequestFlag(t *testing.T) {

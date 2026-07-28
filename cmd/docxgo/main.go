@@ -87,6 +87,8 @@ func capabilitiesMap() map[string]bool {
 		"batch":         true,
 		"applyPatch":    true,
 		"setLanguage":   true,
+		"replaceText":   true,
+		"cellEdit":      true,
 		"streaming":     false,
 		"partialUpdate": false,
 	}
