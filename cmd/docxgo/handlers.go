@@ -517,12 +517,15 @@ type lineSpacingDef struct {
 	Value int    `json:"value,omitempty"` // in twips
 }
 
-// indentDef defines paragraph indentation.
+// indentDef defines paragraph indentation. Each field is a pointer so a
+// caller can set one side explicitly (including to 0, overriding a style's
+// own value on just that side) without touching the other three — see
+// domain.Paragraph.SetIndentLeft/Right/FirstLine/Hanging.
 type indentDef struct {
-	Left      int `json:"left,omitempty"`
-	Right     int `json:"right,omitempty"`
-	FirstLine int `json:"firstLine,omitempty"`
-	Hanging   int `json:"hanging,omitempty"`
+	Left      *int `json:"left,omitempty"`
+	Right     *int `json:"right,omitempty"`
+	FirstLine *int `json:"firstLine,omitempty"`
+	Hanging   *int `json:"hanging,omitempty"`
 }
 
 // numberingDef defines a numbering reference.
@@ -1813,12 +1816,18 @@ func applyParagraph(para domain.Paragraph, item paragraphItem) error {
 		_ = para.SetLineSpacing(parseLineSpacing(item.LineSpacing))
 	}
 	if item.Indent != nil {
-		_ = para.SetIndent(domain.Indentation{
-			Left:      item.Indent.Left,
-			Right:     item.Indent.Right,
-			FirstLine: item.Indent.FirstLine,
-			Hanging:   item.Indent.Hanging,
-		})
+		if item.Indent.Left != nil {
+			_ = para.SetIndentLeft(*item.Indent.Left)
+		}
+		if item.Indent.Right != nil {
+			_ = para.SetIndentRight(*item.Indent.Right)
+		}
+		if item.Indent.FirstLine != nil {
+			_ = para.SetIndentFirstLine(*item.Indent.FirstLine)
+		}
+		if item.Indent.Hanging != nil {
+			_ = para.SetIndentHanging(*item.Indent.Hanging)
+		}
 	}
 	if item.Numbering != nil {
 		_ = para.SetNumbering(domain.NumberingReference{

@@ -520,14 +520,19 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 		}
 	}
 
-	// Indentation
+	// Indentation. Each side is gated independently, the same way spacing is
+	// below: an explicit 0 on just one side (e.g. SetIndent to zero out a
+	// style's right indent while leaving left alone) must be emitted for that
+	// side without stamping the other three sides as explicitly zero too.
 	indent := para.Indent()
-	if indent.Left != 0 || indent.Right != 0 || indent.FirstLine != 0 || indent.Hanging != 0 {
+	leftSet, rightSet, firstLineSet, hangingSet := indentSetFlags(para)
+	if indent.Left != 0 || indent.Right != 0 || indent.FirstLine != 0 || indent.Hanging != 0 ||
+		leftSet || rightSet || firstLineSet || hangingSet {
 		props.Indentation = &xml.Indentation{
-			Left:      intPtrIfNotZero(indent.Left),
-			Right:     intPtrIfNotZero(indent.Right),
-			FirstLine: intPtrIfNotZero(indent.FirstLine),
-			Hanging:   intPtrIfNotZero(indent.Hanging),
+			Left:      explicitOrNonZero(indent.Left, leftSet),
+			Right:     explicitOrNonZero(indent.Right, rightSet),
+			FirstLine: explicitOrNonZero(indent.FirstLine, firstLineSet),
+			Hanging:   explicitOrNonZero(indent.Hanging, hangingSet),
 		}
 	}
 
@@ -569,11 +574,11 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 
 	if before != 0 || after != 0 || beforeSet || afterSet || lineDeparts {
 		spacing := &xml.Spacing{
-			Before: spacingAttr(before, beforeSet),
-			After:  spacingAttr(after, afterSet),
+			Before: explicitOrNonZero(before, beforeSet),
+			After:  explicitOrNonZero(after, afterSet),
 		}
 		if lineDeparts {
-			spacing.Line = spacingAttr(lineSpacing.Value, lineSet)
+			spacing.Line = explicitOrNonZero(lineSpacing.Value, lineSet)
 			spacing.LineRule = s.lineSpacingRuleToString(lineSpacing.Rule)
 		}
 		props.Spacing = spacing
@@ -1026,16 +1031,44 @@ func spacingSetFlags(para domain.Paragraph) (beforeSet, afterSet, lineSet bool) 
 	return false, false, false
 }
 
-// spacingAttr returns a pointer to value for XML serialization: present
+// explicitOrNonZero returns a pointer to value for XML serialization: present
 // whenever the caller explicitly set the property, even at zero, so it
-// overrides a style's own spacing instead of being mistaken for "unset".
+// overrides a style's own value instead of being mistaken for "unset".
 // Otherwise it falls back to omitting zero, letting docDefaults or the
-// paragraph's style supply the value.
-func spacingAttr(value int, explicitlySet bool) *int {
+// paragraph's style supply the value. Shared by spacing and indentation.
+func explicitOrNonZero(value int, explicitlySet bool) *int {
 	if explicitlySet {
 		return intPtr(value)
 	}
 	return intPtrIfNotZero(value)
+}
+
+// indentSetter exposes whether a paragraph's individual indentation fields
+// were ever set, letting the serializer emit an explicit 0 on just the sides
+// the caller touched instead of either all four or none. Implemented by the
+// concrete paragraph type in internal/core; see serializeProperties.
+//
+// SetIndent takes the whole domain.Indentation struct in one call, so it
+// cannot itself express "only Left was set" -- the per-field setters this
+// interface exposes are concrete-type-only (not part of domain.Paragraph)
+// and exist specifically so the reader can mark only the attributes present
+// in a source <w:ind> element, without SetIndent's all-or-nothing granularity
+// forcing a re-serialized document to claim sides the source never set.
+type indentSetter interface {
+	IndentLeftSet() bool
+	IndentRightSet() bool
+	IndentFirstLineSet() bool
+	IndentHangingSet() bool
+}
+
+// indentSetFlags returns whether para's four indentation fields were
+// explicitly set, degrading to all-false for any domain.Paragraph
+// implementation that doesn't expose indentSetter.
+func indentSetFlags(para domain.Paragraph) (leftSet, rightSet, firstLineSet, hangingSet bool) {
+	if p, ok := para.(indentSetter); ok {
+		return p.IndentLeftSet(), p.IndentRightSet(), p.IndentFirstLineSet(), p.IndentHangingSet()
+	}
+	return false, false, false, false
 }
 
 func intPtrIfNotZero(i int) *int {
