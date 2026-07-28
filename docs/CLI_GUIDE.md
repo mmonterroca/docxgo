@@ -1052,6 +1052,12 @@ Style reference field (for running headers):
 }
 ```
 
+`url`, `style`, and `options.levels` (the TOC field's heading-range switch) are
+rejected if they contain a double quote — they are embedded inside a quoted
+argument of the generated field code, and a literal `"` would otherwise break
+out of it. The request fails with a validation error rather than producing a
+corrupted or exploitable field.
+
 **Image object:**
 
 ```json

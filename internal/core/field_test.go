@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
 func TestNewField(t *testing.T) {
@@ -168,6 +169,102 @@ func TestNewStyleRefField(t *testing.T) {
 	code := field.Code()
 	if !strings.Contains(code, "STYLEREF") || !strings.Contains(code, styleName) {
 		t.Errorf("Code() = %q, want to contain STYLEREF and %q", code, styleName)
+	}
+}
+
+// newTestRun returns a fresh run inside a scratch document, for tests that
+// need to exercise run.AddField's validation.
+func newTestRun(t *testing.T) domain.Run {
+	t.Helper()
+	doc := NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph() error = %v", err)
+	}
+	run, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+	return run
+}
+
+// TestNewHyperlinkFieldRejectsQuote pins the fix for the field-code
+// injection CodeQL flagged (go/unsafe-quoting): a url containing a double
+// quote used to break out of the quoted HYPERLINK argument. The
+// strings.Contains style used elsewhere in this file would pass on an
+// injected payload, so this asserts Code() by exact equality.
+func TestNewHyperlinkFieldRejectsQuote(t *testing.T) {
+	url := `https://example.com/" INCLUDETEXT "C:\x`
+
+	field := NewHyperlinkField(url, "display")
+
+	if got, want := field.Code(), "HYPERLINK"; got != want {
+		t.Errorf("Code() = %q, want %q (safe default, not the injected value)", got, want)
+	}
+
+	df := field.(*docxField)
+	if _, ok := df.GetProperty("url"); ok {
+		t.Error("GetProperty(url) = ok, want the property to be unset on rejection")
+	}
+
+	run := newTestRun(t)
+	if err := run.AddField(field); err == nil {
+		t.Error("AddField() error = nil, want a validation error for the rejected field")
+	}
+}
+
+// TestNewStyleRefFieldRejectsQuote is the STYLEREF counterpart. Unlike
+// HYPERLINK, STYLEREF always reaches word/document.xml unconditionally
+// (there's no relationship-branch shadowing), so this is the more directly
+// exploitable of the two.
+func TestNewStyleRefFieldRejectsQuote(t *testing.T) {
+	styleName := `Heading 1" \* MERGEFORMAT "x`
+
+	field := NewStyleRefField(styleName)
+
+	if got, want := field.Code(), `STYLEREF "Heading 1"`; got != want {
+		t.Errorf("Code() = %q, want %q (safe default, not the injected value)", got, want)
+	}
+
+	run := newTestRun(t)
+	if err := run.AddField(field); err == nil {
+		t.Error("AddField() error = nil, want a validation error for the rejected field")
+	}
+}
+
+// TestNewTOCFieldRejectsInvalidLevels covers the third CodeQL-flagged sink:
+// the \o switch built from the caller-supplied "levels" property.
+func TestNewTOCFieldRejectsInvalidLevels(t *testing.T) {
+	field := NewTOCField(map[string]string{"levels": `1-3" \c "Figure`})
+
+	// field.go builds \\o (double backslash) as a raw string literal today —
+	// that's a separate, pre-existing quirk (tracked separately), not part
+	// of this fix. The default-else branch in buildTOCCode is the exact
+	// bytes this must match.
+	want := constants.FieldCodeTOC + ` \\o "1-3" \\h \\z \\u`
+	if got := field.Code(); got != want {
+		t.Errorf("Code() = %q, want %q (safe default, not the injected value)", got, want)
+	}
+
+	run := newTestRun(t)
+	if err := run.AddField(field); err == nil {
+		t.Error("AddField() error = nil, want a validation error for the rejected field")
+	}
+}
+
+// TestNewTOCFieldAcceptsValidLevels guards against the quote guard being too
+// aggressive: a legitimate levels value must still work.
+func TestNewTOCFieldAcceptsValidLevels(t *testing.T) {
+	field := NewTOCField(map[string]string{"levels": "1-5"})
+
+	want := constants.FieldCodeTOC + ` \\o "1-5" \\h \\z \\u`
+	if got := field.Code(); got != want {
+		t.Errorf("Code() = %q, want %q", got, want)
+	}
+
+	run := newTestRun(t)
+	if err := run.AddField(field); err != nil {
+		t.Errorf("AddField() error = %v, want nil for a valid field", err)
 	}
 }
 
