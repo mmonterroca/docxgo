@@ -929,7 +929,7 @@ Writes to a cell covered by a horizontal merge are rejected. Such a cell is neve
 
 Writes to a vertical-merge continuation cell are rejected too. Unlike a horizontal-merge continuation, this cell is still written to the file, but Word renders the vertical-merge-restart cell's content in its place, so the write would report success while remaining invisible — target the topmost cell of the merged region instead.
 
-The cell can grow to fit more paragraphs than it had, but it cannot shrink: paragraphs beyond the new content are left in place as empty paragraphs, since `domain.TableCell` only exposes adding paragraphs, not removing them. `paragraphCount` in the result reflects the cell's paragraph count after the write, which may be larger than the number of items you provided.
+The cell's paragraph count always matches the number of items you provide: fewer items than the cell had removes the trailing paragraphs, more appends new ones. `paragraphCount` in the result always equals the number of items written.
 
 **Params:**
 

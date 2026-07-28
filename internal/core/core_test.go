@@ -366,6 +366,64 @@ func TestTableCell_AddParagraph(t *testing.T) {
 	}
 }
 
+func TestTableCell_RemoveParagraph(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 1)
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+
+	p1, _ := cell.AddParagraph()
+	p1.AddRun()
+	p1.Runs()[0].SetText("first")
+
+	p2, _ := cell.AddParagraph()
+	p2.AddRun()
+	p2.Runs()[0].SetText("second")
+
+	p3, _ := cell.AddParagraph()
+	p3.AddRun()
+	p3.Runs()[0].SetText("third")
+
+	if err := cell.RemoveParagraph(1); err != nil {
+		t.Fatalf("RemoveParagraph(1) failed: %v", err)
+	}
+
+	paras := cell.Paragraphs()
+	if len(paras) != 2 {
+		t.Fatalf("expected 2 paragraphs, got %d", len(paras))
+	}
+	if paras[0].Text() != "first" {
+		t.Errorf("paras[0].Text() = %q, want %q", paras[0].Text(), "first")
+	}
+	if paras[1].Text() != "third" {
+		t.Errorf("paras[1].Text() = %q, want %q", paras[1].Text(), "third")
+	}
+}
+
+func TestTableCell_RemoveParagraph_OutOfRange(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 1)
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+	cell.AddParagraph()
+
+	tests := []struct {
+		name  string
+		index int
+	}{
+		{"negative index", -1},
+		{"equal to length", 1},
+		{"way out of range", 100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := cell.RemoveParagraph(tt.index); err == nil {
+				t.Errorf("expected error for index %d, got nil", tt.index)
+			}
+		})
+	}
+}
+
 func TestParagraph_ClearRuns(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()

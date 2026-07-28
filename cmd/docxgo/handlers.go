@@ -1235,11 +1235,19 @@ func (s *server) handleTableSetCell(req *Request) Response {
 		items = append(items, pItem)
 	}
 
-	// Replace the cell's content: clear every existing paragraph, then write
-	// the new items into existing paragraphs (reusing their slots) and append
-	// paragraphs for any overflow. Cells cannot drop paragraphs, so leftover
-	// paragraphs beyond the new content stay as empty paragraphs.
+	// Replace the cell's content: reuse existing paragraph slots for as many
+	// items as there are, remove any trailing paragraphs the new content
+	// doesn't need, and append new paragraphs for any overflow.
+	// paragraphCount in the result always matches len(items).
 	existing := cell.Paragraphs()
+	for i := len(existing); i > len(items); i-- {
+		if err := cell.RemoveParagraph(i - 1); err != nil {
+			return errorResponse(req.ID, errors.ErrCodeInternal, "failed to remove paragraph: "+err.Error(), op)
+		}
+	}
+	if len(items) < len(existing) {
+		existing = existing[:len(items)]
+	}
 	for _, p := range existing {
 		p.ClearRuns()
 	}
