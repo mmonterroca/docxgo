@@ -698,7 +698,13 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 		var extraFields []domain.Field
 		if url != "" {
 			field := core.NewField(domain.FieldTypeHyperlink)
-			if err := field.SetCode(fmt.Sprintf(`HYPERLINK "%s"`, url)); err != nil {
+			// SetCodeRaw, not SetCode: url comes from the source file's own
+			// relationship target or w:anchor attribute, which is the
+			// ground truth here, not this package's own validation — same
+			// reasoning as buildFieldFromInstruction's SetCodeRaw call.
+			if setter, ok := field.(interface{ SetCodeRaw(string) }); ok {
+				setter.SetCodeRaw(fmt.Sprintf(`HYPERLINK "%s"`, url))
+			} else if err := field.SetCode(fmt.Sprintf(`HYPERLINK "%s"`, url)); err != nil {
 				return errors.Wrap(err, opHydrateHyperlink)
 			}
 			if accessor, ok := field.(interface{ SetProperty(string, string) }); ok {

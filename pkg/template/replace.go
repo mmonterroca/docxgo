@@ -58,8 +58,7 @@ func ReplaceText(doc domain.Document, find, replace string) (ReplaceResult, erro
 	var result ReplaceResult
 	err := walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
 		if skipHeaderFooter && (ctx.locationType == LocationHeader || ctx.locationType == LocationFooter) {
-			_, full := paragraphSpans(para)
-			result.Skipped += strings.Count(full, find)
+			result.Skipped += strings.Count(para.Text(), find)
 			return nil
 		}
 		replaced, skipped, err := replaceInParagraph(para, find, replace)

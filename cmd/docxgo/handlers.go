@@ -1765,7 +1765,6 @@ func lookupTheme(name string) themes.Theme {
 
 // ─── Content application ──────────────────────────────────────────────────────
 
-// applyContent processes a content array and adds items to the document.
 // applyContent applies every content item to doc. Each item is validated
 // against a scratch document first: content items are independent additive
 // mutations (each adds a new paragraph, table, or section), so a scratch
@@ -1775,8 +1774,14 @@ func lookupTheme(name string) themes.Theme {
 // same failure this guards against as validateParagraphItem does for a
 // single paragraph.
 func applyContent(doc domain.Document, content []json.RawMessage) error {
+	// One shared scratch document for the whole validation pass, not one per
+	// item: items are independent additive mutations, so validating item N
+	// against a scratch document that already holds items 1..N-1 gives the
+	// same verdict as a fresh one would, at roughly half the construction
+	// cost for a large batch.
+	scratch := docx.NewDocument()
 	for _, raw := range content {
-		if err := applyContentItem(docx.NewDocument(), raw); err != nil {
+		if err := applyContentItem(scratch, raw); err != nil {
 			return err
 		}
 	}
