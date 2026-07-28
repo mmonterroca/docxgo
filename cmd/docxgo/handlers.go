@@ -876,13 +876,21 @@ func (s *server) handleParagraphAdd(req *Request) Response {
 			fmt.Sprintf("document %q not found", params.DocumentID), op)
 	}
 
+	// Validate before touching the document: applyParagraph can fail partway
+	// through (e.g. a field constructor rejecting a quote), which would
+	// otherwise leave a stray, half-populated paragraph appended to doc.
+	if err := validateParagraphItem(params.paragraphItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
 	para, err := doc.AddParagraph()
 	if err != nil {
 		return errorResponse(req.ID, errors.ErrCodeInternal, "failed to add paragraph: "+err.Error(), op)
 	}
 
 	if err := applyParagraph(para, params.paragraphItem); err != nil {
-		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+		return errorResponse(req.ID, errors.ErrCodeInternal,
+			"applying validated paragraph: "+err.Error(), op)
 	}
 
 	index := len(doc.Paragraphs()) - 1
@@ -939,8 +947,17 @@ func (s *server) handleTableAdd(req *Request) Response {
 			fmt.Sprintf("document %q not found", params.DocumentID), op)
 	}
 
-	if err := applyTable(doc, params.tableItem); err != nil {
+	// Validate against a scratch document before touching doc: applyTable
+	// can fail partway through a multi-row, multi-cell table (e.g. a field
+	// constructor rejecting a quote in some cell), which would otherwise
+	// leave a stray, half-populated table appended to doc.
+	if err := applyTable(docx.NewDocument(), params.tableItem); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	if err := applyTable(doc, params.tableItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeInternal,
+			"applying validated table: "+err.Error(), op)
 	}
 
 	index := len(doc.Tables()) - 1
@@ -1003,7 +1020,7 @@ func (s *server) handleReplaceText(req *Request) Response {
 	const op = "document.replaceText"
 
 	var params replaceTextParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	if err := decodeStrict(req.Params, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -1135,7 +1152,7 @@ func (s *server) handleTableGetCell(req *Request) Response {
 	const op = "table.getCell"
 
 	var params tableCellRef
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	if err := decodeStrict(req.Params, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -1167,7 +1184,7 @@ func (s *server) handleTableSetCell(req *Request) Response {
 	const op = "table.setCell"
 
 	var params tableSetCellParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	if err := decodeStrict(req.Params, &params); err != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
 	}
 
@@ -1749,49 +1766,70 @@ func lookupTheme(name string) themes.Theme {
 // ─── Content application ──────────────────────────────────────────────────────
 
 // applyContent processes a content array and adds items to the document.
+// applyContent applies every content item to doc. Each item is validated
+// against a scratch document first: content items are independent additive
+// mutations (each adds a new paragraph, table, or section), so a scratch
+// document gives the same verdict as the real one, and validating the whole
+// batch up front means a request that turns out to be invalid halfway
+// through never leaves the real document with a stray partial item — the
+// same failure this guards against as validateParagraphItem does for a
+// single paragraph.
 func applyContent(doc domain.Document, content []json.RawMessage) error {
 	for _, raw := range content {
-		var item contentItem
-		if err := json.Unmarshal(raw, &item); err != nil {
-			return fmt.Errorf("invalid content item: %w", err)
+		if err := applyContentItem(docx.NewDocument(), raw); err != nil {
+			return err
 		}
+	}
+	for _, raw := range content {
+		if err := applyContentItem(doc, raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-		switch item.Type {
-		case "paragraph":
-			var pItem paragraphItem
-			if err := json.Unmarshal(raw, &pItem); err != nil {
-				return fmt.Errorf("invalid paragraph: %w", err)
-			}
-			para, err := doc.AddParagraph()
-			if err != nil {
-				return fmt.Errorf("failed to add paragraph: %w", err)
-			}
-			if err := applyParagraph(para, pItem); err != nil {
-				return err
-			}
-		case "table":
-			var tItem tableItem
-			if err := json.Unmarshal(raw, &tItem); err != nil {
-				return fmt.Errorf("invalid table: %w", err)
-			}
-			if err := applyTable(doc, tItem); err != nil {
-				return err
-			}
-		case "section":
-			var sItem sectionItem
-			if err := json.Unmarshal(raw, &sItem); err != nil {
-				return fmt.Errorf("invalid section: %w", err)
-			}
-			if err := applySection(doc, sItem); err != nil {
-				return err
-			}
-		case "pageBreak":
-			if err := doc.AddPageBreak(); err != nil {
-				return fmt.Errorf("failed to add page break: %w", err)
-			}
-		default:
-			return fmt.Errorf("unknown content type: %s", item.Type)
+// applyContentItem applies a single content item to doc.
+func applyContentItem(doc domain.Document, raw json.RawMessage) error {
+	var item contentItem
+	if err := json.Unmarshal(raw, &item); err != nil {
+		return fmt.Errorf("invalid content item: %w", err)
+	}
+
+	switch item.Type {
+	case "paragraph":
+		var pItem paragraphItem
+		if err := json.Unmarshal(raw, &pItem); err != nil {
+			return fmt.Errorf("invalid paragraph: %w", err)
 		}
+		para, err := doc.AddParagraph()
+		if err != nil {
+			return fmt.Errorf("failed to add paragraph: %w", err)
+		}
+		if err := applyParagraph(para, pItem); err != nil {
+			return err
+		}
+	case "table":
+		var tItem tableItem
+		if err := json.Unmarshal(raw, &tItem); err != nil {
+			return fmt.Errorf("invalid table: %w", err)
+		}
+		if err := applyTable(doc, tItem); err != nil {
+			return err
+		}
+	case "section":
+		var sItem sectionItem
+		if err := json.Unmarshal(raw, &sItem); err != nil {
+			return fmt.Errorf("invalid section: %w", err)
+		}
+		if err := applySection(doc, sItem); err != nil {
+			return err
+		}
+	case "pageBreak":
+		if err := doc.AddPageBreak(); err != nil {
+			return fmt.Errorf("failed to add page break: %w", err)
+		}
+	default:
+		return fmt.Errorf("unknown content type: %s", item.Type)
 	}
 	return nil
 }

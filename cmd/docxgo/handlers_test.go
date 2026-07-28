@@ -826,6 +826,67 @@ func TestHandleReplaceText_Validation(t *testing.T) {
 	}
 }
 
+// TestHandleReplaceText_RejectsUnknownField is a regression test: a request
+// with a misspelled "replacement" field instead of "replace" used to decode
+// via plain json.Unmarshal, silently treating params.Replace as "" and
+// deleting every occurrence of "find" while reporting success. It must now
+// be rejected before touching the document.
+func TestHandleReplaceText_RejectsUnknownField(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "document.replaceText", map[string]interface{}{
+		"documentId":  docID,
+		"find":        "ACME",
+		"replacement": "OTHER",
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR for unknown field, got %+v", resp.Error)
+	}
+
+	// The document must be untouched: "ACME" still present.
+	listResp := s.dispatch(makeRequest(3, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	paras := listResp.Result.(map[string]interface{})["paragraphs"].([]map[string]interface{})
+	if paras[0]["text"] != "Vendor: ACME Corp" {
+		t.Errorf("document was mutated despite rejected request: paragraph text = %q", paras[0]["text"])
+	}
+}
+
+// TestHandleTableSetCell_RejectsUnknownField uses "txet" (a typo of "text")
+// alongside a well-formed "text" field, so every currently-required field is
+// present and only DisallowUnknownFields can catch the mistake — a request
+// with the misspelled field alone would already be rejected by the "text or
+// paragraphs" presence check regardless of strict decoding.
+func TestHandleTableSetCell_RejectsUnknownField(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 0, "columnIndex": 0,
+		"text": "Correct",
+		"txet": "typo",
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR for unknown field, got %+v", resp.Error)
+	}
+}
+
+// TestHandleTableGetCell_RejectsUnknownField includes a correctly-spelled
+// "columnIndex" alongside the typo'd "colummnIndex", so every required
+// pointer field is populated and only DisallowUnknownFields can catch the
+// mistake.
+func TestHandleTableGetCell_RejectsUnknownField(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.getCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 0, "columnIndex": 0,
+		"colummnIndex": 0,
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR for unknown field, got %+v", resp.Error)
+	}
+}
+
 func TestHandleParagraphSetText(t *testing.T) {
 	s, docID := newEditTestDoc(t)
 
@@ -1741,6 +1802,55 @@ func TestHandleAddContent_EmptyContent(t *testing.T) {
 	}
 }
 
+// TestHandleAddContent_RejectedItemLeavesNoPartialContent is a regression
+// test: applyContent used to apply items to the real document one at a time,
+// so a batch whose second item fails (e.g. a field constructor rejecting a
+// quote) would still leave the first item's paragraph appended even though
+// the call as a whole returned an error.
+func TestHandleAddContent_RejectedItemLeavesNoPartialContent(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "document.addContent", map[string]interface{}{
+		"documentId": docID,
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{map[string]interface{}{"text": "Valid first item"}},
+			},
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{
+					map[string]interface{}{
+						"field": map[string]interface{}{
+							"type":  "styleRef",
+							"style": `Heading 1" \* MERGEFORMAT "x`,
+						},
+					},
+				},
+			},
+		},
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for a style name containing a double quote")
+	}
+	if resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Error.Code)
+	}
+
+	listResp := s.dispatch(makeRequest(3, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	paras := listResp.Result.(map[string]interface{})["paragraphs"].([]map[string]interface{})
+	if len(paras) != 0 {
+		t.Errorf("expected no paragraphs after rejected addContent batch, got %d", len(paras))
+	}
+}
+
 // ─── document.addPageBreak tests ─────────────────────────────────────────────
 
 func TestHandleAddPageBreak(t *testing.T) {
@@ -1817,6 +1927,46 @@ func TestHandleParagraphAdd_NotFound(t *testing.T) {
 	}
 	if resp.Error.Code != "NOT_FOUND" {
 		t.Errorf("expected NOT_FOUND, got %s", resp.Error.Code)
+	}
+}
+
+// TestHandleParagraphAdd_RejectedFieldLeavesNoOrphanParagraph is a
+// regression test: paragraph.add used to call doc.AddParagraph() before
+// applyParagraph could fail (e.g. a field constructor rejecting a quote in
+// its style name), leaving a stray empty paragraph appended to the document
+// even though the request as a whole was rejected.
+func TestHandleParagraphAdd_RejectedFieldLeavesNoOrphanParagraph(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.add", map[string]interface{}{
+		"documentId": docID,
+		"runs": []interface{}{
+			map[string]interface{}{
+				"field": map[string]interface{}{
+					"type":  "styleRef",
+					"style": `Heading 1" \* MERGEFORMAT "x`,
+				},
+			},
+		},
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for a style name containing a double quote")
+	}
+	if resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Error.Code)
+	}
+
+	listResp := s.dispatch(makeRequest(3, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	paras := listResp.Result.(map[string]interface{})["paragraphs"].([]map[string]interface{})
+	if len(paras) != 0 {
+		t.Errorf("expected no paragraphs after rejected paragraph.add, got %d", len(paras))
 	}
 }
 
@@ -2042,6 +2192,65 @@ func TestHandleTableAdd(t *testing.T) {
 	}
 	if _, ok := result["index"]; !ok {
 		t.Error("expected index in result")
+	}
+}
+
+// TestHandleTableAdd_RejectedFieldLeavesNoOrphanTable is a regression test:
+// table.add used to call doc.AddTable() and start populating cells before a
+// later cell's field could fail (e.g. a quote in a styleRef field's style
+// name), leaving a stray, half-populated table appended to the document even
+// though the request as a whole was rejected.
+func TestHandleTableAdd_RejectedFieldLeavesNoOrphanTable(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	resp := s.dispatch(makeRequest(2, "table.add", map[string]interface{}{
+		"documentId": docID,
+		"rows": []interface{}{
+			map[string]interface{}{
+				"cells": []interface{}{
+					map[string]interface{}{
+						"paragraphs": []interface{}{
+							map[string]interface{}{
+								"runs": []interface{}{map[string]interface{}{"text": "A1"}},
+							},
+						},
+					},
+					map[string]interface{}{
+						"paragraphs": []interface{}{
+							map[string]interface{}{
+								"runs": []interface{}{
+									map[string]interface{}{
+										"field": map[string]interface{}{
+											"type":  "styleRef",
+											"style": `Heading 1" \* MERGEFORMAT "x`,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for a style name containing a double quote")
+	}
+	if resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Error.Code)
+	}
+
+	listResp := s.dispatch(makeRequest(3, "table.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	result := listResp.Result.(map[string]interface{})
+	if count := result["count"]; count != 0 {
+		t.Errorf("expected no tables after rejected table.add, got count=%v", count)
 	}
 }
 
