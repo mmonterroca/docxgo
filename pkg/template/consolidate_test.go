@@ -59,26 +59,34 @@ func countImageRuns(para domain.Paragraph) int {
 // (a zip archive) for tests that need to assert on the raw markup.
 func extractDocumentXML(t *testing.T, docxBytes []byte) []byte {
 	t.Helper()
+	return extractZipPart(t, docxBytes, "word/document.xml")
+}
+
+// extractZipPart reads a single named entry out of a serialized .docx (a zip
+// archive) for tests that need to assert on the raw markup of a part other
+// than word/document.xml (e.g. a header or footer).
+func extractZipPart(t *testing.T, docxBytes []byte, partName string) []byte {
+	t.Helper()
 	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
 	if err != nil {
 		t.Fatalf("zip.NewReader: %v", err)
 	}
 	for _, f := range zr.File {
-		if f.Name != "word/document.xml" {
+		if f.Name != partName {
 			continue
 		}
 		rc, err := f.Open()
 		if err != nil {
-			t.Fatalf("open word/document.xml: %v", err)
+			t.Fatalf("open %s: %v", partName, err)
 		}
 		defer rc.Close()
 		var buf bytes.Buffer
 		if _, err := buf.ReadFrom(rc); err != nil {
-			t.Fatalf("read word/document.xml: %v", err)
+			t.Fatalf("read %s: %v", partName, err)
 		}
 		return buf.Bytes()
 	}
-	t.Fatal("word/document.xml not found in archive")
+	t.Fatalf("%s not found in archive", partName)
 	return nil
 }
 

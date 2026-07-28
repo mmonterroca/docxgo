@@ -803,6 +803,15 @@ func (d *document) HasPreservedParts() bool {
 	return d != nil && d.GetPreservedParts() != nil
 }
 
+// HasPreservedHeadersOrFooters returns true if this document has preserved
+// header or footer bytes from reading. WriteTo writes preserved headers and
+// footers verbatim (see writer.PreservedParts), so any in-memory mutation to
+// a header or footer paragraph on such a document never reaches the saved
+// file.
+func (d *document) HasPreservedHeadersOrFooters() bool {
+	return d != nil && (len(d.preservedHeaders) > 0 || len(d.preservedFooters) > 0)
+}
+
 func normalizeNumberingTarget(target string) string {
 	trimmed := strings.TrimSpace(target)
 	trimmed = strings.TrimPrefix(trimmed, "./")

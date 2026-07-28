@@ -7,9 +7,11 @@
 package template
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
+	docx "github.com/mmonterroca/docxgo/v2"
 	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/internal/core"
 )
@@ -418,5 +420,91 @@ func TestReplaceText_DeletionMatchesStdlibSemantics(t *testing.T) {
 	}
 	if result.Replaced != 1 {
 		t.Errorf("replaced = %d, want 1", result.Replaced)
+	}
+}
+
+// TestReplaceText_SkipsPreservedHeaderAndFooter is an end-to-end regression
+// test for the case where ReplaceText reported a header/footer match as
+// Replaced even though WriteTo writes preserved headers/footers verbatim,
+// silently discarding the edit. It builds a document with "FOO" in the body,
+// a header, and a footer, saves it, reopens it (which preserves the header
+// and footer bytes for round-trip), replaces "FOO" with "BAR", saves again,
+// and inspects the raw zip entries: the body must change and the header/
+// footer must not.
+func TestReplaceText_SkipsPreservedHeaderAndFooter(t *testing.T) {
+	doc := core.NewDocument()
+	bodyPara, _ := doc.AddParagraph()
+	bodyRun, _ := bodyPara.AddRun()
+	bodyRun.SetText("FOO in body")
+
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection: %v", err)
+	}
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	headerPara, _ := header.AddParagraph()
+	headerRun, _ := headerPara.AddRun()
+	headerRun.SetText("FOO in header")
+
+	footer, err := section.Footer(domain.FooterDefault)
+	if err != nil {
+		t.Fatalf("Footer: %v", err)
+	}
+	footerPara, _ := footer.AddParagraph()
+	footerRun, _ := footerPara.AddRun()
+	footerRun.SetText("FOO in footer")
+
+	templatePath := t.TempDir() + "/preserved_header_footer.docx"
+	if err := doc.SaveAs(templatePath); err != nil {
+		t.Fatalf("SaveAs: %v", err)
+	}
+
+	opened, err := docx.OpenDocument(templatePath)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+
+	result, err := ReplaceText(opened, "FOO", "BAR")
+	if err != nil {
+		t.Fatalf("ReplaceText: %v", err)
+	}
+	if result.Replaced != 1 {
+		t.Errorf("replaced = %d, want 1 (body only)", result.Replaced)
+	}
+	if result.Skipped != 2 {
+		t.Errorf("skipped = %d, want 2 (header + footer)", result.Skipped)
+	}
+
+	var buf bytes.Buffer
+	if _, err := opened.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	savedBytes := buf.Bytes()
+
+	docXML := string(extractDocumentXML(t, savedBytes))
+	if !strings.Contains(docXML, "BAR in body") {
+		t.Errorf("document.xml: expected replaced body text, got %s", docXML)
+	}
+	if strings.Contains(docXML, "FOO") {
+		t.Errorf("document.xml: unexpected leftover FOO, got %s", docXML)
+	}
+
+	headerXML := string(extractZipPart(t, savedBytes, "word/header1.xml"))
+	if !strings.Contains(headerXML, "FOO in header") {
+		t.Errorf("header1.xml: expected untouched FOO, got %s", headerXML)
+	}
+	if strings.Contains(headerXML, "BAR") {
+		t.Errorf("header1.xml: unexpected BAR — header should be preserved verbatim, got %s", headerXML)
+	}
+
+	footerXML := string(extractZipPart(t, savedBytes, "word/footer1.xml"))
+	if !strings.Contains(footerXML, "FOO in footer") {
+		t.Errorf("footer1.xml: expected untouched FOO, got %s", footerXML)
+	}
+	if strings.Contains(footerXML, "BAR") {
+		t.Errorf("footer1.xml: unexpected BAR — footer should be preserved verbatim, got %s", footerXML)
 	}
 }
