@@ -71,8 +71,13 @@ export type {
   AddPageBreakParams,
   ParagraphAddParams,
   ParagraphListParams,
+  ParagraphSetTextParams,
   TableAddParams,
   TableListParams,
+  TableCellRef,
+  TableGetCellParams,
+  TableSetCellParams,
+  ReplaceTextParams,
   SectionAddParams,
   CloseParams,
   // Results
@@ -91,6 +96,9 @@ export type {
   ParagraphListResult,
   TableInfo,
   TableListResult,
+  TableCellResult,
+  TableSetCellResult,
+  ReplaceTextResult,
   // System
   PingResult,
   SystemVersionResult,

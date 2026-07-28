@@ -402,10 +402,14 @@ The following JSON-RPC methods are available:
 | `document.addContent` | Append content items to an opened document |
 | `document.addPageBreak` | Append a page break |
 | `document.applyPatch` | Apply multi-operation patches sequentially (not atomic) |
+| `document.replaceText` | Find-and-replace a literal string across the document |
 | `paragraph.add` | Add a single paragraph |
 | `paragraph.list` | List all paragraphs |
+| `paragraph.setText` | Replace a body paragraph's content by index |
 | `table.add` | Add a single table |
-| `table.list` | List all tables |
+| `table.list` | List all tables (optionally with cell text) |
+| `table.getCell` | Read a single table cell's content |
+| `table.setCell` | Replace a single table cell's content |
 | `section.add` | Add a section break |
 | `template.inspect` | Find template placeholders |
 | `template.render` | Render template with data |

@@ -160,6 +160,8 @@ export interface ParagraphBordersDef {
 /** A paragraph content item. */
 export interface ParagraphItem {
   type: 'paragraph';
+  /** Plain-text shortcut for a single unformatted run. Ignored when `runs` is given. */
+  text?: string;
   style?: string;
   alignment?: Alignment;
   spacingBefore?: number;
@@ -300,6 +302,8 @@ export interface AddPageBreakParams {
 
 export interface ParagraphAddParams {
   documentId: string;
+  /** Plain-text shortcut for a single unformatted run. Ignored when `runs` is given. */
+  text?: string;
   style?: string;
   alignment?: Alignment;
   spacingBefore?: number;
@@ -315,6 +319,11 @@ export interface ParagraphListParams {
   documentId: string;
 }
 
+/** Replaces a body paragraph's content by index (as reported by paragraph.list). */
+export interface ParagraphSetTextParams extends ParagraphAddParams {
+  index: number;
+}
+
 export interface TableAddParams {
   documentId: string;
   rows?: TableRowDef[];
@@ -325,6 +334,33 @@ export interface TableAddParams {
 
 export interface TableListParams {
   documentId: string;
+  /** When true, adds each table's cell texts to the listing. */
+  includeText?: boolean;
+}
+
+export interface TableCellRef {
+  documentId: string;
+  tableIndex: number;
+  rowIndex: number;
+  columnIndex: number;
+}
+
+export type TableGetCellParams = TableCellRef;
+
+/**
+ * Provide exactly one of `text` or `paragraphs` — supplying both, or neither,
+ * is rejected. Both replace the cell's content, so `text: ''` and
+ * `paragraphs: []` are meaningful requests to empty it.
+ */
+export interface TableSetCellParams extends TableCellRef {
+  text?: string;
+  paragraphs?: Array<Omit<ParagraphItem, 'type'>>;
+}
+
+export interface ReplaceTextParams {
+  documentId: string;
+  find: string;
+  replace: string;
 }
 
 export interface SectionAddParams {
@@ -417,11 +453,34 @@ export interface TableInfo {
   index: number;
   rows: number;
   columns: number;
+  /** Present only when table.list was called with `includeText: true`. */
+  cells?: string[][];
 }
 
 export interface TableListResult {
   count: number;
   tables: TableInfo[];
+}
+
+/** Result of table.getCell. */
+export interface TableCellResult {
+  /** The cell's paragraphs joined with "\n". */
+  text: string;
+  paragraphs: string[];
+  paragraphCount: number;
+}
+
+/** Result of table.setCell. The cell can grow but never shrink; this is the
+ * paragraph count after the write, which may exceed what was written. */
+export interface TableSetCellResult {
+  ok: boolean;
+  paragraphCount: number;
+}
+
+/** Result of document.replaceText. */
+export interface ReplaceTextResult {
+  replaced: number;
+  skipped: number;
 }
 
 // ─── System Types ────────────────────────────────────────────────────────────

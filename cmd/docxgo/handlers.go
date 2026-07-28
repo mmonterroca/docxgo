@@ -109,6 +109,8 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleAddPageBreak(req)
 	case "document.applyPatch":
 		return s.handleApplyPatch(req)
+	case "document.replaceText":
+		return s.handleReplaceText(req)
 	case "document.close":
 		return s.handleClose(req)
 	// paragraph.*
@@ -116,11 +118,17 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleParagraphAdd(req)
 	case "paragraph.list":
 		return s.handleParagraphList(req)
+	case "paragraph.setText":
+		return s.handleParagraphSetText(req)
 	// table.*
 	case "table.add":
 		return s.handleTableAdd(req)
 	case "table.list":
 		return s.handleTableList(req)
+	case "table.getCell":
+		return s.handleTableGetCell(req)
+	case "table.setCell":
+		return s.handleTableSetCell(req)
 	// section.*
 	case "section.add":
 		return s.handleSectionAdd(req)
@@ -283,12 +291,65 @@ type tableAddParams struct {
 // tableListParams are the parameters for table.list.
 type tableListParams struct {
 	DocumentID string `json:"documentId"`
+	// IncludeText adds each table's cell texts to the listing, row by row.
+	// Rows report their actual cells, so ragged tables (merged cells) are
+	// represented faithfully rather than padded to columnCount.
+	IncludeText bool `json:"includeText,omitempty"`
 }
 
 // sectionAddParams are the parameters for section.add.
 type sectionAddParams struct {
 	DocumentID string `json:"documentId"`
 	sectionItem
+}
+
+// replaceTextParams are the parameters for document.replaceText.
+type replaceTextParams struct {
+	DocumentID string `json:"documentId"`
+	Find       string `json:"find"`
+	Replace    string `json:"replace"`
+}
+
+// paragraphSetTextParams are the parameters for paragraph.setText. Index is
+// the body-paragraph index as reported by paragraph.list; the embedded
+// paragraphItem carries the new content (text or runs) and any style fields
+// to apply.
+//
+// Index is a pointer so an omitted field is distinguishable from an
+// explicit 0: this method replaces the paragraph's content, so a client
+// that forgets index must not have its request silently resolve to the
+// first paragraph.
+type paragraphSetTextParams struct {
+	DocumentID string `json:"documentId"`
+	Index      *int   `json:"index"`
+	paragraphItem
+}
+
+// tableCellRef addresses a single cell, shared by table.getCell and
+// table.setCell. Indices follow table.list ordering.
+//
+// The indices are pointers for the same reason as paragraphSetTextParams.Index:
+// an omitted coordinate must be rejected rather than defaulting to 0 and
+// silently addressing the first table/row/column.
+type tableCellRef struct {
+	DocumentID  string `json:"documentId"`
+	TableIndex  *int   `json:"tableIndex"`
+	RowIndex    *int   `json:"rowIndex"`
+	ColumnIndex *int   `json:"columnIndex"`
+}
+
+// tableSetCellParams are the parameters for table.setCell. Text is a shortcut
+// for a single plain paragraph; Paragraphs carries rich content items.
+//
+// Both are pointers/slices rather than plain values so that "provided but
+// empty" stays distinguishable from "omitted": setCell replaces the cell's
+// content, so `"text": ""` and `"paragraphs": []` are meaningful requests to
+// empty it, while omitting both is a request with no content at all and is
+// rejected rather than silently wiping the cell.
+type tableSetCellParams struct {
+	tableCellRef
+	Text       *string           `json:"text,omitempty"`
+	Paragraphs []json.RawMessage `json:"paragraphs,omitempty"`
 }
 
 // applyPatchParams are the parameters for document.applyPatch.
@@ -903,16 +964,304 @@ func (s *server) handleTableList(req *Request) Response {
 	tables := doc.Tables()
 	items := make([]map[string]interface{}, 0, len(tables))
 	for i, t := range tables {
-		items = append(items, map[string]interface{}{
+		item := map[string]interface{}{
 			"index":   i,
 			"rows":    t.RowCount(),
 			"columns": t.ColumnCount(),
-		})
+		}
+		if params.IncludeText {
+			rows := t.Rows()
+			cellRows := make([][]string, 0, len(rows))
+			for _, row := range rows {
+				cells := row.Cells()
+				texts := make([]string, 0, len(cells))
+				for _, cell := range cells {
+					paragraphs := cell.Paragraphs()
+					pTexts := make([]string, 0, len(paragraphs))
+					for _, p := range paragraphs {
+						pTexts = append(pTexts, p.Text())
+					}
+					texts = append(texts, strings.Join(pTexts, "\n"))
+				}
+				cellRows = append(cellRows, texts)
+			}
+			item["cells"] = cellRows
+		}
+		items = append(items, item)
 	}
 
 	return Response{ID: req.ID, Result: map[string]interface{}{
 		"tables": items,
 		"count":  len(items),
+	}}
+}
+
+func (s *server) handleReplaceText(req *Request) Response {
+	const op = "document.replaceText"
+
+	var params replaceTextParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if params.Find == "" {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "find is required and must not be empty", op)
+	}
+
+	result, err := template.ReplaceText(doc, params.Find, params.Replace)
+	if err != nil {
+		return errorResponse(req.ID, errors.ErrCodeInternal, "replace failed: "+err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"replaced": result.Replaced,
+		"skipped":  result.Skipped,
+	}}
+}
+
+func (s *server) handleParagraphSetText(req *Request) Response {
+	const op = "paragraph.setText"
+
+	var params paragraphSetTextParams
+	if err := decodeStrict(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+	if params.Index == nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "index is required", op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	paragraphs := doc.Paragraphs()
+	index := *params.Index
+	if index < 0 || index >= len(paragraphs) {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			fmt.Sprintf("paragraph index %d out of range (document has %d paragraphs)",
+				index, len(paragraphs)), op)
+	}
+
+	// Validate before clearing: this method replaces the paragraph's content,
+	// so rejecting the request after ClearRuns would leave the caller with an
+	// error response and an emptied paragraph.
+	if err := validateParagraphItem(params.paragraphItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	para := paragraphs[index]
+	para.ClearRuns()
+	if err := applyParagraph(para, params.paragraphItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeInternal,
+			"applying validated paragraph: "+err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":    true,
+		"index": index,
+	}}
+}
+
+// decodeStrict decodes data into v, rejecting a literal null and any field v
+// does not declare. Plain json.Unmarshal accepts both silently: a misspelled
+// field name or a null array element would otherwise decode to a zero value
+// indistinguishable from a deliberately minimal request, which for
+// paragraph.setText and table.setCell means content gets silently cleared
+// instead of the request being rejected.
+func decodeStrict(data []byte, v interface{}) error {
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		return fmt.Errorf("must not be null")
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
+}
+
+// validateParagraphItem reports whether applyParagraph would accept item,
+// without touching the caller's document: it applies the item to a scratch
+// paragraph in a throwaway document and reports the outcome.
+//
+// paragraph.setText and table.setCell both clear existing content before
+// writing, so an item that turns out to be invalid has to be caught before
+// anything is destroyed. applyParagraph ignores failures from styling setters
+// (SetStyle, SetAlignment and friends are all discarded with _), so the only
+// errors this can surface come from AddRun/SetText and from hyperlink, field,
+// and image items — none of which depend on the target document's own styles,
+// so a scratch document gives the same verdict as the real one.
+func validateParagraphItem(item paragraphItem) error {
+	scratch := docx.NewDocument()
+	para, err := scratch.AddParagraph()
+	if err != nil {
+		return err
+	}
+	return applyParagraph(para, item)
+}
+
+// resolveCell resolves a tableCellRef to a cell, with range-checked indices.
+func resolveCell(doc domain.Document, ref tableCellRef) (domain.TableCell, error) {
+	if ref.TableIndex == nil || ref.RowIndex == nil || ref.ColumnIndex == nil {
+		return nil, fmt.Errorf("tableIndex, rowIndex, and columnIndex are all required")
+	}
+	tableIndex, rowIndex, columnIndex := *ref.TableIndex, *ref.RowIndex, *ref.ColumnIndex
+
+	tables := doc.Tables()
+	if tableIndex < 0 || tableIndex >= len(tables) {
+		return nil, fmt.Errorf("table index %d out of range (document has %d tables)",
+			tableIndex, len(tables))
+	}
+	row, err := tables[tableIndex].Row(rowIndex)
+	if err != nil {
+		return nil, fmt.Errorf("row %d: %w", rowIndex, err)
+	}
+	cell, err := row.Cell(columnIndex)
+	if err != nil {
+		return nil, fmt.Errorf("column %d: %w", columnIndex, err)
+	}
+	return cell, nil
+}
+
+func (s *server) handleTableGetCell(req *Request) Response {
+	const op = "table.getCell"
+
+	var params tableCellRef
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	cell, err := resolveCell(doc, params)
+	if err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	paragraphs := cell.Paragraphs()
+	texts := make([]string, 0, len(paragraphs))
+	for _, p := range paragraphs {
+		texts = append(texts, p.Text())
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"text":           strings.Join(texts, "\n"),
+		"paragraphs":     texts,
+		"paragraphCount": len(paragraphs),
+	}}
+}
+
+func (s *server) handleTableSetCell(req *Request) Response {
+	const op = "table.setCell"
+
+	var params tableSetCellParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	if params.Text != nil && params.Paragraphs != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			"provide either text or paragraphs, not both", op)
+	}
+	if params.Text == nil && params.Paragraphs == nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			"provide either text or paragraphs; to empty the cell pass an empty paragraphs array", op)
+	}
+
+	cell, err := resolveCell(doc, params.tableCellRef)
+	if err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	// A cell swallowed by a horizontal merge is never serialized, so writing
+	// to it would report success and then silently drop the content on save.
+	// Point the caller at the leading cell of the merged region instead.
+	if cell.IsHorizontallyMergedContinuation() {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			fmt.Sprintf("cell (%d,%d) is covered by a horizontal merge and is not written to the document; "+
+				"target the leading cell of the merged region instead",
+				*params.RowIndex, *params.ColumnIndex), op)
+	}
+
+	// A vertical-merge continuation cell is serialized, but Word ignores its
+	// content and renders the vMerge-restart cell above it instead — writing
+	// here would report success while remaining invisible.
+	if cell.VMerge() == domain.VMergeContinue {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			fmt.Sprintf("cell (%d,%d) is a continuation of a vertical merge and its content is not displayed; "+
+				"target the topmost cell of the merged region instead",
+				*params.RowIndex, *params.ColumnIndex), op)
+	}
+
+	rawItems := params.Paragraphs
+	if params.Text != nil {
+		item, err := json.Marshal(paragraphItem{Text: *params.Text})
+		if err != nil {
+			return errorResponse(req.ID, errors.ErrCodeInternal, "encoding text item: "+err.Error(), op)
+		}
+		rawItems = []json.RawMessage{item}
+	}
+
+	// Decode and validate every item before touching the cell. Writing the
+	// content clears what is already there, so a request that turns out to
+	// be invalid halfway through would otherwise destroy the cell's original
+	// content and still return an error.
+	items := make([]paragraphItem, 0, len(rawItems))
+	for i, raw := range rawItems {
+		var pItem paragraphItem
+		if err := decodeStrict(raw, &pItem); err != nil {
+			return errorResponse(req.ID, errors.ErrCodeValidation,
+				fmt.Sprintf("invalid paragraph at index %d: %v", i, err), op)
+		}
+		if err := validateParagraphItem(pItem); err != nil {
+			return errorResponse(req.ID, errors.ErrCodeValidation,
+				fmt.Sprintf("invalid paragraph at index %d: %v", i, err), op)
+		}
+		items = append(items, pItem)
+	}
+
+	// Replace the cell's content: clear every existing paragraph, then write
+	// the new items into existing paragraphs (reusing their slots) and append
+	// paragraphs for any overflow. Cells cannot drop paragraphs, so leftover
+	// paragraphs beyond the new content stay as empty paragraphs.
+	existing := cell.Paragraphs()
+	for _, p := range existing {
+		p.ClearRuns()
+	}
+	for i, pItem := range items {
+		var para domain.Paragraph
+		if i < len(existing) {
+			para = existing[i]
+		} else {
+			para, err = cell.AddParagraph()
+			if err != nil {
+				return errorResponse(req.ID, errors.ErrCodeInternal, "failed to add paragraph: "+err.Error(), op)
+			}
+		}
+		if err := applyParagraph(para, pItem); err != nil {
+			return errorResponse(req.ID, errors.ErrCodeInternal,
+				fmt.Sprintf("applying validated paragraph %d: %v", i, err), op)
+		}
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":             true,
+		"paragraphCount": len(cell.Paragraphs()),
 	}}
 }
 
