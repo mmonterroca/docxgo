@@ -24,6 +24,12 @@ type docxField struct {
 	result     string
 	isDirty    bool // Indicates if field needs recalculation
 	properties map[string]string
+	// err records a rejection from one of the New*Field constructors — a
+	// caller-supplied value that would have broken out of the field code's
+	// quoted argument (e.g. a `"` in a hyperlink URL or a STYLEREF style
+	// name). The field is left with its safe default code; run.AddField
+	// checks this via ValidationError and refuses to attach the field.
+	err error
 }
 
 // NewField creates a new field with the specified type.
@@ -62,28 +68,63 @@ func NewTOCField(switches map[string]string) domain.Field {
 	}
 
 	// Rebuild code with switches
-	field.code = field.buildTOCCode()
+	code, err := field.buildTOCCode()
+	if err != nil {
+		field.err = err
+		return field
+	}
+	field.code = code
 
 	return field
 }
 
 // NewHyperlinkField creates a hyperlink field.
+//
+// url must not contain a double quote: it is interpolated inside a quoted
+// field-code argument, and Word's field-code syntax has no escape the
+// docxgo reader can round-trip (see extractQuotedStrings in
+// internal/reader/reconstruct.go). A url containing one is rejected — the
+// field is left with a safe default code and no url/display property, and
+// run.AddField refuses to attach it — rather than producing a corrupted or
+// injectable field code.
 func NewHyperlinkField(url, displayText string) domain.Field {
 	field := NewField(domain.FieldTypeHyperlink).(*docxField)
+	safe := strings.ReplaceAll(url, `"`, "")
+	if safe != url {
+		field.err = errors.NewValidationError("NewHyperlinkField", "url", url,
+			`url must not contain a double quote`)
+		return field
+	}
 	field.properties["url"] = url
 	field.properties["display"] = displayText
-	field.code = fmt.Sprintf(`HYPERLINK "%s"`, url)
+	field.code = fmt.Sprintf(`HYPERLINK "%s"`, safe)
 	field.result = displayText
 	field.isDirty = false
 	return field
 }
 
-// NewStyleRefField creates a STYLEREF field.
+// NewStyleRefField creates a STYLEREF field. styleName is subject to the
+// same quoting constraint as NewHyperlinkField's url.
 func NewStyleRefField(styleName string) domain.Field {
 	field := NewField(domain.FieldTypeStyleRef).(*docxField)
+	safe := strings.ReplaceAll(styleName, `"`, "")
+	if safe != styleName {
+		field.err = errors.NewValidationError("NewStyleRefField", "styleName", styleName,
+			`styleName must not contain a double quote`)
+		return field
+	}
 	field.properties["style"] = styleName
-	field.code = fmt.Sprintf(`STYLEREF "%s"`, styleName)
+	field.code = fmt.Sprintf(`STYLEREF "%s"`, safe)
 	return field
+}
+
+// ValidationError reports a rejection recorded by NewHyperlinkField,
+// NewStyleRefField, or NewTOCField. run.AddField checks this via a type
+// assertion and refuses to attach a field that failed construction.
+func (f *docxField) ValidationError() error {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.err
 }
 
 // Type returns the field type.
@@ -212,13 +253,19 @@ func (f *docxField) getDefaultCode() string {
 	}
 }
 
-// buildTOCCode builds a TOC field code with switches.
-func (f *docxField) buildTOCCode() string {
+// buildTOCCode builds a TOC field code with switches. levels is subject to
+// the same quoting constraint as NewHyperlinkField's url.
+func (f *docxField) buildTOCCode() (string, error) {
 	code := constants.FieldCodeTOC
 
 	// Heading levels (default 1-3)
 	if levels, ok := f.properties["levels"]; ok {
-		code += fmt.Sprintf(` \\o "%s"`, levels)
+		safe := strings.ReplaceAll(levels, `"`, "")
+		if safe != levels {
+			return "", errors.NewValidationError("NewTOCField", "levels", levels,
+				`levels must not contain a double quote`)
+		}
+		code += fmt.Sprintf(` \\o "%s"`, safe)
 	} else {
 		code += ` \\o "1-3"`
 	}
@@ -242,7 +289,7 @@ func (f *docxField) buildTOCCode() string {
 	// Use styles
 	code += ` \\u`
 
-	return code
+	return code, nil
 }
 
 // SetProperty sets a field property (for advanced customization).
