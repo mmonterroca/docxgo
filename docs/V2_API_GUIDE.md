@@ -509,6 +509,13 @@ current image decoding pipeline.
 
 Fields are dynamic elements that Word updates automatically.
 
+`NewHyperlinkField`'s `url`, `NewStyleRefField`'s `styleName`, and
+`NewTOCField`'s `"levels"` switch are embedded inside a quoted argument of the
+generated field code. None of these constructors return an error, so a value
+containing a double quote does not panic — it is rejected silently at
+construction (the field keeps its safe default code) and the rejection
+surfaces as an error from `run.AddField`, which callers should check.
+
 #### Available Field Types
 
 ```go

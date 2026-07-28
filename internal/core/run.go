@@ -209,6 +209,12 @@ func (r *run) AddField(field domain.Field) error {
 		return errors.InvalidArgument("Run.AddField", "field", nil, "field cannot be nil")
 	}
 
+	if validator, ok := field.(interface{ ValidationError() error }); ok {
+		if err := validator.ValidationError(); err != nil {
+			return errors.Wrap(err, "Run.AddField")
+		}
+	}
+
 	if field.Type() == domain.FieldTypeHyperlink {
 		accessor, ok := field.(interface {
 			GetProperty(string) (string, bool)

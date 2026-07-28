@@ -891,6 +891,37 @@ func TestHandleCreate_UnknownTheme(t *testing.T) {
 	}
 }
 
+// TestHandleCreate_FieldStyleWithQuoteRejected covers the RPC-reachable path
+// for the field-code injection CodeQL flagged (go/unsafe-quoting): a quote in
+// a styleRef field's style name used to break out of the quoted STYLEREF
+// argument in the generated field code.
+func TestHandleCreate_FieldStyleWithQuoteRejected(t *testing.T) {
+	s := newServer()
+	params := map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "paragraph",
+				"runs": []interface{}{
+					map[string]interface{}{
+						"field": map[string]interface{}{
+							"type":  "styleRef",
+							"style": `Heading 1" \* MERGEFORMAT "x`,
+						},
+					},
+				},
+			},
+		},
+		"output": "buffer",
+	}
+	resp := s.dispatch(makeRequest("t1", "document.create", params))
+	if resp.Error == nil {
+		t.Fatal("expected error for a style name containing a double quote")
+	}
+	if resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Error.Code)
+	}
+}
+
 // ─── Nil params tests ────────────────────────────────────────────────────────
 
 func TestHandleCreate_NilParams(t *testing.T) {
