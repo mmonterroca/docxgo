@@ -1,3 +1,39 @@
+## v2.11.0 — 2026-07-28
+
+v2.10.0 was merged and published without a code review — CI alone. A
+post-hoc review of that batch found ten confirmed defects that gofmt, `go
+vet`, `go test -race`, and golangci-lint cannot see by construction: they're
+about what the code *means*, not whether it compiles or races. This release
+fixes all ten in one batch rather than spreading them across several
+patches, since several touch the same request paths.
+
+### Fixed
+
+- **`document.replaceText`/`template.ReplaceText` no longer report a header or footer match as replaced when the write is discarded on save.** On a document opened via `document.open`, `WriteTo` writes preserved header/footer XML verbatim — an in-memory replacement there never reached the saved file, but the RPC reported it as `replaced` anyway. Those matches are now counted in `skipped` instead. `template.MergeTemplate` had the identical gap for placeholders inside a preserved header/footer; its `StrictMode` now surfaces them as missing keys rather than silently discarding the merge.
+- **`document.replaceText`, `table.getCell`, and `table.setCell` now decode params strictly.** They used plain `json.Unmarshal` for top-level params while nested paragraph items were already decoded strictly — a misspelled field (`replacement` instead of `replace`) silently decoded to a zero value indistinguishable from a deliberately minimal request, so a typo in a `replaceText` call deleted every occurrence of `find` and reported success.
+- **`paragraph.add`, `table.add`, and `document.addContent` no longer leave orphaned content behind when a request is rejected.** All three mutated the real document before content that could still fail (e.g. a field constructor rejecting a quote) had a chance to, so a rejected request could leave a stray, half-populated paragraph or table appended anyway. Each now validates against a scratch document first, the same pattern `paragraph.setText`/`table.setCell` already used.
+- **`SetIndent` no longer leaves a stale per-side flag from an earlier `SetIndentLeft`/`Right`/`FirstLine`/`Hanging` call.** A paragraph hydrated by the reader via `SetIndentLeft` and then given a `SetIndent` call for a different side kept the earlier flag, so the serializer emitted an explicit `w:left="0"` the `SetIndent` call never asked for — clobbering the paragraph's style indentation on that side. This was a round-trip regression introduced by v2.10.0's own indentation fix (#76). `SetIndent` now clears all four flags along with the struct it replaces.
+- **The serializer never emits both `w:ind`'s `firstLine` and `hanging` together.** `SetIndent` rejects setting both, but the per-side setters `SetIndentFirstLine`/`SetIndentHanging` don't share that check — reachable via the reader hydrating a source `<w:ind>` that already carries both attributes. Word treats the two as mutually exclusive even though the schema allows both; the serializer now emits only `hanging` when both are set, matching Word's own behavior.
+- **TOC field switches (`\o`, `\h`, `\n`, `\p`, `\z`, `\u`) are now written with a single backslash.** They were built as Go raw string literals containing two literal backslashes each — XML chardata escaping never touches a bare backslash, so the doubled backslash reached `word/document.xml` verbatim, and Word treats `\\o` as an unrecognized switch. A TOC field built by docxgo never actually applied any of its switches. Rebuilding an existing document doesn't change this on its own — only a document containing a TOC field constructed by `NewTOCField` (directly, or via `field: {type: "toc"}` in the RPC) is affected.
+- **`Field.SetCode` now rejects control characters and line breaks.** It previously accepted any non-blank string verbatim and `serializer.go` emits `Code()` straight into `<w:instrText>` — a way to reach the same class of corruption v2.10.0's field-code sanitizer (#85) exists to prevent, bypassing it entirely since `SetCode` sits outside the `New*Field` constructors' quote check. `SetCode` still accepts balanced quotes (e.g. `STYLEREF "Heading 1"`), since a well-formed instruction legitimately contains them. The reader hydrates a field's code from a real file's own `<w:instrText>` through a new, unexported `SetCodeRaw` path that bypasses this guard — the source file is the ground truth for a valid instruction, not this package's own validation, so `OpenDocument` doesn't fail on a normal `.docx` because of this new check.
+- **Release workflow no longer hard-fails when `RELEASE_PAT` is unset.** Passing an empty `secrets.RELEASE_PAT` as `softprops/action-gh-release`'s `token` input overrides the action's own fallback to `github.token` — an explicitly-passed empty `with:` input wins over the action's default, unlike an unset env var. `release.yml` now falls back explicitly (`secrets.RELEASE_PAT || github.token`), matching the degraded-but-working behavior the emptiness check next to it already documented.
+
+### Changed
+
+- **Docs corrected to match actual `paragraph.setText`/`table.setCell` behavior.** Both replace paragraph *content* (text and runs) only — any paragraph property (style, alignment, indent, spacing) omitted from the request keeps its existing value rather than being reset. `CLI_GUIDE.md` and the npm `ParagraphSetTextParams` JSDoc previously described these as full replacements without drawing that distinction.
+- **`TableSetCellResult`'s npm JSDoc corrected.** It said the cell "can grow but never shrink" — the pre-v2.10.0 behavior, which #84 (also v2.10.0) made false in the same release it shipped in.
+
+### Compatibility
+
+- **`document.replaceText`/`template.ReplaceText` response semantics change for documents with preserved headers/footers.** A call that used to report a header/footer match as `replaced` now reports it as `skipped`; the total match count is unchanged. Every other document shape is unaffected.
+- **`document.replaceText`, `table.getCell`, and `table.setCell` now reject a request containing an unrecognized top-level field**, where it used to be silently ignored. A well-formed request (no typos, no extra fields) is unaffected.
+- **TOC field code bytes change.** A document created with `NewTOCField`/`field: {type: "toc"}` under this release has single-backslash switches (`\o "1-3" \h \z \u`) instead of the doubled-backslash bytes v2.10.0 and earlier produced. This is a fix, not a behavior a caller could have depended on: the doubled-backslash form was never a working TOC field in Word.
+- **`Field.SetCode` (Go API only; not reachable from the RPC layer) now rejects a control character or line break** where it previously accepted anything non-blank. No CLI protocol or npm surface exposes `SetCode` directly.
+- No public Go interface changed. No new public Go, CLI protocol, or Node.js API surface.
+- **Retroactive note on v2.10.0's `Config` pointerization** (`### Compatibility` there described the change but not its concrete consequence): `docx.Config`'s `DefaultFont`/`DefaultFontSize`/`PageSize`/`Margins` fields becoming pointers is source-breaking for code that writes to a `*docx.Config` directly (e.g. a custom `docx.Option`), not for code that only calls `docx.With*` functions. `c.DefaultFont = "Arial"` no longer compiles. See `MIGRATION.md`.
+
+---
+
 ## v2.10.0 — 2026-07-27
 
 ### Added
