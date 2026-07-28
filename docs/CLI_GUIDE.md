@@ -23,10 +23,14 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
   - [document.addContent](#documentaddcontent)
   - [document.addPageBreak](#documentaddpagebreak)
   - [document.applyPatch](#documentapplypatch)
+  - [document.replaceText](#documentreplacetext)
   - [paragraph.add](#paragraphadd)
   - [paragraph.list](#paragraphlist)
+  - [paragraph.setText](#paragraphsettext)
   - [table.add](#tableadd)
   - [table.list](#tablelist)
+  - [table.getCell](#tablegetcell)
+  - [table.setCell](#tablesetcell)
   - [section.add](#sectionadd)
   - [template.inspect](#templateinspect)
   - [template.render](#templaterender)
@@ -222,6 +226,8 @@ Returns a map of supported features for the current binary.
   "batch": true,
   "applyPatch": true,
   "setLanguage": true,
+  "replaceText": true,
+  "cellEdit": true,
   "streaming": false,
   "partialUpdate": false
 }
@@ -639,6 +645,44 @@ Applies a sequence of patch operations to an existing document sequentially. **T
 
 ---
 
+### document.replaceText
+
+Replaces every occurrence of a literal string with another, across body paragraphs, table cells, headers, and footers.
+
+Matching is case-sensitive. Text fragmented across runs with identical formatting is matched as if it were one run; a match spanning runs with *different* formatting is still replaced, taking the formatting of the first run it touches — which flattens that formatting. For example, replacing `": PENDING ("` with `": DONE ("` in `"Status: **PENDING** (review)"` produces `"Status: DONE (review)"` with the bold lost, because the match spans the plain/bold boundary. A match that touches a run containing a field (page number, TOC, MERGEFIELD, hyperlink), a break, or an image is left untouched and counted in `skipped` instead — rewriting that run's text would corrupt or silently discard the non-text content.
+
+This does not reach into tables nested inside other tables, or into tables placed inside a header or footer — the same traversal limits as `template.render`/`template.inspect`, which share the underlying paragraph walk.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `find` | String | Yes | Literal text to search for; must not be empty |
+| `replace` | String | Yes | Replacement text; an empty string deletes each match |
+
+**Success result:**
+
+```json
+{ "replaced": 2, "skipped": 1 }
+```
+
+**Example:**
+
+```json
+{
+  "id": 11,
+  "method": "document.replaceText",
+  "params": {
+    "documentId": "doc-1",
+    "find": "{{status}}",
+    "replace": "Approved"
+  }
+}
+```
+
+---
+
 ### paragraph.add
 
 Adds a single paragraph to an existing document. Supports the same paragraph properties as the content array (style, alignment, spacing, runs, etc.).
@@ -710,6 +754,44 @@ Lists all paragraphs in a document with their text and style.
 
 ---
 
+### paragraph.setText
+
+Replaces a body paragraph's content by index (the same index reported by `paragraph.list`). This clears all of the paragraph's existing runs before writing the new content, so it is a full replacement, not an append.
+
+Accepts the same content fields as `paragraph.add`. Passing only `style` (no `text` and no `runs`) clears the paragraph's runs and writes nothing back — the paragraph is emptied, not left unchanged. This method only addresses paragraphs in the document body; paragraphs inside table cells or headers/footers are not reachable by index here — use `table.setCell` for cell content.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `index` | Number | Yes | Zero-based body paragraph index, as reported by `paragraph.list` |
+| `text` \| `runs` \| `style` \| ... | — | No | Same content fields as `paragraph.add` |
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 0 }
+```
+
+**Example:**
+
+```json
+{
+  "id": 12,
+  "method": "paragraph.setText",
+  "params": {
+    "documentId": "doc-1",
+    "index": 0,
+    "runs": [
+      { "text": "Completed", "bold": true }
+    ]
+  }
+}
+```
+
+---
+
 ### table.add
 
 Adds a table to an existing document. Uses the same table format as the content array.
@@ -770,6 +852,7 @@ Lists all tables in a document with their dimensions.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `documentId` | String | Yes | Session document ID |
+| `includeText` | Boolean | No | When true, adds each table's cell texts to the listing (default `false`) |
 
 **Success result:**
 
@@ -780,6 +863,89 @@ Lists all tables in a document with their dimensions.
     { "index": 0, "rows": 3, "columns": 2 },
     { "index": 1, "rows": 5, "columns": 4 }
   ]
+}
+```
+
+With `includeText: true`, each table item also gets a `cells` key: a `[][]string` of one row per table row, and one entry per **actual** cell in that row (a ragged/merged-cell row reports its real cells, not padded to `columns`). Each cell's paragraphs are joined with `"\n"`. The `cells` key is entirely absent when `includeText` is omitted or `false`.
+
+```json
+{
+  "count": 1,
+  "tables": [
+    {
+      "index": 0,
+      "rows": 2,
+      "columns": 2,
+      "cells": [
+        ["Question", "Answer"],
+        ["Do you encrypt data at rest?", "TBD"]
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### table.getCell
+
+Reads a single cell's content by table, row, and column index.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `tableIndex` | Number | Yes | Zero-based table index, as reported by `table.list` |
+| `rowIndex` | Number | Yes | Zero-based row index |
+| `columnIndex` | Number | Yes | Zero-based column index |
+
+**Success result:**
+
+```json
+{ "text": "TBD", "paragraphs": ["TBD"], "paragraphCount": 1 }
+```
+
+`text` is the cell's paragraphs joined with `"\n"`.
+
+---
+
+### table.setCell
+
+Replaces a single cell's content by table, row, and column index.
+
+Provide either `text` (a shortcut that writes one plain paragraph) or `paragraphs` (rich paragraph items, same shape as `paragraph.add`) — not both. The cell can grow to fit more paragraphs than it had, but it cannot shrink: paragraphs beyond the new content are left in place as empty paragraphs, since `domain.TableCell` only exposes adding paragraphs, not removing them. `paragraphCount` in the result reflects the cell's paragraph count after the write, which may be larger than the number of items you provided. To clear a cell, pass `"paragraphs": []` rather than `"text": ""` — an empty `text` is indistinguishable from omitting it.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `tableIndex` | Number | Yes | Zero-based table index |
+| `rowIndex` | Number | Yes | Zero-based row index |
+| `columnIndex` | Number | Yes | Zero-based column index |
+| `text` | String | No | Plain-text shortcut; mutually exclusive with `paragraphs` |
+| `paragraphs` | Array | No | Rich paragraph items; mutually exclusive with `text` |
+
+**Success result:**
+
+```json
+{ "ok": true, "paragraphCount": 1 }
+```
+
+**Example:**
+
+```json
+{
+  "id": 13,
+  "method": "table.setCell",
+  "params": {
+    "documentId": "doc-1",
+    "tableIndex": 0,
+    "rowIndex": 1,
+    "columnIndex": 1,
+    "text": "Yes"
+  }
 }
 ```
 
