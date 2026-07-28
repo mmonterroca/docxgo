@@ -528,11 +528,23 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 	leftSet, rightSet, firstLineSet, hangingSet := indentSetFlags(para)
 	if indent.Left != 0 || indent.Right != 0 || indent.FirstLine != 0 || indent.Hanging != 0 ||
 		leftSet || rightSet || firstLineSet || hangingSet {
+		firstLine := explicitOrNonZero(indent.FirstLine, firstLineSet)
+		hanging := explicitOrNonZero(indent.Hanging, hangingSet)
+		// CT_Ind allows both attributes, but Word treats them as mutually
+		// exclusive and only one can render correctly. SetIndent rejects
+		// setting both together, but the per-side setters (SetIndentFirstLine,
+		// SetIndentHanging) don't share that check — see their doc comments
+		// — so a paragraph can still reach here with both set, most often via
+		// the reader hydrating a source <w:ind> that already carries both.
+		// Emit only one, matching what Word itself does: hanging wins.
+		if firstLine != nil && hanging != nil {
+			firstLine = nil
+		}
 		props.Indentation = &xml.Indentation{
 			Left:      explicitOrNonZero(indent.Left, leftSet),
 			Right:     explicitOrNonZero(indent.Right, rightSet),
-			FirstLine: explicitOrNonZero(indent.FirstLine, firstLineSet),
-			Hanging:   explicitOrNonZero(indent.Hanging, hangingSet),
+			FirstLine: firstLine,
+			Hanging:   hanging,
 		}
 	}
 

@@ -434,14 +434,21 @@ func (p *paragraph) SetIndent(indent domain.Indentation) error {
 			"cannot have both first line indent and hanging indent")
 	}
 
-	// SetIndent replaces the whole struct in one call and deliberately does
-	// not touch the indent*Set flags: a zero-valued side in the struct is
-	// indistinguishable from a side the caller didn't intend to set, so
-	// marking all four here would claim explicit intent SetIndent's signature
-	// cannot actually express. Callers that need one side's zero value to
-	// override a style explicitly must use SetIndentLeft/Right/FirstLine/
+	// SetIndent replaces the whole struct in one call, so it clears all four
+	// set-flags along with it: a zero-valued side in the struct is the
+	// caller's explicit "no indent on this side" for the whole paragraph,
+	// not a per-side override, and any indent*Set left over from an earlier
+	// SetIndentLeft/Right/FirstLine/Hanging call would otherwise make the
+	// serializer emit that stale side's old value (e.g. a leftover
+	// w:left="0" from a prior SetIndentLeft) even though this call replaced
+	// it. Callers that need to override one side while leaving the other
+	// three genuinely untouched must use SetIndentLeft/Right/FirstLine/
 	// Hanging instead, each of which marks only its own side.
 	p.indent = indent
+	p.indentLeftSet = false
+	p.indentRightSet = false
+	p.indentFirstLineSet = false
+	p.indentHangingSet = false
 	return nil
 }
 
