@@ -315,6 +315,11 @@ export interface ParagraphListParams {
   documentId: string;
 }
 
+/** Replaces a body paragraph's content by index (as reported by paragraph.list). */
+export interface ParagraphSetTextParams extends ParagraphAddParams {
+  index: number;
+}
+
 export interface TableAddParams {
   documentId: string;
   rows?: TableRowDef[];
@@ -325,6 +330,29 @@ export interface TableAddParams {
 
 export interface TableListParams {
   documentId: string;
+  /** When true, adds each table's cell texts to the listing. */
+  includeText?: boolean;
+}
+
+export interface TableCellRef {
+  documentId: string;
+  tableIndex: number;
+  rowIndex: number;
+  columnIndex: number;
+}
+
+export type TableGetCellParams = TableCellRef;
+
+/** Provide either `text` or `paragraphs`, not both. */
+export interface TableSetCellParams extends TableCellRef {
+  text?: string;
+  paragraphs?: Array<Omit<ParagraphItem, 'type'>>;
+}
+
+export interface ReplaceTextParams {
+  documentId: string;
+  find: string;
+  replace: string;
 }
 
 export interface SectionAddParams {
@@ -422,6 +450,27 @@ export interface TableInfo {
 export interface TableListResult {
   count: number;
   tables: TableInfo[];
+}
+
+/** Result of table.getCell. */
+export interface TableCellResult {
+  /** The cell's paragraphs joined with "\n". */
+  text: string;
+  paragraphs: string[];
+  paragraphCount: number;
+}
+
+/** Result of table.setCell. The cell can grow but never shrink; this is the
+ * paragraph count after the write, which may exceed what was written. */
+export interface TableSetCellResult {
+  ok: boolean;
+  paragraphCount: number;
+}
+
+/** Result of document.replaceText. */
+export interface ReplaceTextResult {
+  replaced: number;
+  skipped: number;
 }
 
 // ─── System Types ────────────────────────────────────────────────────────────
