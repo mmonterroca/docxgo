@@ -331,9 +331,15 @@ type tableCellRef struct {
 
 // tableSetCellParams are the parameters for table.setCell. Text is a shortcut
 // for a single plain paragraph; Paragraphs carries rich content items.
+//
+// Both are pointers/slices rather than plain values so that "provided but
+// empty" stays distinguishable from "omitted": setCell replaces the cell's
+// content, so `"text": ""` and `"paragraphs": []` are meaningful requests to
+// empty it, while omitting both is a request with no content at all and is
+// rejected rather than silently wiping the cell.
 type tableSetCellParams struct {
 	tableCellRef
-	Text       string            `json:"text,omitempty"`
+	Text       *string           `json:"text,omitempty"`
 	Paragraphs []json.RawMessage `json:"paragraphs,omitempty"`
 }
 
@@ -1031,16 +1037,44 @@ func (s *server) handleParagraphSetText(req *Request) Response {
 				params.Index, len(paragraphs)), op)
 	}
 
+	// Validate before clearing: this method replaces the paragraph's content,
+	// so rejecting the request after ClearRuns would leave the caller with an
+	// error response and an emptied paragraph.
+	if err := validateParagraphItem(params.paragraphItem); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
 	para := paragraphs[params.Index]
 	para.ClearRuns()
 	if err := applyParagraph(para, params.paragraphItem); err != nil {
-		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+		return errorResponse(req.ID, errors.ErrCodeInternal,
+			"applying validated paragraph: "+err.Error(), op)
 	}
 
 	return Response{ID: req.ID, Result: map[string]interface{}{
 		"ok":    true,
 		"index": params.Index,
 	}}
+}
+
+// validateParagraphItem reports whether applyParagraph would accept item,
+// without touching the caller's document: it applies the item to a scratch
+// paragraph in a throwaway document and reports the outcome.
+//
+// paragraph.setText and table.setCell both clear existing content before
+// writing, so an item that turns out to be invalid has to be caught before
+// anything is destroyed. applyParagraph ignores failures from styling setters
+// (SetStyle, SetAlignment and friends are all discarded with _), so the only
+// errors this can surface come from AddRun/SetText and from hyperlink, field,
+// and image items — none of which depend on the target document's own styles,
+// so a scratch document gives the same verdict as the real one.
+func validateParagraphItem(item paragraphItem) error {
+	scratch := docx.NewDocument()
+	para, err := scratch.AddParagraph()
+	if err != nil {
+		return err
+	}
+	return applyParagraph(para, item)
 }
 
 // resolveCell resolves a tableCellRef to a cell, with range-checked indices.
@@ -1107,9 +1141,13 @@ func (s *server) handleTableSetCell(req *Request) Response {
 			fmt.Sprintf("document %q not found", params.DocumentID), op)
 	}
 
-	if params.Text != "" && len(params.Paragraphs) > 0 {
+	if params.Text != nil && params.Paragraphs != nil {
 		return errorResponse(req.ID, errors.ErrCodeValidation,
 			"provide either text or paragraphs, not both", op)
+	}
+	if params.Text == nil && params.Paragraphs == nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			"provide either text or paragraphs; to empty the cell pass an empty paragraphs array", op)
 	}
 
 	cell, err := resolveCell(doc, params.tableCellRef)
@@ -1117,13 +1155,41 @@ func (s *server) handleTableSetCell(req *Request) Response {
 		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
 	}
 
-	items := params.Paragraphs
-	if params.Text != "" {
-		item, err := json.Marshal(paragraphItem{Text: params.Text})
+	// A cell swallowed by a horizontal merge is never serialized, so writing
+	// to it would report success and then silently drop the content on save.
+	// Point the caller at the leading cell of the merged region instead.
+	if cell.IsHorizontallyMergedContinuation() {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			fmt.Sprintf("cell (%d,%d) is covered by a horizontal merge and is not written to the document; "+
+				"target the leading cell of the merged region instead",
+				params.RowIndex, params.ColumnIndex), op)
+	}
+
+	rawItems := params.Paragraphs
+	if params.Text != nil {
+		item, err := json.Marshal(paragraphItem{Text: *params.Text})
 		if err != nil {
 			return errorResponse(req.ID, errors.ErrCodeInternal, "encoding text item: "+err.Error(), op)
 		}
-		items = []json.RawMessage{item}
+		rawItems = []json.RawMessage{item}
+	}
+
+	// Decode and validate every item before touching the cell. Writing the
+	// content clears what is already there, so a request that turns out to
+	// be invalid halfway through would otherwise destroy the cell's original
+	// content and still return an error.
+	items := make([]paragraphItem, 0, len(rawItems))
+	for i, raw := range rawItems {
+		var pItem paragraphItem
+		if err := json.Unmarshal(raw, &pItem); err != nil {
+			return errorResponse(req.ID, errors.ErrCodeValidation,
+				fmt.Sprintf("invalid paragraph at index %d: %v", i, err), op)
+		}
+		if err := validateParagraphItem(pItem); err != nil {
+			return errorResponse(req.ID, errors.ErrCodeValidation,
+				fmt.Sprintf("invalid paragraph at index %d: %v", i, err), op)
+		}
+		items = append(items, pItem)
 	}
 
 	// Replace the cell's content: clear every existing paragraph, then write
@@ -1134,12 +1200,7 @@ func (s *server) handleTableSetCell(req *Request) Response {
 	for _, p := range existing {
 		p.ClearRuns()
 	}
-	for i, raw := range items {
-		var pItem paragraphItem
-		if err := json.Unmarshal(raw, &pItem); err != nil {
-			return errorResponse(req.ID, errors.ErrCodeValidation,
-				fmt.Sprintf("invalid paragraph at index %d: %v", i, err), op)
-		}
+	for i, pItem := range items {
 		var para domain.Paragraph
 		if i < len(existing) {
 			para = existing[i]
@@ -1150,7 +1211,8 @@ func (s *server) handleTableSetCell(req *Request) Response {
 			}
 		}
 		if err := applyParagraph(para, pItem); err != nil {
-			return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+			return errorResponse(req.ID, errors.ErrCodeInternal,
+				fmt.Sprintf("applying validated paragraph %d: %v", i, err), op)
 		}
 	}
 

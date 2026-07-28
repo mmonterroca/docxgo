@@ -653,8 +653,8 @@ Matching is case-sensitive. Text fragmented across runs with identical formattin
 
 Some matches are reported in `skipped` instead of being replaced:
 
-- A match touching a run that carries a **field** (page number, TOC, MERGEFIELD, hyperlink) is always skipped. Word regenerates a field's displayed text when it opens the document, so replacing it would report a change that never appears.
-- A match spanning **several** runs is also skipped when any of them carries a line/page break or an image, because collapsing those runs would leave that content stranded in the middle of the replacement. A match that fits inside a *single* run carrying a break or image is replaced normally, and the break or image is preserved.
+- A match touching a run that carries a **field** (page number, TOC, MERGEFIELD, hyperlink) is always skipped. Word regenerates a field's displayed text when it opens the document, so replacing it would report a change that never appears. This includes a field on a run holding no text of its own — the shape Word uses for a MERGEFIELD, where the field sits in an empty run immediately before the run holding its display text.
+- A match spanning **several** runs is also skipped when any run between its ends carries a line/page break or an image, because collapsing those runs would leave that content stranded in the middle of the replacement. A match that fits inside a *single* run carrying a break or image is replaced normally, and the break or image is preserved.
 
 This does not reach into tables nested inside other tables, or into tables placed inside a header or footer — the same traversal limits as `template.render`/`template.inspect`, which share the underlying paragraph walk.
 
@@ -871,7 +871,9 @@ Lists all tables in a document with their dimensions.
 }
 ```
 
-With `includeText: true`, each table item also gets a `cells` key: a `[][]string` of one row per table row, and one entry per **actual** cell in that row (a ragged/merged-cell row reports its real cells, not padded to `columns`). Each cell's paragraphs are joined with `"\n"`. The `cells` key is entirely absent when `includeText` is omitted or `false`.
+With `includeText: true`, each table item also gets a `cells` key: a `[][]string` of one row per table row, and one entry per cell that row actually holds. Each cell's paragraphs are joined with `"\n"`. The `cells` key is entirely absent when `includeText` is omitted or `false`.
+
+Note what this does **not** tell you about merged cells. A document read via `document.open` is reconstructed with every row padded to the full column grid, with the cells covered by a horizontal merge kept as empty placeholders — so a 4-column row made of two 2-column merges lists as `["Overview", "", "Detail", ""]`, not as two entries. Those empty strings are merge continuations, not empty cells, and `table.setCell` rejects writes to them (their content is never serialized). Only tables built in-session via `document.create` with genuinely ragged rows report fewer cells than `columns`.
 
 ```json
 {
@@ -919,7 +921,13 @@ Reads a single cell's content by table, row, and column index.
 
 Replaces a single cell's content by table, row, and column index.
 
-Provide either `text` (a shortcut that writes one plain paragraph) or `paragraphs` (rich paragraph items, same shape as `paragraph.add`) — not both. The cell can grow to fit more paragraphs than it had, but it cannot shrink: paragraphs beyond the new content are left in place as empty paragraphs, since `domain.TableCell` only exposes adding paragraphs, not removing them. `paragraphCount` in the result reflects the cell's paragraph count after the write, which may be larger than the number of items you provided. To clear a cell, pass `"paragraphs": []` rather than `"text": ""` — an empty `text` is indistinguishable from omitting it.
+Provide exactly one of `text` (a shortcut that writes one plain paragraph) or `paragraphs` (rich paragraph items, same shape as `paragraph.add`). Supplying **both** is rejected, and so is supplying **neither** — this method replaces the cell's content, so a request that names no content at all (a misspelled field, say) is an error rather than a silent wipe. To empty a cell, pass `"paragraphs": []` or `"text": ""`.
+
+The whole request is validated before the cell is touched: if any paragraph item is malformed or rejected, the call fails and the cell keeps its original content.
+
+Writes to a cell covered by a horizontal merge are rejected. Such a cell is never written to the file, so accepting the write would report success and then silently drop the content on save — target the leading cell of the merged region instead.
+
+The cell can grow to fit more paragraphs than it had, but it cannot shrink: paragraphs beyond the new content are left in place as empty paragraphs, since `domain.TableCell` only exposes adding paragraphs, not removing them. `paragraphCount` in the result reflects the cell's paragraph count after the write, which may be larger than the number of items you provided.
 
 **Params:**
 
@@ -929,8 +937,8 @@ Provide either `text` (a shortcut that writes one plain paragraph) or `paragraph
 | `tableIndex` | Number | Yes | Zero-based table index |
 | `rowIndex` | Number | Yes | Zero-based row index |
 | `columnIndex` | Number | Yes | Zero-based column index |
-| `text` | String | No | Plain-text shortcut; mutually exclusive with `paragraphs` |
-| `paragraphs` | Array | No | Rich paragraph items; mutually exclusive with `text` |
+| `text` | String | One of the two | Plain-text shortcut; mutually exclusive with `paragraphs`. `""` empties the cell |
+| `paragraphs` | Array | One of the two | Rich paragraph items; mutually exclusive with `text`. `[]` empties the cell |
 
 **Success result:**
 

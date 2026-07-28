@@ -976,6 +976,114 @@ func TestHandleTableSetCell_TextAndParagraphsConflict(t *testing.T) {
 	}
 }
 
+// cellText reads a cell's text back through table.getCell.
+func cellText(t *testing.T, s *server, docID string, table, row, col int) string {
+	t.Helper()
+	resp := s.dispatch(makeRequest(99, "table.getCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": table, "rowIndex": row, "columnIndex": col,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("getCell: %+v", resp.Error)
+	}
+	return resp.Result.(map[string]interface{})["text"].(string)
+}
+
+// paragraphText reads a body paragraph's text back through paragraph.list.
+func paragraphText(t *testing.T, s *server, docID string, index int) string {
+	t.Helper()
+	resp := s.dispatch(makeRequest(98, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("paragraph.list: %+v", resp.Error)
+	}
+	paras := resp.Result.(map[string]interface{})["paragraphs"].([]map[string]interface{})
+	return paras[index]["text"].(string)
+}
+
+// TestHandleTableSetCell_NoContentIsRejected covers a request carrying neither
+// text nor paragraphs — a misspelled content field, say. It used to clear the
+// cell and answer ok:true, destroying content the caller never asked to touch
+// and giving no signal that anything had happened.
+func TestHandleTableSetCell_NoContentIsRejected(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+	before := cellText(t, s, docID, 0, 1, 1)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"value": "Yes", // not a field the handler knows
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	if got := cellText(t, s, docID, 0, 1, 1); got != before {
+		t.Errorf("cell text = %q, want %q (unchanged)", got, before)
+	}
+}
+
+// TestHandleTableSetCell_EmptyParagraphsClears keeps the documented way to
+// empty a cell working now that "no content at all" is rejected.
+func TestHandleTableSetCell_EmptyParagraphsClears(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"paragraphs": []interface{}{},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: %+v", resp.Error)
+	}
+	if got := cellText(t, s, docID, 0, 1, 1); got != "" {
+		t.Errorf("cell text = %q, want empty", got)
+	}
+}
+
+// TestHandleTableSetCell_InvalidItemLeavesCellIntact covers a request whose
+// second paragraph is rejected. The handler clears the cell before writing, so
+// validating only as it went left the caller with an error response and a
+// destroyed cell that could not be recovered from the session.
+func TestHandleTableSetCell_InvalidItemLeavesCellIntact(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+	before := cellText(t, s, docID, 0, 1, 1)
+
+	resp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"paragraphs": []interface{}{
+			map[string]interface{}{"text": "Yes"},
+			map[string]interface{}{"runs": []interface{}{
+				map[string]interface{}{"hyperlink": map[string]interface{}{"url": ""}},
+			}},
+		},
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	if got := cellText(t, s, docID, 0, 1, 1); got != before {
+		t.Errorf("cell text = %q, want %q (unchanged)", got, before)
+	}
+}
+
+// TestHandleParagraphSetText_InvalidContentLeavesParagraphIntact is the
+// paragraph-level counterpart: a rejected request must not empty the
+// paragraph it declined to rewrite.
+func TestHandleParagraphSetText_InvalidContentLeavesParagraphIntact(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+	before := paragraphText(t, s, docID, 0)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.setText", map[string]interface{}{
+		"documentId": docID, "index": 0,
+		"runs": []interface{}{
+			map[string]interface{}{"hyperlink": map[string]interface{}{"url": ""}},
+		},
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	if got := paragraphText(t, s, docID, 0); got != before {
+		t.Errorf("paragraph text = %q, want %q (unchanged)", got, before)
+	}
+}
+
 // TestIntegration_EditRoundTrip exercises the questionnaire flow: open a saved
 // document, replace text, fill an answer cell, rewrite a paragraph, save, then
 // reopen and verify all edits survived serialization.
