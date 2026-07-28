@@ -52,6 +52,8 @@ type document struct {
 	numberingTarget string
 	backgroundColor *domain.Color
 	language        *domain.Language
+	defaultFont     *string
+	defaultFontSize *int
 
 	// Preserved parts for round-trip operations (read-modify-write).
 	// When set, these parts are written verbatim to preserve original content.
@@ -397,7 +399,7 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	appProps := ser.SerializeAppProperties(d)
 
 	// Serialize styles (used only if no preserved styles are available)
-	styles := ser.SerializeStyles(d.styleManager, d.language)
+	styles := ser.SerializeStyles(d.styleManager, d.language, d.defaultFont, d.defaultFontSize)
 
 	mediaFiles := d.mediaManager.All()
 
@@ -574,6 +576,39 @@ func (d *document) SetLanguageRaw(lang *domain.Language) {
 	}
 	langCopy := *lang
 	d.language = &langCopy
+}
+
+// SetDefaultFont sets the document's default run font, written to
+// styles.xml's w:docDefaults/w:rPrDefault. Not part of domain.Document —
+// NewDocumentBuilder always starts from a fresh NewDocument(), which has no
+// preserved styles.xml to conflict with, so there's no round-trip guard to
+// write here the way SetLanguage needs one. Reached only via
+// NewDocumentBuilder's own type-assertion (mirrors SetLanguageRaw).
+func (d *document) SetDefaultFont(name string) error {
+	if d == nil {
+		return errors.InvalidState("Document.SetDefaultFont", "document is nil")
+	}
+	if name == "" {
+		return errors.InvalidArgument("Document.SetDefaultFont", "name", name, "font name must not be empty")
+	}
+	d.defaultFont = &name
+	return nil
+}
+
+// SetDefaultFontSize sets the document's default run font size in
+// half-points, written to the same w:docDefaults/w:rPrDefault as
+// SetDefaultFont. See SetDefaultFont regarding why this isn't part of
+// domain.Document.
+func (d *document) SetDefaultFontSize(halfPoints int) error {
+	if d == nil {
+		return errors.InvalidState("Document.SetDefaultFontSize", "document is nil")
+	}
+	if halfPoints <= 0 {
+		return errors.InvalidArgument("Document.SetDefaultFontSize", "halfPoints", halfPoints,
+			"font size must be a positive number of half-points")
+	}
+	d.defaultFontSize = &halfPoints
+	return nil
 }
 
 // StyleManager returns the style manager for this document.

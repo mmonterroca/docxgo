@@ -8,15 +8,20 @@ package docx
 
 import (
 	"github.com/mmonterroca/docxgo/v2/domain"
-	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
 // Config contains configuration options for document creation.
+//
+// DefaultFont, DefaultFontSize, PageSize, and Margins are pointers so
+// NewDocumentBuilder can tell "the caller set this" apart from "the caller
+// never touched this" — the same distinction Language already needed. A
+// caller who passes none of these options gets a document byte-identical to
+// one built before these fields existed.
 type Config struct {
-	DefaultFont      string
-	DefaultFontSize  int
-	PageSize         PageSize
-	Margins          Margins
+	DefaultFont      *string
+	DefaultFontSize  *int
+	PageSize         *PageSize
+	Margins          *Margins
 	StrictValidation bool
 	Metadata         *domain.Metadata
 	Language         *Language
@@ -90,19 +95,21 @@ var (
 // Option is a function that configures a Config.
 type Option func(*Config)
 
-// defaultConfig returns the default configuration.
+// defaultConfig returns the default configuration. DefaultFont,
+// DefaultFontSize, PageSize, and Margins are left nil: NewDocumentBuilder
+// only touches the document's actual defaults (A4, 1" margins, Calibri
+// 11pt) when the caller explicitly sets one of these options.
 func defaultConfig() *Config {
 	return &Config{
-		DefaultFont:      constants.DefaultFontName,
-		DefaultFontSize:  constants.DefaultFontSize,
-		PageSize:         Letter,
-		Margins:          NormalMargins,
 		StrictValidation: false,
 		Metadata:         &domain.Metadata{},
 	}
 }
 
-// WithDefaultFont sets the default font for the document.
+// WithDefaultFont sets the document's default run font, written to
+// styles.xml's w:docDefaults/w:rPrDefault — below the Normal style in the
+// OOXML cascade, so a theme applied via WithTheme still wins for any style
+// that sets its own font.
 //
 // Example:
 //
@@ -111,11 +118,13 @@ func defaultConfig() *Config {
 //	)
 func WithDefaultFont(font string) Option {
 	return func(c *Config) {
-		c.DefaultFont = font
+		c.DefaultFont = &font
 	}
 }
 
-// WithDefaultFontSize sets the default font size in half-points.
+// WithDefaultFontSize sets the document's default run font size in
+// half-points, written to the same w:docDefaults/w:rPrDefault as
+// WithDefaultFont.
 //
 // Example:
 //
@@ -124,11 +133,11 @@ func WithDefaultFont(font string) Option {
 //	)
 func WithDefaultFontSize(halfPoints int) Option {
 	return func(c *Config) {
-		c.DefaultFontSize = halfPoints
+		c.DefaultFontSize = &halfPoints
 	}
 }
 
-// WithPageSize sets the page size for the document.
+// WithPageSize sets the page size for the document's default section.
 //
 // Example:
 //
@@ -137,11 +146,13 @@ func WithDefaultFontSize(halfPoints int) Option {
 //	)
 func WithPageSize(size PageSize) Option {
 	return func(c *Config) {
-		c.PageSize = size
+		c.PageSize = &size
 	}
 }
 
-// WithMargins sets the page margins for the document.
+// WithMargins sets the page margins for the document's default section.
+// Margins has four fields (Top/Bottom/Left/Right); the section's header and
+// footer distances are left at their existing values.
 //
 // Example:
 //
@@ -150,18 +161,18 @@ func WithPageSize(size PageSize) Option {
 //	)
 func WithMargins(margins Margins) Option {
 	return func(c *Config) {
-		c.Margins = margins
+		c.Margins = &margins
 	}
 }
 
-// WithStrictValidation enables strict validation of the document structure.
-// When enabled, Build() will perform more rigorous checks.
+// WithStrictValidation is a no-op.
 //
-// Example:
-//
-//	builder := docx.NewDocumentBuilder(
-//	    docx.WithStrictValidation(),
-//	)
+// Deprecated: there has never been a strict-validation subsystem for this to
+// enable — Build()'s Validate() call always runs the same checks regardless
+// of this option. Config.StrictValidation is kept only so existing callers
+// don't fail to compile; it is never read. See
+// https://github.com/mmonterroca/docxgo/issues/92 for the tracking issue on
+// giving this real semantics.
 func WithStrictValidation() Option {
 	return func(c *Config) {
 		c.StrictValidation = true

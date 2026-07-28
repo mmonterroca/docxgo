@@ -54,6 +54,23 @@ func readZipPart(t *testing.T, doc domain.Document, part string) string {
 	return ""
 }
 
+// docDefaultsFragment extracts the <w:docDefaults>...</w:docDefaults>
+// element from a styles.xml string. Individual named styles (Heading8,
+// Quote, etc.) carry their own w:rFonts/w:sz, so a plain substring search
+// over the whole file would find those instead of docDefaults.
+func docDefaultsFragment(t *testing.T, stylesXML string) string {
+	t.Helper()
+	start := strings.Index(stylesXML, "<w:docDefaults>")
+	if start == -1 {
+		t.Fatalf("no <w:docDefaults> found in styles.xml: %s", stylesXML)
+	}
+	end := strings.Index(stylesXML[start:], "</w:docDefaults>")
+	if end == -1 {
+		t.Fatalf("no closing </w:docDefaults> found in styles.xml: %s", stylesXML)
+	}
+	return stylesXML[start : start+end+len("</w:docDefaults>")]
+}
+
 func TestDocumentBuilder_Build(t *testing.T) {
 	t.Run("builds document with paragraph", func(t *testing.T) {
 		builder := NewDocumentBuilder()
@@ -844,10 +861,15 @@ func TestBuilder_ErrorAccumulation(t *testing.T) {
 
 func TestOptions_Validation(t *testing.T) {
 	t.Run("WithDefaultFont validates font name", func(t *testing.T) {
-		doc, err := NewDocumentBuilder(
+		// A paragraph must be added: Build() also fails on an empty document,
+		// and without content that unrelated error would mask whether the
+		// empty font name was actually rejected.
+		builder := NewDocumentBuilder(
 			WithDefaultFont(""),
-		).Build()
+		)
+		builder.AddParagraph().Text("Test").End()
 
+		doc, err := builder.Build()
 		if err == nil {
 			t.Fatal("expected error for empty font name, got nil")
 		}
@@ -857,10 +879,12 @@ func TestOptions_Validation(t *testing.T) {
 	})
 
 	t.Run("WithDefaultFontSize validates font size", func(t *testing.T) {
-		doc, err := NewDocumentBuilder(
+		builder := NewDocumentBuilder(
 			WithDefaultFontSize(0),
-		).Build()
+		)
+		builder.AddParagraph().Text("Test").End()
 
+		doc, err := builder.Build()
 		if err == nil {
 			t.Fatal("expected error for invalid font size, got nil")
 		}
@@ -916,8 +940,12 @@ func TestOptions_Validation(t *testing.T) {
 
 func TestDocumentBuilder_Options(t *testing.T) {
 	t.Run("WithPageSize sets page size", func(t *testing.T) {
+		// The document's actual default page size is A4 (internal/core's
+		// NewSection), not Letter — using Legal here means the assertion
+		// fails if WithPageSize is a no-op, unlike a size that happens to
+		// coincide with either default.
 		builder := NewDocumentBuilder(
-			WithPageSize(Letter),
+			WithPageSize(Legal),
 		)
 		builder.AddParagraph().Text("Test").End()
 
@@ -931,22 +959,18 @@ func TestDocumentBuilder_Options(t *testing.T) {
 			t.Fatal("expected at least one section")
 		}
 
-		// Note: Default is A4, so we just verify a document was created
-		// The page size conversion is handled by the builder
-		if doc == nil {
-			t.Error("expected document to be created")
+		got := sections[0].PageSize()
+		if got.Width != Legal.Width || got.Height != Legal.Height {
+			t.Errorf("expected page size %+v, got %+v", Legal, got)
 		}
 	})
 
 	t.Run("WithMargins sets margins", func(t *testing.T) {
-		margins := Margins{
-			Top:    1440,
-			Bottom: 1440,
-			Left:   1440,
-			Right:  1440,
-		}
+		// NarrowMargins (720 on all four sides) differs from the section's
+		// own default (1440) on every field WithMargins configures, so this
+		// fails if the option is a no-op instead of passing by coincidence.
 		builder := NewDocumentBuilder(
-			WithMargins(margins),
+			WithMargins(NarrowMargins),
 		)
 		builder.AddParagraph().Text("Test").End()
 
@@ -960,9 +984,16 @@ func TestDocumentBuilder_Options(t *testing.T) {
 			t.Fatal("expected at least one section")
 		}
 
-		actualMargins := sections[0].Margins()
-		if actualMargins.Top != margins.Top || actualMargins.Left != margins.Left {
-			t.Errorf("expected margins %+v, got %+v", margins, actualMargins)
+		got := sections[0].Margins()
+		if got.Top != NarrowMargins.Top || got.Bottom != NarrowMargins.Bottom ||
+			got.Left != NarrowMargins.Left || got.Right != NarrowMargins.Right {
+			t.Errorf("expected top/bottom/left/right %+v, got %+v", NarrowMargins, got)
+		}
+		// docx.Margins has no Header/Footer fields; domain.Margins does.
+		// WithMargins must not zero them out — it should preserve whatever
+		// the section already had (the section's own default, 720).
+		if got.Header != domain.DefaultMargins.Header || got.Footer != domain.DefaultMargins.Footer {
+			t.Errorf("expected header/footer to stay at the section default (720 each), got %+v", got)
 		}
 	})
 
@@ -1733,5 +1764,85 @@ func TestOpenDocument_RoundTripsExplicitZeroSpacing(t *testing.T) {
 	}
 	if !strings.Contains(fragment, `w:after="0"`) {
 		t.Errorf(`expected w:after="0" to survive an open+resave round trip, got: %s`, fragment)
+	}
+}
+
+// TestWithDefaultFont_WritesDocDefaults pins #45: WithDefaultFont used to be
+// a silent no-op (the Config field was set but NewDocumentBuilder never read
+// it), so the font name never reached the generated document at all.
+func TestWithDefaultFont_WritesDocDefaults(t *testing.T) {
+	builder := NewDocumentBuilder(
+		WithDefaultFont("Georgia"),
+	)
+	builder.AddParagraph().Text("Test").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	styles := readZipPart(t, doc, "word/styles.xml")
+	docDefaults := docDefaultsFragment(t, styles)
+	if !strings.Contains(docDefaults, `w:ascii="Georgia"`) || !strings.Contains(docDefaults, `w:hAnsi="Georgia"`) {
+		t.Errorf("expected docDefaults to reference Georgia, got: %s", docDefaults)
+	}
+}
+
+// TestWithDefaultFontSize_WritesDocDefaults mirrors
+// TestWithDefaultFont_WritesDocDefaults for the size half of the same bug.
+func TestWithDefaultFontSize_WritesDocDefaults(t *testing.T) {
+	builder := NewDocumentBuilder(
+		WithDefaultFontSize(32), // 16pt
+	)
+	builder.AddParagraph().Text("Test").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	styles := readZipPart(t, doc, "word/styles.xml")
+	docDefaults := docDefaultsFragment(t, styles)
+	if !strings.Contains(docDefaults, `<w:sz w:val="32"`) {
+		t.Errorf("expected docDefaults to contain w:sz w:val=\"32\", got: %s", docDefaults)
+	}
+	if !strings.Contains(docDefaults, `<w:szCs w:val="32"`) {
+		t.Errorf("expected docDefaults to contain w:szCs w:val=\"32\", got: %s", docDefaults)
+	}
+}
+
+// TestWithoutBuilderOptions_NoRegression is the byte-identity guard for #45:
+// a builder with none of WithDefaultFont/WithDefaultFontSize/WithPageSize/
+// WithMargins set must produce output identical to before those options
+// were wired up — no docDefaults rFonts/sz, A4 page size, 1440 margins.
+// Unlike the other tests in this file, this one must pass before and after
+// the fix; it exists to catch the fix accidentally becoming the new default.
+func TestWithoutBuilderOptions_NoRegression(t *testing.T) {
+	builder := NewDocumentBuilder()
+	builder.AddParagraph().Text("Test").End()
+
+	doc, err := builder.Build()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	styles := readZipPart(t, doc, "word/styles.xml")
+	docDefaults := docDefaultsFragment(t, styles)
+	if strings.Contains(docDefaults, "w:rFonts") {
+		t.Errorf("expected no docDefaults w:rFonts without WithDefaultFont, got: %s", docDefaults)
+	}
+	if strings.Contains(docDefaults, "<w:sz ") || strings.Contains(docDefaults, "<w:szCs ") {
+		t.Errorf("expected no docDefaults w:sz/w:szCs without WithDefaultFontSize, got: %s", docDefaults)
+	}
+
+	sections := doc.Sections()
+	if len(sections) == 0 {
+		t.Fatal("expected at least one section")
+	}
+	if got := sections[0].PageSize(); got != domain.PageSizeA4 {
+		t.Errorf("expected default page size to stay A4, got %+v", got)
+	}
+	if got := sections[0].Margins(); got != domain.DefaultMargins {
+		t.Errorf("expected default margins to stay %+v, got %+v", domain.DefaultMargins, got)
 	}
 }

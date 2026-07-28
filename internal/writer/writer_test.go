@@ -217,12 +217,12 @@ func TestSerializeStyles_PPrDefaultPresentRegardlessOfLang(t *testing.T) {
 	sm := manager.NewStyleManager()
 	ser := serializer.NewDocumentSerializer()
 
-	withoutLang := ser.SerializeStyles(sm, nil)
+	withoutLang := ser.SerializeStyles(sm, nil, nil, nil)
 	if withoutLang.DocDefaults == nil || withoutLang.DocDefaults.ParaDefaults == nil {
 		t.Fatal("expected ParaDefaults to be set even without a language")
 	}
 
-	withLang := ser.SerializeStyles(sm, &domain.Language{Val: "en-US"})
+	withLang := ser.SerializeStyles(sm, &domain.Language{Val: "en-US"}, nil, nil)
 	if withLang.DocDefaults == nil || withLang.DocDefaults.ParaDefaults == nil {
 		t.Fatal("expected ParaDefaults to be set alongside a language")
 	}
