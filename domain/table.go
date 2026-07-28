@@ -68,6 +68,9 @@ type TableCell interface {
 	// AddParagraph adds a paragraph to this cell.
 	AddParagraph() (Paragraph, error)
 
+	// RemoveParagraph removes the paragraph at the given index.
+	RemoveParagraph(index int) error
+
 	// Paragraphs returns all paragraphs in this cell.
 	Paragraphs() []Paragraph
 

@@ -261,6 +261,17 @@ func (c *tableCell) AddParagraph() (domain.Paragraph, error) {
 	return para, nil
 }
 
+// RemoveParagraph removes the paragraph at the given index.
+func (c *tableCell) RemoveParagraph(index int) error {
+	if index < 0 || index >= len(c.paragraphs) {
+		return errors.InvalidArgument("TableCell.RemoveParagraph", "index", index,
+			"paragraph index out of bounds")
+	}
+
+	c.paragraphs = append(c.paragraphs[:index], c.paragraphs[index+1:]...)
+	return nil
+}
+
 // Paragraphs returns all paragraphs in this cell.
 func (c *tableCell) Paragraphs() []domain.Paragraph {
 	paras := make([]domain.Paragraph, len(c.paragraphs))

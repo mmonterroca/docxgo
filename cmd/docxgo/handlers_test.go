@@ -965,6 +965,63 @@ func TestHandleTableSetCell_RichParagraphs(t *testing.T) {
 	}
 }
 
+// TestHandleTableSetCell_ShrinksParagraphCount covers a write with fewer
+// paragraphs than the cell already had. It used to leave the leftover
+// paragraphs in place (cleared but present), so paragraphCount stayed at the
+// old, larger value instead of matching what was actually written.
+func TestHandleTableSetCell_ShrinksParagraphCount(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	growResp := s.dispatch(makeRequest(2, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"paragraphs": []interface{}{
+			map[string]interface{}{"text": "one"},
+			map[string]interface{}{"text": "two"},
+			map[string]interface{}{"text": "three"},
+		},
+	}))
+	if growResp.Error != nil {
+		t.Fatalf("setCell (grow) failed: %+v", growResp.Error)
+	}
+	if got := growResp.Result.(map[string]interface{})["paragraphCount"]; got != 3 {
+		t.Fatalf("paragraphCount after grow = %v, want 3", got)
+	}
+
+	shrinkResp := s.dispatch(makeRequest(3, "table.setCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+		"paragraphs": []interface{}{
+			map[string]interface{}{"text": "only"},
+		},
+	}))
+	if shrinkResp.Error != nil {
+		t.Fatalf("setCell (shrink) failed: %+v", shrinkResp.Error)
+	}
+	if got := shrinkResp.Result.(map[string]interface{})["paragraphCount"]; got != 1 {
+		t.Errorf("paragraphCount after shrink = %v, want 1", got)
+	}
+
+	cellResp := s.dispatch(makeRequest(4, "table.getCell", map[string]interface{}{
+		"documentId": docID, "tableIndex": 0, "rowIndex": 1, "columnIndex": 1,
+	}))
+	result := cellResp.Result.(map[string]interface{})
+	if got := result["text"]; got != "only" {
+		t.Errorf("cell text = %q, want %q", got, "only")
+	}
+	if got := result["paragraphCount"]; got != 1 {
+		t.Errorf("getCell paragraphCount = %v, want 1", got)
+	}
+
+	// In-memory counts alone don't prove serialization shrank too --
+	// confirm the actual <w:p> count in the saved XML. newEditTestDoc's
+	// fixture is 1 body paragraph + 4 cells * 1 paragraph = 5 <w:p>
+	// elements; after growing one cell to 3 and shrinking it back to 1,
+	// the total must return to exactly 5.
+	xml := string(documentSavedXML(t, s, docID))
+	if got := strings.Count(xml, "<w:p "); got+strings.Count(xml, "<w:p>") != 5 {
+		t.Errorf("total <w:p> count = %d, want 5", got+strings.Count(xml, "<w:p>"))
+	}
+}
+
 func TestHandleTableSetCell_TextAndParagraphsConflict(t *testing.T) {
 	s, docID := newEditTestDoc(t)
 
@@ -979,6 +1036,45 @@ func TestHandleTableSetCell_TextAndParagraphsConflict(t *testing.T) {
 }
 
 // cellText reads a cell's text back through table.getCell.
+// documentSavedXML saves docID via document.save (buffer) and returns the raw
+// bytes of word/document.xml, for tests that need to verify serialized
+// output rather than just in-memory object counts.
+func documentSavedXML(t *testing.T, s *server, docID string) []byte {
+	t.Helper()
+	saveResp := s.dispatch(makeRequest(999, "document.save", map[string]interface{}{
+		"documentId": docID, "output": "buffer",
+	}))
+	if saveResp.Error != nil {
+		t.Fatalf("document.save: %+v", saveResp.Error)
+	}
+	dataStr := saveResp.Result.(map[string]interface{})["data"].(string)
+	docxBytes, err := base64.StdEncoding.DecodeString(dataStr)
+	if err != nil {
+		t.Fatalf("decode base64: %v", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
+	if err != nil {
+		t.Fatalf("read docx as zip: %v", err)
+	}
+	for _, f := range zr.File {
+		if f.Name != "word/document.xml" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("open document.xml: %v", err)
+		}
+		defer rc.Close()
+		var buf bytes.Buffer
+		if _, err := buf.ReadFrom(rc); err != nil {
+			t.Fatalf("read document.xml: %v", err)
+		}
+		return buf.Bytes()
+	}
+	t.Fatal("word/document.xml not found in saved docx")
+	return nil
+}
+
 func cellText(t *testing.T, s *server, docID string, table, row, col int) string {
 	t.Helper()
 	resp := s.dispatch(makeRequest(99, "table.getCell", map[string]interface{}{
