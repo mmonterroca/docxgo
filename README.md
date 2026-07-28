@@ -200,3 +200,4 @@ docxgo v2 is distributed under the MIT license ([LICENSE](LICENSE)). Its Git his
 
 - **Support:** [GitHub Issues](https://github.com/mmonterroca/docxgo/issues) for bugs, questions, and feature requests
 - **Email:** misael@monterroca.com
+
