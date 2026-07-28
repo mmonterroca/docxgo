@@ -131,6 +131,14 @@ git push origin feature/your-feature-name
 - Engage in discussion if needed
 - Once approved, maintainers will merge to `master`
 
+#### Required checks
+
+`master` requires three status checks to pass before a PR can merge:
+`Lint, Build and Test`, `Node.js Tests`, and `CodeQL` (GitHub's code-scanning
+aggregate check — separate from the per-language `Analyze (...)` jobs, which
+are informational only). `master` does not currently require an approving
+review before merge — required checks are the actual merge gate.
+
 #### 9. Release Process
 
 Periodically, maintainers will:

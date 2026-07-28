@@ -31,7 +31,15 @@ jobs:
         with:
           version: v2.5.0
           args: --timeout=5m
-          only-new-issues: ${{ github.event_name == 'pull_request' }}
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l ./cmd ./pkg ./internal ./domain ./themes .)
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            echo "The files above are not gofmt-formatted. Run: gofmt -w <file>"
+            exit 1
+          fi
 
       - name: Get dependencies
         run: go mod download
@@ -41,6 +49,9 @@ jobs:
 
       - name: Run tests
         run: go test -v ./...
+
+      - name: Run tests with race detector
+        run: go test -race ./...
 
       - name: Test examples
         run: |
