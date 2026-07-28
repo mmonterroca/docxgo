@@ -1220,6 +1220,45 @@ func TestFieldCreationFunctions(t *testing.T) {
 	})
 }
 
+// TestTOCFieldSwitches_SingleBackslashInSavedXML is an end-to-end regression
+// test: buildTOCCode and getDefaultCode's TOC branch built their switches as
+// Go raw string literals (`\\o`), which is two literal backslashes, not one
+// escaped backslash. XML chardata escaping never touches a bare backslash,
+// so that doubled backslash reached word/document.xml verbatim, and Word
+// treats "\\o" as an unrecognized switch — the TOC field code never actually
+// applied any of \o, \h, \n, \p, \z, or \u. The saved XML must carry exactly
+// one backslash per switch.
+func TestTOCFieldSwitches_SingleBackslashInSavedXML(t *testing.T) {
+	doc := NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.AddField(NewTOCField(map[string]string{"hidePageNumbers": "true", "hideTabLeader": "true"})); err != nil {
+		t.Fatalf("AddField: %v", err)
+	}
+
+	documentXML := readZipPart(t, doc, "word/document.xml")
+
+	if strings.Contains(documentXML, `\\`) {
+		t.Errorf("document.xml contains a doubled backslash — TOC switches would be inert in Word: %s", documentXML)
+	}
+	// XML chardata escaping turns the switch's literal '"' into &#34;, so the
+	// quoted levels argument is checked separately from the plain switches.
+	if !strings.Contains(documentXML, `\o &#34;1-3&#34;`) {
+		t.Errorf("document.xml missing \\o switch with levels: %s", documentXML)
+	}
+	for _, want := range []string{`\h`, `\n`, `\p`, `\z`, `\u`} {
+		if !strings.Contains(documentXML, want) {
+			t.Errorf("document.xml missing switch %q: %s", want, documentXML)
+		}
+	}
+}
+
 func TestTableBuilder_Style(t *testing.T) {
 	t.Run("sets table style", func(t *testing.T) {
 		builder := NewDocumentBuilder()

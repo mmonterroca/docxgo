@@ -1372,7 +1372,15 @@ func buildFieldFromInstruction(instr string) (domain.Field, error) {
 		return nil, nil
 	}
 
-	if err := field.SetCode(trimmed); err != nil {
+	// SetCodeRaw, not SetCode: trimmed comes from the source file's own
+	// <w:instrText>, which is the ground truth for what a field instruction
+	// looks like, not this package's own validation. Bypassing SetCode's
+	// control-character guard here means OpenDocument can't fail on a
+	// perfectly normal .docx merely because some producer emitted a byte
+	// SetCode wouldn't accept from a caller building a field from scratch.
+	if setter, ok := field.(interface{ SetCodeRaw(string) }); ok {
+		setter.SetCodeRaw(trimmed)
+	} else if err := field.SetCode(trimmed); err != nil {
 		return nil, errors.Wrap(err, opBuildField)
 	}
 
