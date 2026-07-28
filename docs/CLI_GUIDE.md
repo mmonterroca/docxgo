@@ -655,6 +655,7 @@ Some matches are reported in `skipped` instead of being replaced:
 
 - A match touching a run that carries a **field** (page number, TOC, MERGEFIELD, hyperlink) is always skipped. Word regenerates a field's displayed text when it opens the document, so replacing it would report a change that never appears. This includes a field on a run holding no text of its own — the shape Word uses for a MERGEFIELD, where the field sits in an empty run immediately before the run holding its display text.
 - A match spanning **several** runs is also skipped when any run between its ends carries a line/page break or an image, because collapsing those runs would leave that content stranded in the middle of the replacement. A match that fits inside a *single* run carrying a break or image is replaced normally, and the break or image is preserved.
+- On a document opened with `document.open`, every match inside a **header or footer** is skipped whenever the document has any preserved header or footer part. Header/footer XML from an opened document is written back byte-for-byte on save (see `document.save`), so an in-memory replacement there would never reach the saved file — reporting it as `replaced` would be a false success. This is a document-wide check, not a per-header/footer one: if any header or footer was preserved, all header/footer matches are skipped, even in a section whose own header/footer wasn't touched.
 
 This does not reach into tables nested inside other tables, or into tables placed inside a header or footer — the same traversal limits as `template.render`/`template.inspect`, which share the underlying paragraph walk.
 
@@ -665,6 +666,8 @@ This does not reach into tables nested inside other tables, or into tables place
 | `documentId` | String | Yes | Session document ID |
 | `find` | String | Yes | Literal text to search for; must not be empty |
 | `replace` | String | Yes | Replacement text; an empty string deletes each match |
+
+Params are decoded strictly: an unrecognized field is rejected rather than silently ignored.
 
 **Success result:**
 
@@ -761,7 +764,9 @@ Lists all paragraphs in a document with their text and style.
 
 ### paragraph.setText
 
-Replaces a body paragraph's content by index (the same index reported by `paragraph.list`). This clears all of the paragraph's existing runs before writing the new content, so it is a full replacement, not an append.
+Replaces a body paragraph's content by index (the same index reported by `paragraph.list`). This clears all of the paragraph's existing runs before writing the new content, so it is a full replacement of the paragraph's *content* (text and runs) — not an append.
+
+It is not a full replacement of the paragraph's *properties*. Style, alignment, indentation, and spacing are only touched by the fields you pass; anything omitted keeps whatever the paragraph already had. Fixing a typo with `paragraph.setText({"index": 0, "text": "..."})` on a Heading1, centered paragraph leaves it a Heading1, centered paragraph — it does not reset it to a plain, left-aligned one. To clear a property, set it explicitly to its default (e.g. `"alignment": "left"`).
 
 Accepts the same content fields as `paragraph.add`, but decoded strictly: an unrecognized field or a `null` value is rejected rather than silently treated as absent, since a typo in a request that replaces content must not read as "clear it". Passing only `style` (no `text` and no `runs`) clears the paragraph's runs and writes nothing back — the paragraph is emptied, not left unchanged. This method only addresses paragraphs in the document body; paragraphs inside table cells or headers/footers are not reachable by index here — use `table.setCell` for cell content.
 
@@ -907,6 +912,8 @@ Reads a single cell's content by table, row, and column index.
 | `rowIndex` | Number | Yes | Zero-based row index |
 | `columnIndex` | Number | Yes | Zero-based column index |
 
+Params are decoded strictly: an unrecognized field is rejected rather than silently ignored.
+
 **Success result:**
 
 ```json
@@ -923,7 +930,9 @@ Replaces a single cell's content by table, row, and column index.
 
 Provide exactly one of `text` (a shortcut that writes one plain paragraph) or `paragraphs` (rich paragraph items, same shape as `paragraph.add`). Supplying **both** is rejected, and so is supplying **neither** — this method replaces the cell's content, so a request that names no content at all (a misspelled field, say) is an error rather than a silent wipe. To empty a cell, pass `"paragraphs": []` or `"text": ""`.
 
-The whole request is validated before the cell is touched: if any paragraph item is malformed or rejected, the call fails and the cell keeps its original content. Unlike `paragraph.add`, each paragraph item here is decoded strictly — an unrecognized field or a `null` item is rejected rather than silently treated as an empty paragraph, since a typo in a request that replaces content must not read as "clear it".
+As with `paragraph.setText`, this replaces paragraph *content*, not paragraph *properties* — a reused paragraph slot keeps whatever style, alignment, indentation, and spacing it already had unless the corresponding paragraph item field says otherwise.
+
+The whole request is validated before the cell is touched: if any paragraph item is malformed or rejected, the call fails and the cell keeps its original content. Every field — the top-level params and each paragraph item — is decoded strictly: an unrecognized field or a `null` item is rejected rather than silently treated as an empty paragraph, since a typo in a request that replaces content must not read as "clear it".
 
 Writes to a cell covered by a horizontal merge are rejected. Such a cell is never written to the file, so accepting the write would report success and then silently drop the content on save — target the leading cell of the merged region instead.
 

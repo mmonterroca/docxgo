@@ -319,7 +319,10 @@ export interface ParagraphListParams {
   documentId: string;
 }
 
-/** Replaces a body paragraph's content by index (as reported by paragraph.list). */
+/** Replaces a body paragraph's content by index (as reported by paragraph.list).
+ * Replaces content (text and runs) only — any of the inherited fields you
+ * omit (style, alignment, indent, ...) leaves the paragraph's existing value
+ * untouched rather than resetting it. */
 export interface ParagraphSetTextParams extends ParagraphAddParams {
   index: number;
 }
@@ -470,8 +473,9 @@ export interface TableCellResult {
   paragraphCount: number;
 }
 
-/** Result of table.setCell. The cell can grow but never shrink; this is the
- * paragraph count after the write, which may exceed what was written. */
+/** Result of table.setCell. paragraphCount always equals the number of
+ * paragraph items written — fewer than the cell had removes the trailing
+ * ones, more appends new ones. */
 export interface TableSetCellResult {
   ok: boolean;
   paragraphCount: number;
