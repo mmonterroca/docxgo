@@ -126,10 +126,18 @@ func paragraphSpans(para domain.Paragraph) ([]runSpan, string) {
 // paragraph text, subject to the run-content rules documented on
 // ReplaceText. Returns false (and no error) when the match must be skipped.
 func replaceSpan(spans []runSpan, start, end int, replace string) (bool, error) {
+	// Runs that actually carry matched text. Zero-width runs contribute no
+	// match text, so only these are ever rewritten below — but they are not
+	// the whole story for deciding whether the match may be rewritten at
+	// all, which is what the two scans further down widen.
+	lo, hi := -1, -1
 	var spanned []runSpan
-	for _, s := range spans {
-		// Zero-width (empty) runs cannot contribute match text.
+	for i, s := range spans {
 		if s.end > s.start && s.start < end && s.end > start {
+			if lo < 0 {
+				lo = i
+			}
+			hi = i
 			spanned = append(spanned, s)
 		}
 	}
@@ -139,10 +147,21 @@ func replaceSpan(spans []runSpan, start, end int, replace string) (bool, error) 
 
 	// A field-bearing run's text is never serialized: the paragraph
 	// serializer routes it through expandRunWithFields, which emits the
-	// field's own result instead. Rewriting that run's text would report a
-	// replacement Word never makes, so skip the match however few runs it
-	// spans.
-	for _, s := range spanned {
+	// field's own result instead. Rewriting around it would report a
+	// replacement Word never makes, so any field vetoes the match however
+	// few runs it spans.
+	//
+	// The scan starts before the first matched run because Word stores a
+	// MERGEFIELD as an empty field-bearing run immediately followed by the
+	// run holding its display text (see replaceParagraph in merge.go): the
+	// field carries no text of its own, so an overlap test alone never sees
+	// it, yet replacing the display text would leave the field live beside
+	// the replacement.
+	fieldLo := lo
+	for fieldLo > 0 && spans[fieldLo-1].end == spans[fieldLo-1].start {
+		fieldLo--
+	}
+	for _, s := range spans[fieldLo : hi+1] {
 		if len(s.run.Fields()) > 0 {
 			return false, nil
 		}
@@ -150,12 +169,13 @@ func replaceSpan(spans []runSpan, start, end int, replace string) (bool, error) 
 
 	// Breaks and images are the opposite case: a run carrying one still has
 	// its text serialized normally, and SetText leaves the break or image
-	// alone, so a match confined to that single run is safely replaceable.
-	// Across several runs it is not — blanking a spanned middle run's text
-	// would strand its break or image in the middle of the replacement — so
-	// only the multi-run path applies the stricter test.
+	// alone, so a match confined to a single run is safely replaceable.
+	// Across several runs it is not — the runs between the ends are blanked,
+	// and a break or image among them would be stranded in the middle of the
+	// replacement. That includes zero-width runs interleaved between the
+	// matched ones, the shape the reader produces for a standalone <w:br/>.
 	if len(spanned) > 1 {
-		for _, s := range spanned {
+		for _, s := range spans[lo : hi+1] {
 			if !isTextOnly(s.run) {
 				return false, nil
 			}
