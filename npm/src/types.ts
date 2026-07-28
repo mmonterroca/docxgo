@@ -300,6 +300,8 @@ export interface AddPageBreakParams {
 
 export interface ParagraphAddParams {
   documentId: string;
+  /** Plain-text shortcut for a single unformatted run. Ignored when `runs` is given. */
+  text?: string;
   style?: string;
   alignment?: Alignment;
   spacingBefore?: number;
@@ -343,7 +345,11 @@ export interface TableCellRef {
 
 export type TableGetCellParams = TableCellRef;
 
-/** Provide either `text` or `paragraphs`, not both. */
+/**
+ * Provide exactly one of `text` or `paragraphs` — supplying both, or neither,
+ * is rejected. Both replace the cell's content, so `text: ''` and
+ * `paragraphs: []` are meaningful requests to empty it.
+ */
 export interface TableSetCellParams extends TableCellRef {
   text?: string;
   paragraphs?: Array<Omit<ParagraphItem, 'type'>>;
