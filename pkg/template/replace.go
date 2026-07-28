@@ -116,9 +116,11 @@ func paragraphSpans(para domain.Paragraph) ([]runSpan, string) {
 }
 
 // replaceSpan writes replace over the byte range [start, end) of the
-// paragraph text. A match confined to a single run is always replaceable;
-// a match spanning several runs is replaceable only if every spanned run is
-// text-only. Returns false (and no error) when the match must be skipped.
+// paragraph text. A match is replaceable only if every run it spans —
+// whether that's one run or several — is text-only; a match touching a run
+// with a field, break, or image is skipped, since rewriting that run's text
+// would corrupt or silently discard the non-text content. Returns false
+// (and no error) when the match must be skipped.
 func replaceSpan(spans []runSpan, start, end int, replace string) (bool, error) {
 	var spanned []runSpan
 	for _, s := range spans {
@@ -131,11 +133,9 @@ func replaceSpan(spans []runSpan, start, end int, replace string) (bool, error) 
 		return false, nil
 	}
 
-	if len(spanned) > 1 {
-		for _, s := range spanned {
-			if !isTextOnly(s.run) {
-				return false, nil
-			}
+	for _, s := range spanned {
+		if !isTextOnly(s.run) {
+			return false, nil
 		}
 	}
 
