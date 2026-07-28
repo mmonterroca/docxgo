@@ -198,6 +198,49 @@ func NewDocumentBuilder(opts ...Option) *DocumentBuilder {
 		}
 	}
 
+	if config.PageSize != nil || config.Margins != nil {
+		if sec, err := doc.DefaultSection(); err != nil {
+			builder.errors = append(builder.errors, err)
+		} else {
+			if config.PageSize != nil {
+				if err := sec.SetPageSize(domain.PageSize{Width: config.PageSize.Width, Height: config.PageSize.Height}); err != nil {
+					builder.errors = append(builder.errors, err)
+				}
+			}
+			if config.Margins != nil {
+				// domain.Margins also carries Header/Footer, which docx.Margins
+				// doesn't expose. Start from the section's current margins (a
+				// fresh NewDocument section, so its own defaults) and overwrite
+				// only the four sides WithMargins actually configures, instead
+				// of a naive struct literal that would zero Header/Footer.
+				merged := sec.Margins()
+				merged.Top = config.Margins.Top
+				merged.Bottom = config.Margins.Bottom
+				merged.Left = config.Margins.Left
+				merged.Right = config.Margins.Right
+				if err := sec.SetMargins(merged); err != nil {
+					builder.errors = append(builder.errors, err)
+				}
+			}
+		}
+	}
+
+	if config.DefaultFont != nil {
+		if setter, ok := doc.(interface{ SetDefaultFont(string) error }); ok {
+			if err := setter.SetDefaultFont(*config.DefaultFont); err != nil {
+				builder.errors = append(builder.errors, err)
+			}
+		}
+	}
+
+	if config.DefaultFontSize != nil {
+		if setter, ok := doc.(interface{ SetDefaultFontSize(int) error }); ok {
+			if err := setter.SetDefaultFontSize(*config.DefaultFontSize); err != nil {
+				builder.errors = append(builder.errors, err)
+			}
+		}
+	}
+
 	// Apply theme if provided
 	if config.Theme != nil {
 		// Use type assertion to get Theme interface

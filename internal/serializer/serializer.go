@@ -1321,10 +1321,12 @@ func documentDefaultParagraphProperties() *xml.ParagraphDefaults {
 	}
 }
 
-// SerializeStyles converts a domain.StyleManager to xml.Styles. When lang is
-// non-nil, it is written as the document's default proofing language
-// (w:docDefaults/w:rPrDefault/w:rPr/w:lang).
-func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager, lang *domain.Language) *xml.Styles {
+// SerializeStyles converts a domain.StyleManager to xml.Styles, writing lang,
+// defaultFont, and defaultFontSize (any of which may be nil) into
+// w:docDefaults/w:rPrDefault. docDefaults sits below the Normal style in the
+// OOXML cascade, so a theme's own font/size on Normal still wins over these —
+// they only take effect for styles that don't set their own.
+func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager, lang *domain.Language, defaultFont *string, defaultFontSize *int) *xml.Styles {
 	xmlStyles := xml.NewStyles()
 
 	// Include Word's latent style catalog to avoid auto-added styles during repair
@@ -1333,12 +1335,19 @@ func (s *DocumentSerializer) SerializeStyles(styleManager domain.StyleManager, l
 	xmlStyles.DocDefaults = &xml.DocDefaults{
 		ParaDefaults: documentDefaultParagraphProperties(),
 	}
-	if lang != nil {
-		xmlStyles.DocDefaults.RunDefaults = &xml.RunDefaults{
-			Properties: &xml.RunProperties{
-				Lang: &xml.Language{Val: lang.Val, EastAsia: lang.EastAsia, Bidi: lang.Bidi},
-			},
+	if lang != nil || defaultFont != nil || defaultFontSize != nil {
+		props := &xml.RunProperties{}
+		if lang != nil {
+			props.Lang = &xml.Language{Val: lang.Val, EastAsia: lang.EastAsia, Bidi: lang.Bidi}
 		}
+		if defaultFont != nil {
+			props.Font = &xml.Font{ASCII: *defaultFont, HAnsi: *defaultFont}
+		}
+		if defaultFontSize != nil {
+			props.Size = &xml.HalfPt{Val: *defaultFontSize}
+			props.SizeCS = &xml.HalfPt{Val: *defaultFontSize}
+		}
+		xmlStyles.DocDefaults.RunDefaults = &xml.RunDefaults{Properties: props}
 	}
 
 	// Serialize all styles from the style manager

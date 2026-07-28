@@ -789,7 +789,7 @@ func TestDocumentSerializer_TableStyleBorders(t *testing.T) {
 	sm := doc.StyleManager()
 
 	ser := serializer.NewDocumentSerializer()
-	xmlStyles := ser.SerializeStyles(sm, nil)
+	xmlStyles := ser.SerializeStyles(sm, nil, nil, nil)
 
 	// Find the TableGrid style
 	var tableGridStyle *xmlstructs.Style
@@ -878,7 +878,7 @@ func TestDocumentSerializer_DocDefaultsStateZeroSpacing(t *testing.T) {
 	sm := doc.StyleManager()
 
 	ser := serializer.NewDocumentSerializer()
-	xmlStyles := ser.SerializeStyles(sm, nil)
+	xmlStyles := ser.SerializeStyles(sm, nil, nil, nil)
 
 	if xmlStyles.DocDefaults == nil || xmlStyles.DocDefaults.ParaDefaults == nil {
 		t.Fatal("expected w:docDefaults/w:pPrDefault to be set")
@@ -939,7 +939,7 @@ func TestParagraphSerializer_StyledParagraphSpacingNotClobbered(t *testing.T) {
 	// i.e. there's something real for the paragraph to inherit.
 	sm := doc.StyleManager()
 	docSer := serializer.NewDocumentSerializer()
-	xmlStyles := docSer.SerializeStyles(sm, nil)
+	xmlStyles := docSer.SerializeStyles(sm, nil, nil, nil)
 
 	var heading1 *xmlstructs.Style
 	for _, s := range xmlStyles.Styles {
