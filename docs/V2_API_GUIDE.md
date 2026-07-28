@@ -1,6 +1,6 @@
 # docxgo v2 API Guide
 
-**Version**: 2.9.1
+**Version**: 2.10.0
 **Last Updated**: July 2026
 
 ---
@@ -1024,4 +1024,4 @@ See [`examples/14_mail_merge/`](../examples/14_mail_merge/) for a complete worki
 ---
 
 **Last Updated**: July 2026
-**Version**: 2.9.1
+**Version**: 2.10.0

@@ -1,8 +1,8 @@
 # docxgo v2 - Clean Architecture Design
 
-**Status**: ✅ v2.9.1 Stable
+**Status**: ✅ v2.10.0 Stable
 **Progress**: Production Ready (all core features complete)
-**Latest Release**: v2.9.1 (July 2026)
+**Latest Release**: v2.10.0 (July 2026)
 **Breaking Changes**: Yes (major version bump from original fork)
 
 > **Project Note**: This project is a substantially rewritten successor to `fumiama/go-docx`, focused on clean architecture, type safety, and modern Go practices. The Git history includes AGPL-era upstream snapshots; the completed [provenance audit](./PROVENANCE_AUDIT.md) determines that the current MIT release contains no protectable AGPL implementation.
@@ -525,7 +525,7 @@ if err := finalDoc.SaveAs("output.docx"); err != nil {
   - [x] Build() method with validation
 - [x] Create options.go with functional options (~200 lines)
   - [x] Config struct with defaults
-  - [x] 9 Option functions (WithDefaultFont, WithPageSize, WithMargins, WithStrictValidation, WithMetadata, WithTitle, WithAuthor, WithSubject)
+  - [x] 9 Option functions (WithDefaultFont, WithPageSize, WithMargins, WithStrictValidation, WithMetadata, WithTitle, WithAuthor, WithSubject) — WithStrictValidation deprecated in v2.10.0, never had real semantics (see #92)
   - [x] PageSize constants (A4, Letter, Legal, A3, Tabloid)
   - [x] Margins presets (Normal, Narrow, Wide)
 - [x] Add API convenience exports (~50 lines in docx.go)
@@ -1344,7 +1344,7 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 ---
 
 **Last Updated**: July 2026
-**Status**: ✅ v2.9.1 Stable
+**Status**: ✅ v2.10.0 Stable
 **Progress**: Production Ready (all core features complete)
 
 **Current State:**
