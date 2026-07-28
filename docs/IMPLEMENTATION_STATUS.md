@@ -1,7 +1,7 @@
 # docxgo v2 Implementation Status
 
 **Last Updated**: July 2026
-**Version**: 2.9.1 (Stable)
+**Version**: 2.10.0 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -39,6 +39,7 @@ All development phases have been completed. The library has gone through multipl
 | v2.8.0      | Jul 2026 | Final MIT provenance determination, corrected notices, license-complete release artifacts |
 | v2.9.0      | Jul 2026 | Fixed npm-publish cascade, read-only `FindPlaceholders`, explicit zero spacing on styled paragraphs |
 | v2.9.1      | Jul 2026 | Code-review fixes: spacing emit gate no longer clobbers style line spacing, placeholder Location offsets corrected |
+| v2.10.0     | Jul 2026 | In-place editing RPC methods recovered from #64, field-code injection fix, mandatory CI checks (CodeQL), `table.setCell` shrink, per-side paragraph indentation, builder page size/margins/default font wiring |
 
 ---
 
@@ -419,5 +420,5 @@ Want to help implement missing features? See [CONTRIBUTING.md](../CONTRIBUTING.m
 ---
 
 **Last Updated**: July 2026
-**Status**: Production Ready (v2.9.1 Stable)
+**Status**: Production Ready (v2.10.0 Stable)
 **Maintained by**: Misael Monterroca ([@mmonterroca](https://github.com/mmonterroca))

@@ -224,4 +224,4 @@ See: IMPLEMENTATION_STATUS.md - Features list
 ---
 
 **Last Updated**: July 2026  
-**Documentation Version**: v2.9.1
+**Documentation Version**: v2.10.0

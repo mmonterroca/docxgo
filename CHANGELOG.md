@@ -1,3 +1,36 @@
+## v2.10.0 — 2026-07-27
+
+### Added
+
+- **In-place editing RPC methods, recovered from #64** (PR #83; originally contributed by @asaf-ramati1 in #64). That PR was closed unmerged after its source fork was deleted, but GitHub retained the two commits under `refs/pull/64/head` — they're merged here with original authorship intact, not reimplemented or squashed. Adds `document.replaceText`, `paragraph.setText`, `table.getCell`, `table.setCell`, and a `includeText` flag on `table.list`, plus the underlying Go API: `template.ReplaceText(doc, find, replace) (ReplaceResult, error)`, which replaces every occurrence of `find` across body paragraphs, table cells, headers, and footers, consolidating fragmented runs first and skipping (not corrupting) matches that touch a field, break, or image in a way that can't be replaced safely.
+- `domain.TableCell.RemoveParagraph(index int) error` (#84), so `table.setCell` can actually shrink a cell's paragraph count instead of leaving cleared-but-present leftovers. `paragraphCount` in the result now always equals the number of items provided.
+- `domain.Paragraph.SetIndentLeft/SetIndentRight/SetIndentFirstLine/SetIndentHanging(twips int) error` (#76), each setting exactly one side of a paragraph's indentation — including to 0, to explicitly override a style's own value on just that side — without touching the other three the way `SetIndent`'s whole-struct call must. The CLI's `paragraph.add`/`paragraph.setText` `indent` fields become nullable (`*int` server-side) for the same reason v2.9.0 did this for spacing.
+
+### Fixed
+
+- **Rejected double quotes in generated field-code arguments** (#85, critical CodeQL `go/unsafe-quoting`). `NewHyperlinkField`'s `url`, `NewStyleRefField`'s `styleName`, and `NewTOCField`'s `"levels"` switch were interpolated unescaped inside a quoted argument of the generated Word field code — a value containing `"` broke out of the quoted argument and injected arbitrary field-code syntax. Escaping was ruled out: the reader's field-code parser splits on bare quotes with no escape awareness, so any `\"` scheme would corrupt docxgo's own open→save round-trip. A value containing a quote is rejected instead, surfaced through `run.AddField` — the one chokepoint every field must pass through to reach a run's XML. The fix uses `strings.ReplaceAll` as the barrier (not an early-return `strings.Contains` guard): CodeQL's `go/unsafe-quoting` only recognizes a `ReplaceAll`-shaped sanitizer, not guard-and-return, so a semantically-equivalent early-return form would have left the alerts open.
+- **`ReplaceText` no longer mutates the whole document on a miss.** It called `ConsolidateRuns` unconditionally on every paragraph before checking for a match, so a `document.replaceText` whose `find` string appears nowhere still rewrote run structure across the entire body, every table cell, and every header/footer. Fixed by checking the concatenated paragraph text first.
+- **A match inside a run carrying a field is now skipped, not silently discarded.** The single-run skip guard was gated on `len(spanned) > 1`, so e.g. a PAGE field's cached text could be replaced in memory while the serializer discarded the change at write time — the RPC still reported it as `replaced`.
+- **`table.setCell` can now shrink a cell's paragraph count**, using the new `TableCell.RemoveParagraph` above instead of clearing-but-keeping leftover paragraphs.
+- **A source `<w:ind>` naming only some sides no longer clobbers the others on save.** The reader merged every attribute it read into one `SetIndent` call, which can't distinguish "this side was 0 in the source" from "this side was never mentioned" — so a document with only `left` set in its source XML came back out with `right`/`firstLine`/`hanging` as explicit `0`, silently overriding a style's own indentation on sides the source never touched. The reader now calls the new per-side setters above directly, one per attribute actually present.
+- **`WithDefaultFont`, `WithDefaultFontSize`, `WithPageSize`, and `WithMargins` are no longer silent no-ops** (#45). `NewDocumentBuilder` built a `Config` from every applied `Option` but only ever read `Metadata` and `Theme` off it — the other four compiled, ran without error, and produced a document completely unaffected by the value passed in. `WithPageSize`/`WithMargins` now flow into the default section; `WithDefaultFont`/`WithDefaultFontSize` now write into `styles.xml`'s `w:docDefaults/w:rPrDefault`, below the Normal style in the OOXML cascade so a theme's own font/size still wins. `WithStrictValidation` is deprecated rather than given invented semantics — there was never a validation subsystem for it to enable (see `### Compatibility`).
+
+### Changed
+
+- **CI now runs `gofmt -l` and `go test -race ./...`**, both required by `CONTRIBUTING.md` but never actually checked, and the golangci-lint step no longer limits itself to `only-new-issues`, so "Lint, Build and Test" checks the whole repository.
+- **`Lint, Build and Test`, `Node.js Tests`, and `CodeQL` are now required status checks** on the `master` branch ruleset — previously nothing was required to pass before merge. A `RepositoryRole: Admin` bypass actor was added at the same time (there was none before), so a context that stops reporting can't block every merge including the owner's.
+- `CONTRIBUTING.md` documents the three required checks.
+
+### Compatibility
+
+- **New public Go interface methods, not breaking.** `domain.TableCell.RemoveParagraph` and `domain.Paragraph.SetIndentLeft/Right/FirstLine/Hanging` follow the precedent of `domain.Document`'s two additions in v2.6.0 and `Paragraph.RemoveRun` itself in v2.3.0: each has exactly one implementor in this repo, and no exported API accepts one of these interfaces from a caller — only returns one.
+- `WithStrictValidation` is deprecated (no-op, as it always has been); `Config.StrictValidation` is kept only so existing callers don't fail to compile. See #92 for the follow-up to give it real semantics.
+- A builder that calls none of `WithDefaultFont`/`WithDefaultFontSize`/`WithPageSize`/`WithMargins` produces byte-identical output to before this release. A builder that does call them now gets the document it asked for, for the first time — most notably, `WithPageSize(docx.Letter)` previously had zero effect (the section always defaulted to A4 regardless), so a caller relying on that option now sees a real page-size change.
+- CLI: `paragraph.add`/`paragraph.setText`'s `indent` fields (`left`/`right`/`firstLine`/`hanging`) become nullable (`*int` server-side); omitting a field is unchanged, but `0` now behaves differently (honored, rather than silently dropped) on a side the caller explicitly set.
+- A source document whose `<w:ind>` names both `firstLine` and `hanging` on the same paragraph now loads successfully (each side applies independently) instead of failing the whole document read, which `SetIndent`'s mutual-exclusivity check used to do.
+
+---
+
 ## v2.9.1 — 2026-07-27
 
 ### Fixed
