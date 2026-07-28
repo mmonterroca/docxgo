@@ -1978,6 +1978,12 @@ func TestHandleSystemCapabilities(t *testing.T) {
 	if !result["batch"] {
 		t.Error("expected batch capability to be true")
 	}
+	if !result["replaceText"] {
+		t.Error("expected replaceText capability to be true")
+	}
+	if !result["cellEdit"] {
+		t.Error("expected cellEdit capability to be true")
+	}
 }
 
 // ─── System batch tests ──────────────────────────────────────────────────────
