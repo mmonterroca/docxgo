@@ -40,19 +40,45 @@ type ReplaceResult struct {
 // or an image, since blanking a spanned run would strand that content in the
 // middle of the replacement. A match confined to a single run carrying a
 // break or an image is replaced, and the break or image is preserved.
+//
+// On a document opened via OpenDocument/OpenDocumentFromBytes/
+// OpenDocumentFromReader whose headers or footers were preserved for
+// round-trip fidelity, every header and footer match is skipped too: WriteTo
+// writes those parts verbatim, so an in-memory edit there would never reach
+// the saved file. This check is document-wide, not per-header/footer — if
+// any header or footer part was preserved, all header/footer paragraphs are
+// skipped, even ones belonging to a different section.
 func ReplaceText(doc domain.Document, find, replace string) (ReplaceResult, error) {
 	if find == "" {
 		return ReplaceResult{}, fmt.Errorf("template: find text must not be empty")
 	}
 
+	skipHeaderFooter := hasPreservedHeadersOrFooters(doc)
+
 	var result ReplaceResult
-	err := walkParagraphs(doc, func(para domain.Paragraph, _ paragraphContext) error {
+	err := walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
+		if skipHeaderFooter && (ctx.locationType == LocationHeader || ctx.locationType == LocationFooter) {
+			result.Skipped += strings.Count(para.Text(), find)
+			return nil
+		}
 		replaced, skipped, err := replaceInParagraph(para, find, replace)
 		result.Replaced += replaced
 		result.Skipped += skipped
 		return err
 	})
 	return result, err
+}
+
+// hasPreservedHeadersOrFooters reports whether doc carries preserved
+// header/footer bytes from a round-trip read. domain.Document does not
+// expose this on its own — the check goes through the same type-assertion
+// idiom walkParagraphs already uses for HeadersAll/FootersAll.
+func hasPreservedHeadersOrFooters(doc domain.Document) bool {
+	type preservedHeaderFooterChecker interface {
+		HasPreservedHeadersOrFooters() bool
+	}
+	checker, ok := doc.(preservedHeaderFooterChecker)
+	return ok && checker.HasPreservedHeadersOrFooters()
 }
 
 // runSpan maps a run to its byte-offset range [start, end) within the

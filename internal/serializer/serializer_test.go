@@ -1069,6 +1069,80 @@ func TestParagraphSerializer_PartialIndentOmitsOtherSides(t *testing.T) {
 	}
 }
 
+// TestParagraphSerializer_SetIndentClearsStalePerSideFlags is a regression
+// test for a paragraph whose left indent was set via SetIndentLeft (the
+// reader's per-attribute path — see applyParagraphIndentation) and then
+// overwritten via a single SetIndent call. SetIndent used to leave
+// indentLeftSet at true from the earlier call, so the serializer emitted an
+// explicit w:left="0" and clobbered a style's own left indentation on a side
+// this SetIndent call never mentioned. SetIndent must clear all four
+// indent*Set flags along with the struct it replaces.
+func TestParagraphSerializer_SetIndentClearsStalePerSideFlags(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	if err := para.SetIndentLeft(720); err != nil {
+		t.Fatalf("SetIndentLeft: %v", err)
+	}
+	if err := para.SetIndent(domain.Indentation{Right: 360}); err != nil {
+		t.Fatalf("SetIndent: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	if xmlPara.Properties == nil || xmlPara.Properties.Indentation == nil {
+		t.Fatal("expected w:ind to be set")
+	}
+	ind := xmlPara.Properties.Indentation
+	if ind.Left != nil {
+		t.Errorf("ind.Left = %v, want omitted (nil) — SetIndent must clear the stale indentLeftSet flag", ind.Left)
+	}
+	if ind.Right == nil || *ind.Right != 360 {
+		t.Errorf("ind.Right = %v, want 360", ind.Right)
+	}
+	if ind.FirstLine != nil {
+		t.Errorf("ind.FirstLine = %v, want omitted (nil)", ind.FirstLine)
+	}
+	if ind.Hanging != nil {
+		t.Errorf("ind.Hanging = %v, want omitted (nil)", ind.Hanging)
+	}
+}
+
+// TestParagraphSerializer_NeverEmitsBothFirstLineAndHanging is a regression
+// test: SetIndent rejects setting both FirstLine and Hanging together, but
+// the per-side setters SetIndentFirstLine/SetIndentHanging don't share that
+// check — reachable from the reader hydrating a source <w:ind> that already
+// carries both attributes (applyParagraphIndentation calls each setter
+// independently per attribute present). CT_Ind's schema allows both, but
+// Word treats them as mutually exclusive, so the serializer must emit only
+// one — hanging wins, matching what Word itself does.
+func TestParagraphSerializer_NeverEmitsBothFirstLineAndHanging(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	if err := para.SetIndentFirstLine(200); err != nil {
+		t.Fatalf("SetIndentFirstLine: %v", err)
+	}
+	if err := para.SetIndentHanging(300); err != nil {
+		t.Fatalf("SetIndentHanging: %v", err)
+	}
+
+	ser := serializer.NewParagraphSerializer()
+	xmlPara := ser.Serialize(para)
+
+	if xmlPara.Properties == nil || xmlPara.Properties.Indentation == nil {
+		t.Fatal("expected w:ind to be set")
+	}
+	ind := xmlPara.Properties.Indentation
+	if ind.FirstLine != nil {
+		t.Errorf("ind.FirstLine = %v, want omitted (nil) — hanging must win when both are set", ind.FirstLine)
+	}
+	if ind.Hanging == nil || *ind.Hanging != 300 {
+		t.Errorf("ind.Hanging = %v, want 300", ind.Hanging)
+	}
+}
+
 // TestParagraphSerializer_ExplicitZeroAfterOnStyledParagraphIsEmitted guards
 // against the #69 bug: SpacingAfter() int can't distinguish "never called"
 // from "explicitly set to 0", so an explicit SetSpacingAfter(0) on a

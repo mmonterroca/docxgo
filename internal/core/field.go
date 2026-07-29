@@ -141,7 +141,18 @@ func (f *docxField) Code() string {
 	return f.code
 }
 
-// SetCode sets the field code.
+// SetCode sets the field code. code must be a complete, trusted field
+// instruction: SetCode performs no quote-sanitization the way the New*Field
+// constructors do (see docxField.err), because a well-formed instruction
+// legitimately contains balanced quotes (e.g. `STYLEREF "Heading 1"`) that a
+// naive quote check can't tell apart from an injection attempt. Untrusted,
+// caller-supplied fragments (a URL, a style name, ...) must go through one of
+// the New*Field constructors instead, which sanitize the fragment before
+// building the code around it.
+//
+// The one thing SetCode does reject is a control character or line break:
+// <w:instrText> holds a single-line instruction, and Word's field-code parser
+// has no defined behavior for one containing a raw control byte.
 func (f *docxField) SetCode(code string) error {
 	if strings.TrimSpace(code) == "" {
 		return errors.NewValidationError(
@@ -151,6 +162,16 @@ func (f *docxField) SetCode(code string) error {
 			"field code cannot be empty",
 		)
 	}
+	for _, r := range code {
+		if r < 0x20 {
+			return errors.NewValidationError(
+				"SetCode",
+				"code",
+				code,
+				"field code must not contain control characters or line breaks",
+			)
+		}
+	}
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -159,6 +180,22 @@ func (f *docxField) SetCode(code string) error {
 	f.isDirty = true
 
 	return nil
+}
+
+// SetCodeRaw hydrates the field's code directly, bypassing SetCode's
+// control-character guard. Used exclusively by the reader package during
+// OpenDocument to reflect a field instruction already present in the source
+// file's <w:instrText> — a real .docx from any producer is the ground truth
+// for what a "valid" instruction looks like, not this package's own
+// validation, so OpenDocument must not fail on one merely because it
+// contains a byte SetCode wouldn't have accepted from a caller. Not part of
+// domain.Field, reached only via the reader's own type-assertion (mirrors
+// SetLanguageRaw / SetPreservedStylesPart).
+func (f *docxField) SetCodeRaw(code string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.code = code
+	f.isDirty = true
 }
 
 // Result returns the field result (calculated value).
@@ -233,7 +270,7 @@ func (f *docxField) getDefaultCode() string {
 	case domain.FieldTypeNumPages:
 		return constants.FieldCodeNumPages
 	case domain.FieldTypeTOC:
-		return constants.FieldCodeTOC + ` \\o "1-3" \\h \\z \\u`
+		return constants.FieldCodeTOC + ` \o "1-3" \h \z \u`
 	case domain.FieldTypeDate:
 		return constants.FieldCodeDate
 	case domain.FieldTypeTime:
@@ -265,29 +302,29 @@ func (f *docxField) buildTOCCode() (string, error) {
 			return "", errors.NewValidationError("NewTOCField", "levels", levels,
 				`levels must not contain a double quote`)
 		}
-		code += fmt.Sprintf(` \\o "%s"`, safe)
+		code += fmt.Sprintf(` \o "%s"`, safe)
 	} else {
-		code += ` \\o "1-3"`
+		code += ` \o "1-3"`
 	}
 
 	// Hyperlinks (always included by default)
-	code += ` \\h`
+	code += ` \h`
 
 	// Hide page numbers (only if explicitly set to "true")
 	if hidePN, ok := f.properties["hidePageNumbers"]; ok && hidePN == "true" {
-		code += ` \\n`
+		code += ` \n`
 	}
 
 	// Hide tab leader (only if explicitly set to "true")
 	if hideTab, ok := f.properties["hideTabLeader"]; ok && hideTab == "true" {
-		code += ` \\p`
+		code += ` \p`
 	}
 
 	// Preserve tab entries
-	code += ` \\z`
+	code += ` \z`
 
 	// Use styles
-	code += ` \\u`
+	code += ` \u`
 
 	return code, nil
 }

@@ -19,6 +19,14 @@ import (
 //
 // By default, placeholders use {{key}} syntax. Unmatched placeholders are left
 // as-is unless StrictMode is enabled in options.
+//
+// On a document opened via OpenDocument/OpenDocumentFromBytes/
+// OpenDocumentFromReader whose headers or footers were preserved for
+// round-trip fidelity, header and footer placeholders are never written:
+// WriteTo writes those parts verbatim, so an in-memory replacement there
+// would never reach the saved file. Their keys are reported through
+// missingKeys instead (and so trigger StrictMode's error), since silently
+// succeeding while discarding the write on save would be worse.
 func MergeTemplate(doc domain.Document, data MergeData, opts ...MergeOptions) error {
 	opt := DefaultMergeOptions()
 	if len(opts) > 0 {
@@ -26,9 +34,16 @@ func MergeTemplate(doc domain.Document, data MergeData, opts ...MergeOptions) er
 	}
 
 	pattern := BuildPattern(opt)
+	skipHeaderFooter := hasPreservedHeadersOrFooters(doc)
 	var missingKeys []string
 
 	err := walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
+		if skipHeaderFooter && (ctx.locationType == LocationHeader || ctx.locationType == LocationFooter) {
+			for _, ph := range scanParagraph(para, pattern, ctx) {
+				missingKeys = append(missingKeys, ph.Name)
+			}
+			return nil
+		}
 		if err := ConsolidateRuns(para); err != nil {
 			return err
 		}

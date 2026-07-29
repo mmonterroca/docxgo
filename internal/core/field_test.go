@@ -237,11 +237,9 @@ func TestNewStyleRefFieldRejectsQuote(t *testing.T) {
 func TestNewTOCFieldRejectsInvalidLevels(t *testing.T) {
 	field := NewTOCField(map[string]string{"levels": `1-3" \c "Figure`})
 
-	// field.go builds \\o (double backslash) as a raw string literal today —
-	// that's a separate, pre-existing quirk (tracked separately), not part
-	// of this fix. The default-else branch in buildTOCCode is the exact
-	// bytes this must match.
-	want := constants.FieldCodeTOC + ` \\o "1-3" \\h \\z \\u`
+	// The default-else branch in buildTOCCode is the exact bytes this must
+	// match.
+	want := constants.FieldCodeTOC + ` \o "1-3" \h \z \u`
 	if got := field.Code(); got != want {
 		t.Errorf("Code() = %q, want %q (safe default, not the injected value)", got, want)
 	}
@@ -257,7 +255,7 @@ func TestNewTOCFieldRejectsInvalidLevels(t *testing.T) {
 func TestNewTOCFieldAcceptsValidLevels(t *testing.T) {
 	field := NewTOCField(map[string]string{"levels": "1-5"})
 
-	want := constants.FieldCodeTOC + ` \\o "1-5" \\h \\z \\u`
+	want := constants.FieldCodeTOC + ` \o "1-5" \h \z \u`
 	if got := field.Code(); got != want {
 		t.Errorf("Code() = %q, want %q", got, want)
 	}
@@ -290,6 +288,39 @@ func TestFieldSetCodeEmpty(t *testing.T) {
 
 	if err := field.SetCode("   "); err == nil {
 		t.Error("SetCode() with whitespace should return error")
+	}
+}
+
+// TestFieldSetCodeRejectsControlCharacters is a regression test: SetCode used
+// to accept any non-blank string verbatim, including control characters and
+// line breaks, and serializer.go emits Code() straight into <w:instrText> —
+// a way to reach the exact byte-level corruption the #85 field-code
+// sanitizer existed to prevent, alongside the New*Field constructors' quote
+// rejection.
+func TestFieldSetCodeRejectsControlCharacters(t *testing.T) {
+	field := NewField(domain.FieldTypeCustom)
+
+	for _, tc := range []string{"CUSTOM\nINJECTED", "CUSTOM\rINJECTED", "CUSTOM\tINJECTED", "CUSTOM\x00INJECTED"} {
+		if err := field.SetCode(tc); err == nil {
+			t.Errorf("SetCode(%q) error = nil, want error for a control character", tc)
+		}
+	}
+}
+
+// TestFieldSetCode_BalancedQuotesAccepted guards against the quote-rejection
+// idea considered for SetCode: a legitimate instruction legitimately
+// contains balanced quotes (e.g. the examples in examples/04_fields), so
+// SetCode must not reject them the way the New*Field constructors reject a
+// caller-supplied fragment.
+func TestFieldSetCode_BalancedQuotesAccepted(t *testing.T) {
+	field := NewField(domain.FieldTypeCustom)
+
+	code := `STYLEREF "Heading 1" \* MERGEFORMAT`
+	if err := field.SetCode(code); err != nil {
+		t.Errorf("SetCode(%q) error = %v, want nil", code, err)
+	}
+	if field.Code() != code {
+		t.Errorf("Code() = %q, want %q", field.Code(), code)
 	}
 }
 

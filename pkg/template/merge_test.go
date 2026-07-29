@@ -7,9 +7,11 @@
 package template
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
+	docx "github.com/mmonterroca/docxgo/v2"
 	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/internal/core"
 )
@@ -156,6 +158,70 @@ func TestMergeTemplate_MissingKey_Strict(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "role") {
 		t.Errorf("expected error to mention 'role', got: %v", err)
+	}
+}
+
+// TestMergeTemplate_SkipsPreservedHeaderAndFooter is an end-to-end regression
+// test for the case where MergeTemplate silently replaced placeholder text
+// in a header/footer whose bytes WriteTo then writes verbatim, discarding
+// the edit on save. On a document whose headers/footers were preserved from
+// a round-trip open, a header/footer placeholder must be left untouched (so
+// re-running the merge later still finds it) and, in strict mode, reported
+// as missing rather than silently dropped.
+func TestMergeTemplate_SkipsPreservedHeaderAndFooter(t *testing.T) {
+	doc := core.NewDocument()
+	bodyPara, _ := doc.AddParagraph()
+	bodyRun, _ := bodyPara.AddRun()
+	bodyRun.SetText("Body: {{name}}")
+
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection: %v", err)
+	}
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	headerPara, _ := header.AddParagraph()
+	headerRun, _ := headerPara.AddRun()
+	headerRun.SetText("Header: {{name}}")
+
+	templatePath := t.TempDir() + "/preserved_header.docx"
+	if err := doc.SaveAs(templatePath); err != nil {
+		t.Fatalf("SaveAs: %v", err)
+	}
+
+	opened, err := docx.OpenDocument(templatePath)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+
+	opts := MergeOptions{OpenDelimiter: "{{", CloseDelimiter: "}}", StrictMode: true}
+	err = MergeTemplate(opened, MergeData{"name": "Alice"}, opts)
+	if err == nil {
+		t.Fatal("expected strict-mode error for the header placeholder that cannot be persisted")
+	}
+	if !strings.Contains(err.Error(), "name") {
+		t.Errorf("expected error to mention 'name', got: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := opened.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	savedBytes := buf.Bytes()
+
+	docXML := string(extractDocumentXML(t, savedBytes))
+	if !strings.Contains(docXML, "Body: Alice") {
+		t.Errorf("document.xml: expected merged body text, got %s", docXML)
+	}
+
+	headerXML := string(extractZipPart(t, savedBytes, "word/header1.xml"))
+	if !strings.Contains(headerXML, "Header: {{name}}") {
+		t.Errorf("header1.xml: expected untouched placeholder, got %s", headerXML)
+	}
+	if strings.Contains(headerXML, "Alice") {
+		t.Errorf("header1.xml: unexpected merged value — header should be preserved verbatim, got %s", headerXML)
 	}
 }
 

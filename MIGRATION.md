@@ -1,6 +1,6 @@
 # Migration Guide: v1 → docxgo v2
 
-**Current target:** v2.10.0
+**Current target:** v2.11.0
 **Minimum Go version:** 1.23
 
 This guide covers migration from the historical `fumiama/go-docx` API to the
@@ -27,9 +27,18 @@ For the complete current API, see the [API guide](docs/V2_API_GUIDE.md) and
 ## 1. Update the module
 
 ```bash
-go get github.com/mmonterroca/docxgo/v2@v2.10.0
+go get github.com/mmonterroca/docxgo/v2@v2.11.0
 go mod tidy
 ```
+
+> **v2.10.0 note:** `docx.Config`'s `DefaultFont`, `DefaultFontSize`,
+> `PageSize`, and `Margins` fields changed from plain values to pointers so
+> `NewDocumentBuilder` could tell "the caller set this" apart from "the
+> caller never touched this" (`Language` already worked this way). This only
+> affects code that writes to a `*docx.Config` directly — for example a
+> custom `docx.Option` (`func(*docx.Config)`) — not code that only calls
+> `docx.With*` functions. `c.DefaultFont = "Arial"` no longer compiles; use
+> `font := "Arial"; c.DefaultFont = &font` instead.
 
 Replace the old import:
 

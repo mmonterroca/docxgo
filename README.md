@@ -22,7 +22,7 @@ Since v2.7.0 it also ships a JSON-RPC command-line interface and a Node.js wrapp
 - **Proofing language** — `WithLanguage` / `WithLanguageEx` for spell-check, grammar, hyphenation
 - **Production quality** — clean architecture, explicit errors, thread-safe internals
 
-**Status:** v2.10.0 · Production-ready · Requires Go 1.23+ (no external C dependencies; runs on Linux, macOS, Windows). See the [CHANGELOG](CHANGELOG.md) for version history.
+**Status:** v2.11.0 · Production-ready · Requires Go 1.23+ (no external C dependencies; runs on Linux, macOS, Windows). See the [CHANGELOG](CHANGELOG.md) for version history.
 
 ---
 
