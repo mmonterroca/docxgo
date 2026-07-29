@@ -1,6 +1,6 @@
 # Release Notes - v2.11.0
 
-**Release Date:** July 28, 2026
+**Release Date:** July 29, 2026
 
 ## Summary
 

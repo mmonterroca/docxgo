@@ -1,4 +1,4 @@
-## v2.11.0 — 2026-07-28
+## v2.11.0 — 2026-07-29
 
 v2.10.0 was merged and published without a code review — CI alone. A
 post-hoc review of that batch found ten confirmed defects that gofmt, `go
