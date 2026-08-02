@@ -476,6 +476,40 @@ func TestRunSerializer_Highlight(t *testing.T) {
 	}
 }
 
+func TestRunSerializer_Language(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	run, _ := para.AddRun()
+	run.SetText("bonjour")
+	if err := run.SetLanguage(&domain.Language{Val: "fr", EastAsia: "fr", Bidi: "fr"}); err != nil {
+		t.Fatalf("SetLanguage: %v", err)
+	}
+
+	ser := serializer.NewRunSerializer()
+	xmlRun := ser.Serialize(run)
+
+	if xmlRun.Properties == nil || xmlRun.Properties.Lang == nil {
+		t.Fatal("expected run language to be set")
+	}
+	if xmlRun.Properties.Lang.Val != "fr" || xmlRun.Properties.Lang.EastAsia != "fr" || xmlRun.Properties.Lang.Bidi != "fr" {
+		t.Errorf("unexpected Lang: %+v", xmlRun.Properties.Lang)
+	}
+}
+
+func TestRunSerializer_Language_UnsetOmitsLangElement(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	run, _ := para.AddRun()
+	run.SetText("plain")
+
+	ser := serializer.NewRunSerializer()
+	xmlRun := ser.Serialize(run)
+
+	if xmlRun.Properties != nil && xmlRun.Properties.Lang != nil {
+		t.Error("expected no run-level language when unset — should inherit the document default")
+	}
+}
+
 func TestParagraphSerializer_LineSpacing(t *testing.T) {
 	tests := []struct {
 		name    string

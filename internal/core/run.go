@@ -27,6 +27,7 @@ type run struct {
 	underline  domain.UnderlineStyle
 	strike     bool
 	highlight  domain.HighlightColor
+	language   *domain.Language
 	fields     []domain.Field     // Fields embedded in this run
 	breaks     []domain.BreakType // Breaks in this run
 	relManager *manager.RelationshipManager
@@ -169,6 +170,30 @@ func (r *run) SetHighlight(color domain.HighlightColor) error {
 			"invalid highlight color")
 	}
 	r.highlight = color
+	return nil
+}
+
+// Language returns a copy of the run's language override, or nil if unset.
+// Mutating the returned value has no effect on the run.
+func (r *run) Language() *domain.Language {
+	if r.language == nil {
+		return nil
+	}
+	langCopy := *r.language
+	return &langCopy
+}
+
+// SetLanguage sets a per-run language override.
+func (r *run) SetLanguage(lang *domain.Language) error {
+	if lang != nil && lang.Val == "" && lang.EastAsia == "" && lang.Bidi == "" {
+		return errors.InvalidArgument("Run.SetLanguage", "lang", lang, "at least one of Val, EastAsia, or Bidi must be set")
+	}
+	if lang == nil {
+		r.language = nil
+		return nil
+	}
+	langCopy := *lang
+	r.language = &langCopy
 	return nil
 }
 

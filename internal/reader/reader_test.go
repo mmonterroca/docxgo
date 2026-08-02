@@ -212,6 +212,9 @@ func TestReconstructDocumentFormatting(t *testing.T) {
 	if err := run.SetFont(domain.Font{Name: "Times New Roman", EastAsia: "SimSun", CS: "Arial"}); err != nil {
 		t.Fatalf("SetFont: %v", err)
 	}
+	if err := run.SetLanguage(&domain.Language{Val: "fr", EastAsia: "ja", Bidi: "ar"}); err != nil {
+		t.Fatalf("SetLanguage: %v", err)
+	}
 
 	var buf bytes.Buffer
 	if _, err := doc.WriteTo(&buf); err != nil {
@@ -297,6 +300,10 @@ func TestReconstructDocumentFormatting(t *testing.T) {
 	}
 	if font.CS != "Arial" {
 		t.Fatalf("unexpected complex script font: %s", font.CS)
+	}
+	recoveredLang := recoveredRun.Language()
+	if recoveredLang == nil || recoveredLang.Val != "fr" || recoveredLang.EastAsia != "ja" || recoveredLang.Bidi != "ar" {
+		t.Fatalf("unexpected run language: %+v", recoveredLang)
 	}
 }
 
