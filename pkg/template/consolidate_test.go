@@ -185,6 +185,46 @@ func TestConsolidateRuns_DifferentFormatting(t *testing.T) {
 	}
 }
 
+func TestConsolidateRuns_DifferentLanguage(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("hello ")
+
+	r2, _ := para.AddRun()
+	r2.SetText("bonjour")
+	if err := r2.SetLanguage(&domain.Language{Val: "fr"}); err != nil {
+		t.Fatalf("SetLanguage: %v", err)
+	}
+
+	r3, _ := para.AddRun()
+	r3.SetText(" world")
+
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
+
+	// Visually identical formatting (no bold/italic/color/etc on any of the
+	// three), but r2's language override must keep it from merging with its
+	// neighbors — a merge would either lose the "fr" tag on r2's text or
+	// wrongly stamp it onto "hello "/" world" too.
+	runs := para.Runs()
+	if len(runs) != 3 {
+		t.Fatalf("expected 3 runs (no merge across a language boundary), got %d", len(runs))
+	}
+	if runs[0].Text() != "hello " || runs[0].Language() != nil {
+		t.Errorf("run[0]: expected unset language 'hello ', got %q lang=%+v", runs[0].Text(), runs[0].Language())
+	}
+	lang := runs[1].Language()
+	if runs[1].Text() != "bonjour" || lang == nil || lang.Val != "fr" {
+		t.Errorf("run[1]: expected fr 'bonjour', got %q lang=%+v", runs[1].Text(), lang)
+	}
+	if runs[2].Text() != " world" || runs[2].Language() != nil {
+		t.Errorf("run[2]: expected unset language ' world', got %q lang=%+v", runs[2].Text(), runs[2].Language())
+	}
+}
+
 func TestConsolidateRuns_SplitPlaceholder(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()

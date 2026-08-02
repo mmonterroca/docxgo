@@ -1,8 +1,8 @@
 # docxgo v2 - Clean Architecture Design
 
-**Status**: ✅ v2.11.0 Stable
+**Status**: ✅ v2.12.0 Stable
 **Progress**: Production Ready (all core features complete)
-**Latest Release**: v2.11.0 (July 2026)
+**Latest Release**: v2.12.0 (August 2026)
 **Breaking Changes**: Yes (major version bump from original fork)
 
 > **Project Note**: This project is a substantially rewritten successor to `fumiama/go-docx`, focused on clean architecture, type safety, and modern Go practices. The Git history includes AGPL-era upstream snapshots; the completed [provenance audit](./PROVENANCE_AUDIT.md) determines that the current MIT release contains no protectable AGPL implementation.
@@ -1343,8 +1343,8 @@ See [CREDITS.md](../CREDITS.md) for complete project history.
 
 ---
 
-**Last Updated**: July 2026
-**Status**: ✅ v2.11.0 Stable
+**Last Updated**: August 2026
+**Status**: ✅ v2.12.0 Stable
 **Progress**: Production Ready (all core features complete)
 
 **Current State:**
