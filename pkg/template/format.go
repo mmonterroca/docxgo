@@ -9,8 +9,14 @@ package template
 import "github.com/mmonterroca/docxgo/v2/domain"
 
 // formatsEqual returns true if two runs have identical visible formatting.
-// It compares all 8 formatting attributes that affect text appearance.
-// This is used by ConsolidateRuns to decide if adjacent runs can be merged.
+// It compares the 8 visual formatting attributes plus Language — not
+// visible, but ConsolidateRuns must not merge two runs with different
+// language overrides, since the merge keeps only the leader's formatting
+// (see ConsolidateRuns) and silently discarding one run's Language would
+// wrongly re-tag a foreign-language phrase (domain.Run.SetLanguage; e.g. a
+// [bonjour]{lang=fr} span in otherwise French-unmarked prose) as the
+// surrounding document's default language the moment MergeTemplate or
+// ReplaceText happened to run over it.
 func formatsEqual(a, b domain.Run) bool {
 	return a.Font() == b.Font() &&
 		a.Color() == b.Color() &&
@@ -19,7 +25,17 @@ func formatsEqual(a, b domain.Run) bool {
 		a.Italic() == b.Italic() &&
 		a.Underline() == b.Underline() &&
 		a.Strike() == b.Strike() &&
-		a.Highlight() == b.Highlight()
+		a.Highlight() == b.Highlight() &&
+		languagesEqual(a.Language(), b.Language())
+}
+
+// languagesEqual is a nil-safe comparison of two *domain.Language: both
+// unset, or both set to the same Val/EastAsia/Bidi.
+func languagesEqual(a, b *domain.Language) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // isTextOnly returns true if the run contains only text (no fields, breaks, or images).

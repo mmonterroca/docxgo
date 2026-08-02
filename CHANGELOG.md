@@ -8,6 +8,10 @@
   - Written as `w:lang` in the run's own `w:rPr`, into the field `internal/xml.RunProperties.Lang` that already existed but nothing wrote to.
   - Opening an existing `.docx` via `OpenDocument`/`OpenDocumentFromBytes`/`OpenDocumentFromReader` now hydrates each run's `Language()` from its `w:rPr/w:lang`, if present — same round-trip fidelity as every other run property (`Bold`, `Highlight`, etc).
 
+### Fixed
+
+- **`ConsolidateRuns` (and therefore `MergeTemplate`/`ReplaceText`) could merge across a language boundary.** `formatsEqual`, which decides whether two adjacent runs are mergeable, compared 8 visual formatting attributes but not the new `Language`. Two visually-identical runs — one carrying a `SetLanguage` override (e.g. a `bonjour` run tagged `fr` inside otherwise-untagged prose), one not — were merged into a single run, silently discarding whichever run's language the merge didn't keep. Found in review of this same release before it was tagged. `formatsEqual` now compares `Language()` too (nil-safe: both unset, or both set to the same `Val`/`EastAsia`/`Bidi`), so a language boundary blocks the merge like any other formatting difference.
+
 ### Changed
 
 - **`domain.Run` interface gained two methods** (`SetLanguage`, `Language`, above). If you implement `domain.Run` directly with your own type — most commonly a hand-written test double — you'll need to add both methods; embedding `domain.Run` in your type is unaffected, since the new methods are promoted automatically. No exported docxgo API accepts a `domain.Run` from a caller (only returns one), same reasoning as `Document.SetLanguage`/`Language` in v2.6.0.
