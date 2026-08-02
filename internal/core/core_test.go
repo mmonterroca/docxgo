@@ -210,6 +210,54 @@ func TestRun_TextFormatting(t *testing.T) {
 	}
 }
 
+func TestRun_Language(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	run, _ := para.AddRun()
+
+	if run.Language() != nil {
+		t.Fatal("expected no language override by default")
+	}
+
+	lang := &domain.Language{Val: "fr", EastAsia: "fr", Bidi: "fr"}
+	if err := run.SetLanguage(lang); err != nil {
+		t.Fatalf("SetLanguage failed: %v", err)
+	}
+	got := run.Language()
+	if got == nil || *got != *lang {
+		t.Errorf("expected language %+v, got %+v", lang, got)
+	}
+
+	// Mutating the caller's copy after SetLanguage must not affect the run,
+	// and mutating the returned copy must not affect the run either — same
+	// copy-semantics contract as Document.SetLanguage/Language.
+	lang.Val = "mutated"
+	if run.Language().Val != "fr" {
+		t.Error("SetLanguage must copy its argument")
+	}
+	got.Val = "mutated"
+	if run.Language().Val != "fr" {
+		t.Error("Language must return a copy")
+	}
+
+	if err := run.SetLanguage(nil); err != nil {
+		t.Fatalf("SetLanguage(nil) failed: %v", err)
+	}
+	if run.Language() != nil {
+		t.Error("expected SetLanguage(nil) to clear the override")
+	}
+}
+
+func TestRun_SetLanguage_RejectsEmptyTag(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+	run, _ := para.AddRun()
+
+	if err := run.SetLanguage(&domain.Language{}); err == nil {
+		t.Error("expected an error for a Language with no Val/EastAsia/Bidi set")
+	}
+}
+
 func TestRun_SetSize_Validation(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()

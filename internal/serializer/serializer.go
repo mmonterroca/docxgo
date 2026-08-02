@@ -134,6 +134,12 @@ func (s *RunSerializer) serializeProperties(run domain.Run) *xml.RunProperties {
 		}
 	}
 
+	// Language override — falls back to the document default (SerializeStyles)
+	// when unset, same Val/EastAsia/Bidi shape.
+	if lang := run.Language(); lang != nil {
+		props.Lang = &xml.Language{Val: lang.Val, EastAsia: lang.EastAsia, Bidi: lang.Bidi}
+	}
+
 	return props
 }
 

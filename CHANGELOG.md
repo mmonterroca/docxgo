@@ -1,3 +1,19 @@
+## v2.12.0 — 2026-08-02
+
+### Added
+
+- **`domain.Run.SetLanguage` / `Language`** — set a per-run proofing language override, used by Word for spell-checking, grammar-checking, and hyphenation of just that run (e.g. a foreign-language phrase inside an otherwise single-language paragraph). Complements `Document.SetLanguage`/`WithLanguage`, which only set the document-wide default; a run without an override inherits that default.
+  - `SetLanguage(lang *domain.Language) error` — same `Language{Val, EastAsia, Bidi}` shape as `Document.SetLanguage`; at least one field must be non-empty. Pass `nil` to clear the override and fall back to the document default.
+  - `Language() *domain.Language` — returns a defensive copy, or `nil` if unset. Mutating it has no effect on the run.
+  - Written as `w:lang` in the run's own `w:rPr`, into the field `internal/xml.RunProperties.Lang` that already existed but nothing wrote to.
+  - Opening an existing `.docx` via `OpenDocument`/`OpenDocumentFromBytes`/`OpenDocumentFromReader` now hydrates each run's `Language()` from its `w:rPr/w:lang`, if present — same round-trip fidelity as every other run property (`Bold`, `Highlight`, etc).
+
+### Changed
+
+- **`domain.Run` interface gained two methods** (`SetLanguage`, `Language`, above). If you implement `domain.Run` directly with your own type — most commonly a hand-written test double — you'll need to add both methods; embedding `domain.Run` in your type is unaffected, since the new methods are promoted automatically. No exported docxgo API accepts a `domain.Run` from a caller (only returns one), same reasoning as `Document.SetLanguage`/`Language` in v2.6.0.
+
+---
+
 ## v2.11.0 — 2026-07-29
 
 v2.10.0 was merged and published without a code review — CI alone. A

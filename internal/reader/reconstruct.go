@@ -659,6 +659,17 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
+	if langElem := findChild(props, "lang"); langElem != nil {
+		val, _ := getAttr(langElem, "val")
+		eastAsia, _ := getAttr(langElem, "eastAsia")
+		bidi, _ := getAttr(langElem, "bidi")
+		if val != "" || eastAsia != "" || bidi != "" {
+			if err := run.SetLanguage(&domain.Language{Val: val, EastAsia: eastAsia, Bidi: bidi}); err != nil {
+				return errors.Wrap(err, opApplyRunProperties)
+			}
+		}
+	}
+
 	return nil
 }
 

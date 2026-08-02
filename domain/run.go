@@ -63,6 +63,20 @@ type Run interface {
 	// SetHighlight sets the highlight color.
 	SetHighlight(color HighlightColor) error
 
+	// Language returns the run's language override, or nil if unset — in
+	// which case the run inherits the document's default proofing language
+	// (see Document.SetLanguage). Mutating the returned value has no effect
+	// on the run.
+	Language() *Language
+
+	// SetLanguage sets a per-run language override, used by Word for
+	// spell-checking, grammar-checking, and hyphenation of just this run —
+	// e.g. a foreign-language phrase inside an otherwise single-language
+	// paragraph. Pass nil to clear it and fall back to the document default.
+	// Returns an error if lang is non-nil but has no tag set (Val, EastAsia,
+	// and Bidi all empty).
+	SetLanguage(lang *Language) error
+
 	// AddText is a convenience method that appends text to the run.
 	AddText(text string) error
 
