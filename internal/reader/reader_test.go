@@ -15,6 +15,7 @@ import (
 	"image/png"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -57,6 +58,11 @@ func zipPartXML(t *testing.T, docxBytes []byte, name string) string {
 	t.Fatalf("%s not found in package", name)
 	return ""
 }
+
+// paragraphOpenTagRE matches a <w:p> opening tag, with or without attributes
+// or self-closing -- but not <w:pPr>, <w:pStyle>, etc, whose 4th character
+// isn't a space, '>', or '/'.
+var paragraphOpenTagRE = regexp.MustCompile(`<w:p( |>|/)`)
 
 // buildRawZipPackage assembles a .docx archive byte-for-byte from the given
 // part contents. Unlike every other fixture in this file, it does not go
@@ -294,6 +300,94 @@ func TestReconstructHyperlink_AnchorDoesNotMintRelationship(t *testing.T) {
 	relsXML := zipPartXML(t, buf.Bytes(), "word/_rels/document.xml.rels")
 	if strings.Contains(relsXML, constants.RelTypeHyperlink) {
 		t.Errorf("resaved document.xml.rels contains an orphaned hyperlink relationship for an internal anchor:\n%s", relsXML)
+	}
+}
+
+// TestReconstructMidBodySectionBreak_AgainstHandAuthoredPackage is a
+// regression for issue #102: a mid-document section break (a <w:sectPr>
+// embedded in a paragraph's own pPr, rather than the body's last child) was
+// silently dropped on read, collapsing a two-section document into one.
+//
+// The paragraph here matches the real, Word-authored shape that exposed
+// this (see testdata/word/issue-102-input.docx): no runs, and its pPr's only
+// child is sectPr -- Word's usual way of ending a section without any other
+// content on that paragraph. Deliberately omits <w:type>: its schema default
+// is "nextPage", not "no section break", so the fix must not treat an absent
+// w:type as "don't start a new section" -- see applySectionProperties's
+// embedded parameter in reconstruct.go.
+func TestReconstructMidBodySectionBreak_AgainstHandAuthoredPackage(t *testing.T) {
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p><w:r><w:t>First section</w:t></w:r></w:p>
+<w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p>
+<w:p><w:r><w:t>Second section</w:t></w:r></w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	if got := len(doc.Sections()); got != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2 (the mid-body sectPr must start a new section)", got)
+	}
+
+	// The bare paragraph that carried the sectPr must not survive as its own
+	// domain.Paragraph -- it exists in the source purely to hold the break,
+	// and the writer already synthesizes a paragraph like it for every
+	// section break (see DocumentSerializer.SerializeBody). Keeping both
+	// would double it on the next write.
+	paras := doc.Paragraphs()
+	if len(paras) != 2 {
+		t.Fatalf("len(Paragraphs()) = %d, want 2 (the bare section-break paragraph is not a separate domain.Paragraph)", len(paras))
+	}
+	if got := paras[0].Runs()[0].Text(); got != "First section" {
+		t.Errorf("Paragraphs()[0].Runs()[0].Text() = %q, want %q", got, "First section")
+	}
+	if got := paras[1].Runs()[0].Text(); got != "Second section" {
+		t.Errorf("Paragraphs()[1].Runs()[0].Text() = %q, want %q", got, "Second section")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+
+	if got := strings.Count(written, "<w:sectPr"); got != 2 {
+		t.Errorf("resaved document.xml contains %d <w:sectPr> elements, want 2 (the mid-body break plus the final section)", got)
+	}
+	if got := len(paragraphOpenTagRE.FindAllString(written, -1)); got != 3 {
+		t.Errorf("resaved document.xml contains %d <w:p> elements, want 3 (2 content paragraphs + 1 synthetic section-break carrier -- not 4)", got)
 	}
 }
 
