@@ -25,3 +25,7 @@ DocxValidator/obj/
 examples/[0-9][0-9]_*/*
 !examples/[0-9][0-9]_*/**/*.go
 !examples/[0-9][0-9]_*/**/*.md
+
+# Compiled example binaries built to the repo root
+# (e.g. `go build ./examples/13_themes/04_tech_architecture` from the root)
+/[0-9][0-9]_*
