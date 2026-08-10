@@ -849,6 +849,18 @@ func TestAddHyperlink_EmitsRealHyperlinkElement(t *testing.T) {
 	if hyperlinkRelCount != 1 {
 		t.Errorf("hyperlink relationship count = %d, want 1 (AddHyperlink must not leave an orphaned relationship)", hyperlinkRelCount)
 	}
+
+	// Regression for a defect found while planning #101's follow-ups:
+	// expandRunWithFields (internal/serializer/serializer.go) serialized the
+	// run's display text into the <w:hyperlink>'s own <w:r>, then -- since
+	// the run's in-memory text was never cleared -- serialized it a second
+	// time as a plain trailing <w:r>. Every prior hyperlink assertion in this
+	// repo counted <w:hyperlink> elements or inspected the in-memory model,
+	// both blind to a duplicated rendered run, so this counts occurrences of
+	// the display text in the actual bytes instead.
+	if got := strings.Count(documentXML, "See the policy"); got != 1 {
+		t.Errorf("display text %q appears %d times in word/document.xml, want 1 (duplicated trailing run)", "See the policy", got)
+	}
 }
 
 // TestAddHyperlink_RoundTrip guards against the fix regressing on a document

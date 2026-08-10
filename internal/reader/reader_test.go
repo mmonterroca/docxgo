@@ -197,6 +197,19 @@ func TestReconstructHyperlink_AgainstHandAuthoredPackage(t *testing.T) {
 	if got := strings.Count(written, "<w:hyperlink"); got != 2 {
 		t.Errorf("resaved document.xml contains %d <w:hyperlink> elements, want 2 (one per run, since reading flattens the source's single element)", got)
 	}
+
+	// Regression for a defect found while planning #101's follow-ups: this
+	// hydration path (hydrateHyperlink -> hydrateRun -> run.AddField) predates
+	// issue #101's fix and was never covered by a rendered-text assertion --
+	// only the <w:hyperlink> element count above, which stays correct whether
+	// or not the run's text is also duplicated as a trailing plain <w:r>.
+	// Reading ANY hyperlink-bearing document (not just ones built through
+	// AddHyperlink) and resaving it without modification hit this.
+	for _, wantText := range []string{"Example ", "Site"} {
+		if got := strings.Count(written, wantText); got != 1 {
+			t.Errorf("resaved document.xml contains %q %d times, want 1 (duplicated trailing run)", wantText, got)
+		}
+	}
 }
 
 // TestReconstructHyperlink_AnchorDoesNotMintRelationship pins the other half
