@@ -593,6 +593,139 @@ func TestParagraph_InsertRunAt(t *testing.T) {
 	}
 }
 
+// TestParagraph_AddHyperlink_AttachesField pins the issue #101 fix: the run
+// AddHyperlink returns must carry a domain.FieldTypeHyperlink field, since
+// that field is what makes the serializer emit a real <w:hyperlink r:id>
+// wrapper instead of a plain styled run (see expandRunWithFields in
+// internal/serializer/serializer.go). Before the fix, this run had zero
+// fields.
+func TestParagraph_AddHyperlink_AttachesField(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	run, err := para.AddHyperlink("https://example.com/policy", "See the policy")
+	if err != nil {
+		t.Fatalf("AddHyperlink() error = %v", err)
+	}
+
+	fields := run.Fields()
+	if len(fields) != 1 {
+		t.Fatalf("len(run.Fields()) = %d, want 1", len(fields))
+	}
+	if fields[0].Type() != domain.FieldTypeHyperlink {
+		t.Errorf("Fields()[0].Type() = %v, want %v", fields[0].Type(), domain.FieldTypeHyperlink)
+	}
+
+	if got, want := run.Text(), "See the policy"; got != want {
+		t.Errorf("run.Text() = %q, want %q", got, want)
+	}
+}
+
+// TestParagraph_AddHyperlink_DefaultDisplayTextIsURL pins the existing
+// "empty displayText falls back to the url" behavior, unchanged by the fix.
+func TestParagraph_AddHyperlink_DefaultDisplayTextIsURL(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	run, err := para.AddHyperlink("https://example.com", "")
+	if err != nil {
+		t.Fatalf("AddHyperlink() error = %v", err)
+	}
+	if got, want := run.Text(), "https://example.com"; got != want {
+		t.Errorf("run.Text() = %q, want %q", got, want)
+	}
+}
+
+// TestParagraph_AddHyperlink_EmptyURL pins the existing empty-url guard.
+func TestParagraph_AddHyperlink_EmptyURL(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	if _, err := para.AddHyperlink("", "text"); err == nil {
+		t.Error("AddHyperlink(\"\", ...) error = nil, want an error")
+	}
+}
+
+// TestParagraph_AddHyperlink_RejectsQuoteInURL is a Compatibility change from
+// the issue #101 fix: routing through NewHyperlinkField means a url
+// containing a double quote is now rejected (see
+// TestNewHyperlinkFieldRejectsQuote), where it previously produced a broken
+// link silently.
+func TestParagraph_AddHyperlink_RejectsQuoteInURL(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	if _, err := para.AddHyperlink(`https://example.com/?q="x"`, "text"); err == nil {
+		t.Error("AddHyperlink() error = nil, want an error for a url containing a double quote")
+	}
+}
+
+// TestParagraph_AddHyperlink_InternalAnchor pins the free win found while
+// fixing issue #101: a "#anchor" url now produces a working internal link
+// (via w:anchor) instead of a broken external relationship whose target is
+// the literal "#anchor" string. See run.AddField's hyperlink branch.
+func TestParagraph_AddHyperlink_InternalAnchor(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	run, err := para.AddHyperlink("#Chapter1", "See chapter 1")
+	if err != nil {
+		t.Fatalf("AddHyperlink() error = %v", err)
+	}
+
+	fields := run.Fields()
+	if len(fields) != 1 {
+		t.Fatalf("len(run.Fields()) = %d, want 1", len(fields))
+	}
+
+	accessor, ok := fields[0].(interface {
+		GetProperty(string) (string, bool)
+	})
+	if !ok {
+		t.Fatal("field does not support GetProperty")
+	}
+	if relID, ok := accessor.GetProperty("relationshipID"); ok && relID != "" {
+		t.Errorf("GetProperty(relationshipID) = %q, want unset for an internal anchor link", relID)
+	}
+}
+
+// TestParagraph_AddHyperlink_HeaderFooterRejected pins the issue #101 guard:
+// docxgo does not yet write a per-part relationships file
+// (word/_rels/headerN.xml.rels), so a hyperlink relationship minted on a
+// header/footer paragraph would reference a part that doesn't exist and
+// produce a document Word offers to repair. AddHyperlink refuses instead.
+func TestParagraph_AddHyperlink_HeaderFooterRejected(t *testing.T) {
+	doc := core.NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection() error = %v", err)
+	}
+
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header() error = %v", err)
+	}
+	headerPara, err := header.AddParagraph()
+	if err != nil {
+		t.Fatalf("header.AddParagraph() error = %v", err)
+	}
+	if _, err := headerPara.AddHyperlink("https://example.com", "text"); err == nil {
+		t.Error("header paragraph AddHyperlink() error = nil, want an error")
+	}
+
+	footer, err := section.Footer(domain.FooterDefault)
+	if err != nil {
+		t.Fatalf("Footer() error = %v", err)
+	}
+	footerPara, err := footer.AddParagraph()
+	if err != nil {
+		t.Fatalf("footer.AddParagraph() error = %v", err)
+	}
+	if _, err := footerPara.AddHyperlink("https://example.com", "text"); err == nil {
+		t.Error("footer paragraph AddHyperlink() error = nil, want an error")
+	}
+}
+
 func TestParagraph_InsertRunAt_OutOfRange(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()

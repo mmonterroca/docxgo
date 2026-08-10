@@ -9,14 +9,17 @@ package docx
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/xml"
 	"image"
 	"image/color"
 	"image/png"
 	"io"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
+	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
 func TestOpenDocumentVariants(t *testing.T) {
@@ -640,6 +643,230 @@ func TestOpenDocument_PreservedStylesKeepDocumentDefaults(t *testing.T) {
 		t.Errorf("opened document's preserved styles.xml was rewritten with new document defaults; "+
 			"round-trip fidelity requires writing it back verbatim.\ngot: %s", styles)
 	}
+}
+
+// relsOf unmarshals a word/_rels/*.rels part into a minimal, test-local view
+// of its Relationship entries.
+func relsOf(t *testing.T, relsXML []byte) []struct {
+	ID     string `xml:"Id,attr"`
+	Type   string `xml:"Type,attr"`
+	Target string `xml:"Target,attr"`
+} {
+	t.Helper()
+	var rels struct {
+		Relationships []struct {
+			ID     string `xml:"Id,attr"`
+			Type   string `xml:"Type,attr"`
+			Target string `xml:"Target,attr"`
+		} `xml:"Relationship"`
+	}
+	if err := xml.Unmarshal(relsXML, &rels); err != nil {
+		t.Fatalf("unmarshal .rels: %v", err)
+	}
+	return rels.Relationships
+}
+
+var hyperlinkElementRE = regexp.MustCompile(`<w:hyperlink[^>]*\br:id="([^"]+)"[^>]*>`)
+
+// TestAddHyperlink_EmitsRealHyperlinkElement is the end-to-end regression for
+// issue #101: Paragraph.AddHyperlink wrote a relationship into
+// word/_rels/document.xml.rels that nothing in word/document.xml referenced
+// -- Word rendered a plain blue, underlined run instead of a clickable link.
+// This asserts the actual bytes docxgo produces, not just the in-memory
+// domain.Field the fix attaches.
+func TestAddHyperlink_EmitsRealHyperlinkElement(t *testing.T) {
+	doc := NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	const url = "https://example.com/policy"
+	if _, err := para.AddHyperlink(url, "See the policy"); err != nil {
+		t.Fatalf("AddHyperlink: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	documentXML := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	match := hyperlinkElementRE.FindStringSubmatch(documentXML)
+	if match == nil {
+		t.Fatalf("word/document.xml does not contain a <w:hyperlink r:id=...> element:\n%s", documentXML)
+	}
+	rID := match[1]
+
+	rels := relsOf(t, zipPart(t, buf.Bytes(), "word/_rels/document.xml.rels"))
+
+	var hyperlinkRelCount int
+	var foundMatchingTarget bool
+	for _, rel := range rels {
+		if rel.Type != constants.RelTypeHyperlink {
+			continue
+		}
+		hyperlinkRelCount++
+		if rel.ID == rID && rel.Target == url {
+			foundMatchingTarget = true
+		}
+	}
+
+	if !foundMatchingTarget {
+		t.Errorf("no hyperlink relationship with Id=%q Target=%q found in document.xml.rels; got %+v", rID, url, rels)
+	}
+	if hyperlinkRelCount != 1 {
+		t.Errorf("hyperlink relationship count = %d, want 1 (AddHyperlink must not leave an orphaned relationship)", hyperlinkRelCount)
+	}
+}
+
+// TestAddHyperlink_RoundTrip guards against the fix regressing on a document
+// that is written, reopened, and written again -- the hyperlink and its
+// relationship must survive both trips.
+func TestAddHyperlink_RoundTrip(t *testing.T) {
+	doc := NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	const url = "https://example.com/policy"
+	if _, err := para.AddHyperlink(url, "See the policy"); err != nil {
+		t.Fatalf("AddHyperlink: %v", err)
+	}
+
+	var first bytes.Buffer
+	if _, err := doc.WriteTo(&first); err != nil {
+		t.Fatalf("WriteTo (first): %v", err)
+	}
+
+	reopened, err := OpenDocumentFromBytes(first.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	var second bytes.Buffer
+	if _, err := reopened.WriteTo(&second); err != nil {
+		t.Fatalf("WriteTo (second): %v", err)
+	}
+
+	documentXML := string(zipPart(t, second.Bytes(), "word/document.xml"))
+	match := hyperlinkElementRE.FindStringSubmatch(documentXML)
+	if match == nil {
+		t.Fatalf("word/document.xml (after round-trip) does not contain a <w:hyperlink r:id=...> element:\n%s", documentXML)
+	}
+
+	rels := relsOf(t, zipPart(t, second.Bytes(), "word/_rels/document.xml.rels"))
+	var found bool
+	for _, rel := range rels {
+		if rel.ID == match[1] && rel.Type == constants.RelTypeHyperlink && rel.Target == url {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("round-tripped document.xml.rels missing hyperlink relationship Id=%q Target=%q; got %+v", match[1], url, rels)
+	}
+}
+
+// TestOpenDocument_AddHyperlink_RegeneratesRelsWithoutLosingOriginal pins the
+// issue #101 fix for the round-trip hazard: word/_rels/document.xml.rels is
+// normally written back verbatim for a document opened with OpenDocument (see
+// docRelsNeedsRegeneration in internal/core/document.go). Adding a hyperlink
+// after open mints a new relationship id that the preserved bytes don't
+// contain -- if they were still written verbatim, the saved document.xml
+// would carry a dangling r:id. The fix regenerates the rels part from the
+// relationship manager instead, which was fully seeded from the original
+// rels on open, so nothing from the source document is lost.
+func TestOpenDocument_AddHyperlink_RegeneratesRelsWithoutLosingOriginal(t *testing.T) {
+	doc := NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	const originalURL = "https://example.com/original"
+	if _, err := para.AddHyperlink(originalURL, "Original link"); err != nil {
+		t.Fatalf("AddHyperlink: %v", err)
+	}
+
+	var original bytes.Buffer
+	if _, err := doc.WriteTo(&original); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	originalRels := relsOf(t, zipPart(t, original.Bytes(), "word/_rels/document.xml.rels"))
+
+	t.Run("unchanged document keeps rels byte-identical", func(t *testing.T) {
+		reopened, err := OpenDocumentFromBytes(original.Bytes())
+		if err != nil {
+			t.Fatalf("OpenDocumentFromBytes: %v", err)
+		}
+		var resaved bytes.Buffer
+		if _, err := reopened.WriteTo(&resaved); err != nil {
+			t.Fatalf("WriteTo: %v", err)
+		}
+		got := zipPart(t, resaved.Bytes(), "word/_rels/document.xml.rels")
+		want := zipPart(t, original.Bytes(), "word/_rels/document.xml.rels")
+		if !bytes.Equal(got, want) {
+			t.Errorf("resaving an opened document with no new relationships changed document.xml.rels;\ngot:  %s\nwant: %s", got, want)
+		}
+	})
+
+	t.Run("adding a hyperlink regenerates rels without dropping originals", func(t *testing.T) {
+		reopened, err := OpenDocumentFromBytes(original.Bytes())
+		if err != nil {
+			t.Fatalf("OpenDocumentFromBytes: %v", err)
+		}
+		paras := reopened.Paragraphs()
+		if len(paras) == 0 {
+			t.Fatalf("expected at least one paragraph in the reopened document")
+		}
+		const newURL = "https://example.com/added-after-open"
+		if _, err := paras[0].AddHyperlink(newURL, "Added after open"); err != nil {
+			t.Fatalf("AddHyperlink (after open): %v", err)
+		}
+
+		var resaved bytes.Buffer
+		if _, err := reopened.WriteTo(&resaved); err != nil {
+			t.Fatalf("WriteTo: %v", err)
+		}
+
+		documentXML := string(zipPart(t, resaved.Bytes(), "word/document.xml"))
+		matches := hyperlinkElementRE.FindAllStringSubmatch(documentXML, -1)
+		if len(matches) != 2 {
+			t.Fatalf("found %d <w:hyperlink r:id> elements in resaved document.xml, want 2:\n%s", len(matches), documentXML)
+		}
+
+		rels := relsOf(t, zipPart(t, resaved.Bytes(), "word/_rels/document.xml.rels"))
+		relByID := make(map[string]string, len(rels))
+		for _, rel := range rels {
+			relByID[rel.ID] = rel.Target
+		}
+
+		var foundOriginal, foundNew bool
+		for _, m := range matches {
+			switch relByID[m[1]] {
+			case originalURL:
+				foundOriginal = true
+			case newURL:
+				foundNew = true
+			}
+		}
+		if !foundOriginal {
+			t.Errorf("resaved document.xml.rels lost the original relationship (Target=%q); got %+v", originalURL, rels)
+		}
+		if !foundNew {
+			t.Errorf("resaved document.xml.rels missing the newly added relationship (Target=%q); got %+v", newURL, rels)
+		}
+
+		// Every non-hyperlink relationship from the original save must still
+		// be present too (styles, fontTable, theme, settings, webSettings, ...).
+		origByID := make(map[string]string, len(originalRels))
+		for _, rel := range originalRels {
+			origByID[rel.ID] = rel.Target
+		}
+		for id, target := range origByID {
+			if got, ok := relByID[id]; !ok || got != target {
+				t.Errorf("resaved rels lost or changed original relationship %s (Target=%q): got Target=%q, ok=%v", id, target, got, ok)
+			}
+		}
+	})
 }
 
 // zipPart returns the named entry from a .docx archive.

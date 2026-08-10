@@ -21,6 +21,7 @@
 package core
 
 import (
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +31,7 @@ import (
 	"github.com/mmonterroca/docxgo/v2/internal/manager"
 	"github.com/mmonterroca/docxgo/v2/internal/serializer"
 	"github.com/mmonterroca/docxgo/v2/internal/writer"
+	xmlstructs "github.com/mmonterroca/docxgo/v2/internal/xml"
 	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
@@ -359,6 +361,40 @@ func (d *document) ensureDefaultRelationships() {
 	}
 }
 
+// docRelsNeedsRegeneration reports whether d.relManager holds a relationship
+// ID that is not present in the preserved word/_rels/document.xml.rels bytes.
+// Those bytes are written back verbatim on a round-tripped document (see
+// WriteTo); if something was added to the relationship manager after the
+// document was opened -- e.g. AddHyperlink -- writing the preserved bytes
+// unchanged would leave a dangling r:id in document.xml. See issue #101.
+func (d *document) docRelsNeedsRegeneration() bool {
+	if len(d.preservedDocRels) == 0 {
+		return false
+	}
+
+	var preserved xmlstructs.Relationships
+	if err := xml.Unmarshal(d.preservedDocRels, &preserved); err != nil {
+		// Malformed preserved bytes: keep the existing verbatim behavior
+		// rather than risk mangling a part that couldn't be parsed.
+		return false
+	}
+
+	known := make(map[string]bool, len(preserved.Relationships))
+	for _, rel := range preserved.Relationships {
+		if rel != nil {
+			known[rel.ID] = true
+		}
+	}
+
+	for _, rel := range d.relManager.All() {
+		if rel != nil && !known[rel.ID] {
+			return true
+		}
+	}
+
+	return false
+}
+
 // WriteTo writes the document to the provided writer in .docx format.
 func (d *document) WriteTo(w io.Writer) (int64, error) {
 	if len(d.sections) == 0 {
@@ -415,10 +451,21 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	// Build writer.PreservedParts from core.PreservedParts if available
 	var writerPreserved *writer.PreservedParts
 	if corePreserved := d.GetPreservedParts(); corePreserved != nil {
+		docRels := corePreserved.DocRels
+		if d.docRelsNeedsRegeneration() {
+			// A relationship was added since this document was opened (e.g.
+			// AddHyperlink). Leave DocRels empty so zip.go's non-round-trip
+			// branch regenerates word/_rels/document.xml.rels from
+			// d.relManager -- which was seeded with every original
+			// relationship on open, so this is lossless for the unchanged
+			// ones and adds the new one(s).
+			docRels = nil
+		}
+
 		writerPreserved = &writer.PreservedParts{
 			Headers:          corePreserved.Headers,
 			Footers:          corePreserved.Footers,
-			DocRels:          corePreserved.DocRels,
+			DocRels:          docRels,
 			ContentTypes:     corePreserved.ContentTypes,
 			Additional:       corePreserved.Additional,
 			Themes:           corePreserved.Themes,

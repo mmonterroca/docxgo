@@ -8,6 +8,8 @@
 package core
 
 import (
+	"strings"
+
 	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/internal/manager"
 	"github.com/mmonterroca/docxgo/v2/pkg/constants"
@@ -252,16 +254,25 @@ func (r *run) AddField(field domain.Field) error {
 		// Check if this hyperlink already has a relationship ID (preserved from read)
 		// If so, skip creating a new one to preserve original document references
 		existingRelID, hasExistingRelID := accessor.GetProperty("relationshipID")
-		if hasExistingRelID && existingRelID != "" {
-			// Already has a relationship ID, skip creating new one
-		} else {
-			// No existing relationship ID, create a new one
+		url, hasURL := accessor.GetProperty("url")
+		isAnchor := hasURL && strings.HasPrefix(url, "#")
+
+		switch {
+		case hasExistingRelID && existingRelID != "":
+			// Already has a relationship ID, skip creating new one.
+		case isAnchor:
+			// An internal link (w:anchor) has no relationship of its own --
+			// the serializer resolves it from the "url"/"anchor" property
+			// directly (see expandRunWithFields). Minting an External
+			// relationship whose target is "#anchor" would only leave an
+			// orphaned entry in the .rels part.
+		default:
+			// No existing relationship ID and not an internal anchor: create one.
 			if r.relManager == nil {
 				return errors.InvalidState("Run.AddField", "hyperlink relationship manager not initialized")
 			}
 
-			url, ok := accessor.GetProperty("url")
-			if !ok || url == "" {
+			if !hasURL || url == "" {
 				return errors.InvalidArgument("Run.AddField", "url", url, "hyperlink URL cannot be empty")
 			}
 
