@@ -651,12 +651,23 @@ func TestParagraph_AddHyperlink_EmptyURL(t *testing.T) {
 // containing a double quote is now rejected (see
 // TestNewHyperlinkFieldRejectsQuote), where it previously produced a broken
 // link silently.
+//
+// It also pins a fix to the fix, found in the PR's own review: AddHyperlink
+// used to build the field (and validate it) only after already calling
+// AddRun/SetText/SetColor/SetUnderline, so a rejected url left a stray blue,
+// underlined run behind the returned error. The field is now validated
+// before the paragraph is touched at all, so a rejected call must leave the
+// paragraph exactly as it found it.
 func TestParagraph_AddHyperlink_RejectsQuoteInURL(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()
 
 	if _, err := para.AddHyperlink(`https://example.com/?q="x"`, "text"); err == nil {
 		t.Error("AddHyperlink() error = nil, want an error for a url containing a double quote")
+	}
+
+	if got := len(para.Runs()); got != 0 {
+		t.Errorf("len(para.Runs()) = %d, want 0: a rejected AddHyperlink call must not leave a run behind", got)
 	}
 }
 

@@ -138,6 +138,19 @@ func (p *paragraph) AddHyperlink(url, displayText string) (domain.Run, error) {
 		text = url
 	}
 
+	// Build (and validate) the field before touching the paragraph at all.
+	// NewHyperlinkField rejects a url containing a double quote by recording
+	// a validation error on the field rather than returning nil -- checking
+	// it here, before AddRun, means a rejected url leaves the paragraph
+	// exactly as it was instead of a stray blue, underlined run behind a
+	// returned error.
+	field := NewHyperlinkField(url, text)
+	if validator, ok := field.(interface{ ValidationError() error }); ok {
+		if err := validator.ValidationError(); err != nil {
+			return nil, errors.Wrap(err, "Paragraph.AddHyperlink")
+		}
+	}
+
 	// Create run with hyperlink text
 	run, err := p.AddRun()
 	if err != nil {
@@ -160,8 +173,10 @@ func (p *paragraph) AddHyperlink(url, displayText string) (domain.Run, error) {
 	// real <w:hyperlink> wrapper (see expandRunWithFields in
 	// internal/serializer/serializer.go) instead of a plain styled run. It
 	// also mints (or, for a "#anchor" url, skips) the relationship -- see
-	// run.AddField.
-	field := NewHyperlinkField(url, text)
+	// run.AddField. The validation check above already ruled out the only
+	// failure mode reachable with a non-empty url and an initialized
+	// relationship manager, so this should not fail in practice; still
+	// wrapped in case a future field or run change adds one.
 	if err := run.AddField(field); err != nil {
 		return nil, errors.Wrap(err, "Paragraph.AddHyperlink")
 	}

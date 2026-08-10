@@ -16,6 +16,7 @@ import (
 	"io"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -501,6 +502,137 @@ func buildCollidingRelationshipDocx(t *testing.T, pngBytes []byte) []byte {
 	return buf.Bytes()
 }
 
+// TestOpenDocument_AddHyperlink_PreservesForeignRelationshipIDs pins a fix
+// found in this PR's own review: NewDocument() -- used internally to build
+// the domain.Document that ReconstructDocument hydrates into -- used to
+// assign rId1..rId5 to the base relationships (styles, fontTable, theme,
+// settings, webSettings) immediately at construction, before the source
+// file's own relationships were ever registered. A real Word document has no
+// reason to number its relationships in that order; its rId1 is whatever it
+// happened to add first, which is routinely a header or a hyperlink, not
+// styles.xml.
+//
+// RegisterExistingRelationship is a no-op when the ID is already taken (by
+// design, so re-registering the same relationship twice is harmless), so the
+// source file's real rId1 relationship was silently DROPPED instead of
+// registered whenever it collided with one of NewDocument's freshly-minted
+// IDs. That corruption was invisible as long as document.xml.rels was always
+// written back verbatim on save -- but this PR's own fix for issue #101 adds
+// a case where it is regenerated from the relationship manager instead (see
+// docRelsNeedsRegeneration in internal/core/document.go), which exposed it:
+// rId1 in the *regenerated* file no longer matched what word/document.xml's
+// own w:headerReference expected, silently repointing the header at
+// styles.xml.
+//
+// The fix is internal/core.NewDocumentForReconstruction, which defers
+// assigning the base relationships until Document.WriteTo runs -- by which
+// point the source file's relationships are already registered under their
+// real IDs, so nothing collides.
+func TestOpenDocument_AddHyperlink_PreservesForeignRelationshipIDs(t *testing.T) {
+	const contentTypesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+</Types>`
+
+	const rootRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	// rId1 is the header here -- not styles, which is what a fresh
+	// NewDocument() would hand out to rId1 if it ran before this file's own
+	// relationships were registered.
+	const documentRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="` + constants.RelTypeHeader + `" Target="header1.xml"/>
+<Relationship Id="rId2" Type="` + constants.RelTypeStyles + `" Target="styles.xml"/>
+</Relationships>`
+
+	const mainDocumentXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>
+<w:p><w:r><w:t>Body paragraph</w:t></w:r></w:p>
+<w:sectPr>
+<w:headerReference w:type="default" r:id="rId1"/>
+<w:pgSz w:w="11906" w:h="16838"/>
+</w:sectPr>
+</w:body>
+</w:document>`
+
+	const headerXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:p><w:r><w:t>Header text</w:t></w:r></w:p>
+</w:hdr>`
+
+	const stylesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+</w:styles>`
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, f := range []struct {
+		name string
+		data string
+	}{
+		{"[Content_Types].xml", contentTypesXML},
+		{"_rels/.rels", rootRelsXML},
+		{"word/document.xml", mainDocumentXML},
+		{"word/_rels/document.xml.rels", documentRelsXML},
+		{"word/header1.xml", headerXML},
+		{"word/styles.xml", stylesXML},
+	} {
+		w, err := zw.Create(f.name)
+		if err != nil {
+			t.Fatalf("zip.Create(%s): %v", f.name, err)
+		}
+		if _, err := w.Write([]byte(f.data)); err != nil {
+			t.Fatalf("write %s: %v", f.name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip.Close: %v", err)
+	}
+
+	doc, err := OpenDocumentFromBytes(buf.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	paras := doc.Paragraphs()
+	if len(paras) == 0 {
+		t.Fatal("expected at least one paragraph")
+	}
+	if _, err := paras[0].AddHyperlink("https://example.com/added", "Added link"); err != nil {
+		t.Fatalf("AddHyperlink: %v", err)
+	}
+
+	var resaved bytes.Buffer
+	if _, err := doc.WriteTo(&resaved); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	rels := relsOf(t, zipPart(t, resaved.Bytes(), "word/_rels/document.xml.rels"))
+	relByID := make(map[string]string, len(rels))
+	for _, rel := range rels {
+		relByID[rel.ID] = rel.Type
+	}
+
+	if got := relByID["rId1"]; got != constants.RelTypeHeader {
+		t.Errorf("resaved rId1 Type = %q, want %q (the header relationship); "+
+			"adding a hyperlink must not repoint a foreign document's rId1 at "+
+			"docxgo's own default styles.xml relationship", got, constants.RelTypeHeader)
+	}
+
+	resavedDocumentXML := string(zipPart(t, resaved.Bytes(), "word/document.xml"))
+	if !strings.Contains(resavedDocumentXML, `w:headerReference`) || !strings.Contains(resavedDocumentXML, `r:id="rId1"`) {
+		t.Errorf("resaved document.xml should still reference the header via rId1:\n%s", resavedDocumentXML)
+	}
+}
+
 // TestOpenDocument_MalformedHeaderRelsIsTolerated guards against a regression:
 // a header/footer part's own .rels was previously never parsed, so a document
 // with an unparseable "word/_rels/header1.xml.rels" still opened. Parsing those
@@ -775,6 +907,17 @@ func TestAddHyperlink_RoundTrip(t *testing.T) {
 // would carry a dangling r:id. The fix regenerates the rels part from the
 // relationship manager instead, which was fully seeded from the original
 // rels on open, so nothing from the source document is lost.
+//
+// The "unchanged document" sub-test below only holds because the fixture is
+// itself docxgo-authored and so already carries all five of docxgo's default
+// relationships (styles, fontTable, theme, settings, webSettings). A source
+// file missing one of those still regenerates the rels part on an otherwise
+// untouched resave, since Document.WriteTo always ensures they're present
+// (unrelated to this fix -- see ensureDefaultRelationships) and the newly
+// minted relationship is, correctly, not in the preserved bytes either. See
+// TestOpenDocument_AddHyperlink_PreservesForeignRelationshipIDs's fixture,
+// which is missing all four non-styles defaults and demonstrates exactly
+// that: it still round-trips correctly, just not byte-for-byte.
 func TestOpenDocument_AddHyperlink_RegeneratesRelsWithoutLosingOriginal(t *testing.T) {
 	doc := NewDocument()
 	para, err := doc.AddParagraph()
