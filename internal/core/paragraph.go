@@ -65,6 +65,10 @@ type paragraph struct {
 	bookmarkID         string // ID for bookmark (if this paragraph needs one for TOC)
 	bookmarkName       string // Name for bookmark (e.g., "_Toc123456")
 	mediaManager       *manager.MediaManager
+	// inHeaderFooter is true for a paragraph that lives in a header or footer
+	// part. AddHyperlink refuses to run on such a paragraph -- see its doc
+	// comment for why.
+	inHeaderFooter bool
 }
 
 // NewParagraph creates a new Paragraph.
@@ -85,6 +89,16 @@ func NewParagraph(id string, idGen IDGenerator, relManager *manager.Relationship
 	}
 }
 
+// markHeaderFooterParagraph flags a paragraph as living inside a header or
+// footer part, so AddHyperlink can refuse to run on it. p is always a
+// *paragraph in practice -- NewParagraph is the only constructor -- so a
+// failed type assertion is silently ignored rather than panicking.
+func markHeaderFooterParagraph(p domain.Paragraph) {
+	if concrete, ok := p.(*paragraph); ok {
+		concrete.inHeaderFooter = true
+	}
+}
+
 // AddRun adds a new text run to the paragraph.
 func (p *paragraph) AddRun() (domain.Run, error) {
 	id := p.idGen.NextRunID()
@@ -101,15 +115,40 @@ func (p *paragraph) AddField(_ domain.FieldType) (domain.Field, error) {
 }
 
 // AddHyperlink adds a hyperlink to the paragraph.
+//
+// The link is written as a real OOXML <w:hyperlink> element: for an external
+// URL, via a relationship in this part's .rels (r:id); for an internal link
+// (a url starting with "#"), via a bookmark anchor (w:anchor) with no
+// relationship at all. Do not call this on a header or footer paragraph:
+// docxgo does not yet emit a per-part relationships file
+// (word/_rels/headerN.xml.rels / footerN.xml.rels), so an external hyperlink
+// relationship minted there would reference a part that doesn't exist.
 func (p *paragraph) AddHyperlink(url, displayText string) (domain.Run, error) {
 	if url == "" {
 		return nil, errors.InvalidArgument("Paragraph.AddHyperlink", "url", url, "URL cannot be empty")
 	}
 
-	// Add relationship for hyperlink
-	_, err := p.relManager.AddHyperlink(url)
-	if err != nil {
-		return nil, errors.Wrap(err, "Paragraph.AddHyperlink")
+	if p.inHeaderFooter {
+		return nil, errors.Unsupported("Paragraph.AddHyperlink",
+			"hyperlinks in a header or footer paragraph (no word/_rels/headerN.xml.rels support yet)")
+	}
+
+	text := displayText
+	if text == "" {
+		text = url
+	}
+
+	// Build (and validate) the field before touching the paragraph at all.
+	// NewHyperlinkField rejects a url containing a double quote by recording
+	// a validation error on the field rather than returning nil -- checking
+	// it here, before AddRun, means a rejected url leaves the paragraph
+	// exactly as it was instead of a stray blue, underlined run behind a
+	// returned error.
+	field := NewHyperlinkField(url, text)
+	if validator, ok := field.(interface{ ValidationError() error }); ok {
+		if err := validator.ValidationError(); err != nil {
+			return nil, errors.Wrap(err, "Paragraph.AddHyperlink")
+		}
 	}
 
 	// Create run with hyperlink text
@@ -118,19 +157,29 @@ func (p *paragraph) AddHyperlink(url, displayText string) (domain.Run, error) {
 		return nil, errors.Wrap(err, "Paragraph.AddHyperlink")
 	}
 
-	text := displayText
-	if text == "" {
-		text = url
-	}
-
 	err = run.SetText(text)
 	if err != nil {
 		return nil, errors.Wrap(err, "Paragraph.AddHyperlink")
 	}
 
-	// Set hyperlink styling (blue, underlined)
+	// Set hyperlink styling (blue, underlined) -- redundant with the
+	// Hyperlink character style the serializer also applies via the field
+	// below, but kept so the run renders correctly for any consumer that
+	// doesn't resolve character styles.
 	_ = run.SetColor(domain.ColorBlue)
 	_ = run.SetUnderline(domain.UnderlineSingle)
+
+	// Attach the hyperlink field: this is what makes the serializer emit a
+	// real <w:hyperlink> wrapper (see expandRunWithFields in
+	// internal/serializer/serializer.go) instead of a plain styled run. It
+	// also mints (or, for a "#anchor" url, skips) the relationship -- see
+	// run.AddField. The validation check above already ruled out the only
+	// failure mode reachable with a non-empty url and an initialized
+	// relationship manager, so this should not fail in practice; still
+	// wrapped in case a future field or run change adds one.
+	if err := run.AddField(field); err != nil {
+		return nil, errors.Wrap(err, "Paragraph.AddHyperlink")
+	}
 
 	return run, nil
 }

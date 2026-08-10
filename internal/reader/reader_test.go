@@ -28,27 +28,273 @@ import (
 // in-memory accessor values that can diverge from it.
 func documentXML(t *testing.T, docxBytes []byte) string {
 	t.Helper()
+	return zipPartXML(t, docxBytes, "word/document.xml")
+}
+
+// zipPartXML unzips a .docx buffer and returns the raw bytes of the named
+// part, as a string.
+func zipPartXML(t *testing.T, docxBytes []byte, name string) string {
+	t.Helper()
 	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
 	if err != nil {
 		t.Fatalf("zip.NewReader: %v", err)
 	}
 	for _, f := range zr.File {
-		if f.Name != "word/document.xml" {
+		if f.Name != name {
 			continue
 		}
 		rc, err := f.Open()
 		if err != nil {
-			t.Fatalf("open word/document.xml: %v", err)
+			t.Fatalf("open %s: %v", name, err)
 		}
 		defer rc.Close()
 		data, err := io.ReadAll(rc)
 		if err != nil {
-			t.Fatalf("read word/document.xml: %v", err)
+			t.Fatalf("read %s: %v", name, err)
 		}
 		return string(data)
 	}
-	t.Fatalf("word/document.xml not found in package")
+	t.Fatalf("%s not found in package", name)
 	return ""
+}
+
+// buildRawZipPackage assembles a .docx archive byte-for-byte from the given
+// part contents. Unlike every other fixture in this file, it does not go
+// through docxgo's own writer -- see
+// TestReconstructHyperlink_AgainstHandAuthoredPackage for why that matters.
+func buildRawZipPackage(t *testing.T, parts map[string]string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for name, content := range parts {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("zip.Create(%s): %v", name, err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip.Close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// TestReconstructHyperlink_AgainstHandAuthoredPackage is the answer to issue
+// #101's own diagnosis: every other fixture in this test suite is written by
+// docxgo and read back by docxgo, so a writer gap and a reader gap that
+// happen to cancel out are indistinguishable from correctness (a document
+// whose writer never emits <w:hyperlink> round-trips as "a document with no
+// links", which looks identical to a document that genuinely has none).
+//
+// This builds a minimal OOXML package as raw XML bytes -- not through
+// core.NewDocument()/WriteTo -- shaped the way real Word writes a hyperlink:
+// a <w:hyperlink r:id="..." w:history="1"> wrapping two separate <w:r>
+// children (Word splits a hyperlink's display text across runs whenever
+// formatting changes mid-link), each styled with rStyle="Hyperlink". It
+// exercises hydrateHyperlink and hydrateRun directly against input the
+// writer side of this package had no part in producing.
+func TestReconstructHyperlink_AgainstHandAuthoredPackage(t *testing.T) {
+	const url = "https://example.com/from-word"
+
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	docRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId2" Type="` + constants.RelTypeHyperlink + `" Target="` + url + `" TargetMode="External"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p>
+<w:hyperlink r:id="rId2" w:history="1">
+<w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">Example </w:t></w:r>
+<w:r><w:rPr><w:rStyle w:val="Hyperlink"/><w:b/></w:rPr><w:t>Site</w:t></w:r>
+</w:hyperlink>
+</w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml":          contentTypesXML,
+		"_rels/.rels":                  rootRelsXML,
+		"word/document.xml":            mainDocumentXML,
+		"word/_rels/document.xml.rels": docRelsXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	paras := doc.Paragraphs()
+	if len(paras) != 1 {
+		t.Fatalf("len(Paragraphs()) = %d, want 1", len(paras))
+	}
+	runs := paras[0].Runs()
+	if len(runs) != 2 {
+		t.Fatalf("len(Runs()) = %d, want 2 (one <w:hyperlink> flattens its children onto the paragraph)", len(runs))
+	}
+
+	for i, wantText := range []string{"Example ", "Site"} {
+		run := runs[i]
+		if got := run.Text(); got != wantText {
+			t.Errorf("Runs()[%d].Text() = %q, want %q", i, got, wantText)
+		}
+
+		fields := run.Fields()
+		if len(fields) != 1 {
+			t.Fatalf("len(Runs()[%d].Fields()) = %d, want 1", i, len(fields))
+		}
+		if fields[0].Type() != domain.FieldTypeHyperlink {
+			t.Errorf("Runs()[%d].Fields()[0].Type() = %v, want %v", i, fields[0].Type(), domain.FieldTypeHyperlink)
+		}
+
+		accessor, ok := fields[0].(interface {
+			GetProperty(string) (string, bool)
+		})
+		if !ok {
+			t.Fatalf("Runs()[%d] field does not support GetProperty", i)
+		}
+		if gotURL, ok := accessor.GetProperty("url"); !ok || gotURL != url {
+			t.Errorf("Runs()[%d] field GetProperty(url) = %q, ok=%v, want %q", i, gotURL, ok, url)
+		}
+		if gotRelID, ok := accessor.GetProperty("relationshipID"); !ok || gotRelID != "rId2" {
+			t.Errorf("Runs()[%d] field GetProperty(relationshipID) = %q, ok=%v, want %q", i, gotRelID, ok, "rId2")
+		}
+	}
+
+	// Writing the reconstructed document back out must not mint a second
+	// relationship for the preserved rId2 (see run.AddField's
+	// "already has a relationship ID" branch).
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if got := strings.Count(written, "<w:hyperlink"); got != 2 {
+		t.Errorf("resaved document.xml contains %d <w:hyperlink> elements, want 2 (one per run, since reading flattens the source's single element)", got)
+	}
+
+	// Regression for a defect found while planning #101's follow-ups: this
+	// hydration path (hydrateHyperlink -> hydrateRun -> run.AddField) predates
+	// issue #101's fix and was never covered by a rendered-text assertion --
+	// only the <w:hyperlink> element count above, which stays correct whether
+	// or not the run's text is also duplicated as a trailing plain <w:r>.
+	// Reading ANY hyperlink-bearing document (not just ones built through
+	// AddHyperlink) and resaving it without modification hit this.
+	for _, wantText := range []string{"Example ", "Site"} {
+		if got := strings.Count(written, wantText); got != 1 {
+			t.Errorf("resaved document.xml contains %q %d times, want 1 (duplicated trailing run)", wantText, got)
+		}
+	}
+}
+
+// TestReconstructHyperlink_AnchorDoesNotMintRelationship pins the other half
+// of the issue #101 fix: an internal hyperlink read from a real document
+// (w:anchor, no r:id, and no relationship at all in the source's own rels)
+// must not cause docxgo to invent an External relationship whose target is
+// the literal "#Chapter1" string when the document is written back out. See
+// run.AddField's isAnchor branch in internal/core/run.go.
+func TestReconstructHyperlink_AnchorDoesNotMintRelationship(t *testing.T) {
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	// Deliberately no word/_rels/document.xml.rels part: a <w:hyperlink
+	// w:anchor> has no relationship of its own in a real Word document.
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p>
+<w:hyperlink w:anchor="Chapter1" w:history="1">
+<w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t>See chapter 1</w:t></w:r>
+</w:hyperlink>
+</w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	paras := doc.Paragraphs()
+	if len(paras) != 1 || len(paras[0].Runs()) != 1 {
+		t.Fatalf("unexpected shape: %d paragraphs", len(paras))
+	}
+	run := paras[0].Runs()[0]
+	fields := run.Fields()
+	if len(fields) != 1 || fields[0].Type() != domain.FieldTypeHyperlink {
+		t.Fatalf("expected a single hyperlink field, got %+v", fields)
+	}
+	accessor, ok := fields[0].(interface {
+		GetProperty(string) (string, bool)
+	})
+	if !ok {
+		t.Fatal("field does not support GetProperty")
+	}
+	if relID, ok := accessor.GetProperty("relationshipID"); ok && relID != "" {
+		t.Errorf("GetProperty(relationshipID) = %q, want unset for an internal anchor read from a source document", relID)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	if got := documentXML(t, buf.Bytes()); !strings.Contains(got, `w:anchor="Chapter1"`) {
+		t.Errorf("resaved document.xml lost the anchor: %s", got)
+	}
+
+	relsXML := zipPartXML(t, buf.Bytes(), "word/_rels/document.xml.rels")
+	if strings.Contains(relsXML, constants.RelTypeHyperlink) {
+		t.Errorf("resaved document.xml.rels contains an orphaned hyperlink relationship for an internal anchor:\n%s", relsXML)
+	}
 }
 
 func TestLoadPackageFromBytes(t *testing.T) {

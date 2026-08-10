@@ -229,6 +229,7 @@ func (h *docxHeader) AddParagraph() (domain.Paragraph, error) {
 
 	id := h.idGen.NextParagraphID()
 	para := NewParagraph(id, h.idGen, h.relationMgr, h.mediaManager)
+	markHeaderFooterParagraph(para)
 	h.paragraphs = append(h.paragraphs, para)
 	return para, nil
 }
@@ -293,6 +294,7 @@ func (f *docxFooter) AddParagraph() (domain.Paragraph, error) {
 
 	id := f.idGen.NextParagraphID()
 	para := NewParagraph(id, f.idGen, f.relationMgr, f.mediaManager)
+	markHeaderFooterParagraph(para)
 	f.paragraphs = append(f.paragraphs, para)
 	return para, nil
 }

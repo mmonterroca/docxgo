@@ -357,6 +357,11 @@ func (s *ParagraphSerializer) expandRunWithNewlines(run domain.Run, text string)
 func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domain.Field) []interface{} {
 	elements := make([]interface{}, 0, len(fields)*5)
 
+	// Set when a hyperlink branch below already serialized the run's text
+	// into the <w:hyperlink>'s own <w:r> -- the trailing "leftover text"
+	// block at the end of this function must not serialize it again.
+	textConsumedByHyperlink := false
+
 	for _, field := range fields {
 		wasDirty := false
 		if dirtyChecker, ok := field.(interface{ IsDirty() bool }); ok {
@@ -426,6 +431,7 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 						Runs:    []*xml.Run{xmlRun},
 					}
 					elements = append(elements, hyperlink)
+					textConsumedByHyperlink = true
 					continue
 				}
 
@@ -464,6 +470,7 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 						Runs: []*xml.Run{xmlRun},
 					}
 					elements = append(elements, hyperlink)
+					textConsumedByHyperlink = true
 					continue
 				}
 			}
@@ -500,7 +507,7 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 		elements = append(elements, endRun)
 	}
 
-	if run.Text() != "" {
+	if run.Text() != "" && !textConsumedByHyperlink {
 		elements = append(elements, s.runSerializer.Serialize(run))
 	}
 

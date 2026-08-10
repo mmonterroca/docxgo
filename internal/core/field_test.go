@@ -490,6 +490,63 @@ func TestHyperlinkRelationshipIDPreservation(t *testing.T) {
 	}
 }
 
+// TestRunAddField_HyperlinkExternalURLMintsRelationship is the control for
+// TestRunAddField_HyperlinkAnchorSkipsRelationship below: a plain external
+// URL must still mint exactly one relationship, and AddField must record its
+// ID on the field.
+func TestRunAddField_HyperlinkExternalURLMintsRelationship(t *testing.T) {
+	r := newTestRun(t)
+	concreteRun, ok := r.(*run)
+	if !ok {
+		t.Fatalf("run is %T, want *run", r)
+	}
+	before := concreteRun.relManager.Count()
+
+	field := NewHyperlinkField("https://example.com", "Example")
+	if err := r.AddField(field); err != nil {
+		t.Fatalf("AddField() error = %v", err)
+	}
+
+	if got, want := concreteRun.relManager.Count(), before+1; got != want {
+		t.Errorf("relManager.Count() = %d, want %d (exactly one new relationship)", got, want)
+	}
+
+	df := field.(*docxField)
+	if relID, ok := df.GetProperty("relationshipID"); !ok || relID == "" {
+		t.Error("GetProperty(relationshipID) not set after AddField")
+	}
+}
+
+// TestRunAddField_HyperlinkAnchorSkipsRelationship pins the issue #101 fix:
+// a hyperlink field whose url starts with "#" (an internal bookmark link)
+// must not mint an External relationship targeting the literal "#anchor"
+// string -- that relationship would be orphaned, since the serializer
+// resolves an internal link straight from the url/anchor property (see
+// expandRunWithFields in internal/serializer/serializer.go) and never looks
+// at relationshipID for it.
+func TestRunAddField_HyperlinkAnchorSkipsRelationship(t *testing.T) {
+	r := newTestRun(t)
+	concreteRun, ok := r.(*run)
+	if !ok {
+		t.Fatalf("run is %T, want *run", r)
+	}
+	before := concreteRun.relManager.Count()
+
+	field := NewHyperlinkField("#Chapter1", "See chapter 1")
+	if err := r.AddField(field); err != nil {
+		t.Fatalf("AddField() error = %v", err)
+	}
+
+	if got := concreteRun.relManager.Count(); got != before {
+		t.Errorf("relManager.Count() = %d, want %d (no relationship for an internal anchor)", got, before)
+	}
+
+	df := field.(*docxField)
+	if relID, ok := df.GetProperty("relationshipID"); ok && relID != "" {
+		t.Errorf("GetProperty(relationshipID) = %q, want unset for an internal anchor", relID)
+	}
+}
+
 // TestHyperlinkAnchorField tests internal hyperlinks that use anchors
 // instead of external URLs.
 func TestHyperlinkAnchorField(t *testing.T) {

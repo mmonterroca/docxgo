@@ -1120,6 +1120,58 @@ func TestHandleParagraphAdd_IndentSideCanBeSetExplicitlyToZero(t *testing.T) {
 	}
 }
 
+// TestHandleParagraphAdd_HyperlinkRunProducesRealLink is the CLI/RPC
+// regression for issue #101. paragraph.add's "runs": [{"hyperlink": {...}}]
+// shortcut (and the identical npm HyperlinkDef surface) is applyRun's only
+// caller of domain.Paragraph.AddHyperlink -- this is the surface real users
+// of the CLI/npm bridge actually hit, not just the Go API.
+func TestHandleParagraphAdd_HyperlinkRunProducesRealLink(t *testing.T) {
+	s, docID := newEditTestDoc(t)
+
+	const url = "https://example.com/policy"
+	resp := s.dispatch(makeRequest(2, "paragraph.add", map[string]interface{}{
+		"documentId": docID,
+		"runs": []interface{}{
+			map[string]interface{}{"hyperlink": map[string]interface{}{
+				"url": url, "displayText": "See the policy",
+			}},
+		},
+	}))
+	if resp.Error != nil {
+		t.Fatalf("paragraph.add failed: %+v", resp.Error)
+	}
+
+	documentXML := string(documentSavedXML(t, s, docID))
+	idx := strings.Index(documentXML, `<w:hyperlink`)
+	if idx == -1 {
+		t.Fatalf("saved document.xml does not contain a <w:hyperlink> element:\n%s", documentXML)
+	}
+	end := strings.Index(documentXML[idx:], ">")
+	if end == -1 {
+		t.Fatalf("malformed <w:hyperlink> element")
+	}
+	hyperlinkTag := documentXML[idx : idx+end+1]
+
+	ridStart := strings.Index(hyperlinkTag, `r:id="`)
+	if ridStart == -1 {
+		t.Fatalf("<w:hyperlink> element has no r:id attribute: %s", hyperlinkTag)
+	}
+	ridStart += len(`r:id="`)
+	ridEnd := strings.Index(hyperlinkTag[ridStart:], `"`)
+	if ridEnd == -1 {
+		t.Fatalf("malformed r:id attribute: %s", hyperlinkTag)
+	}
+	rID := hyperlinkTag[ridStart : ridStart+ridEnd]
+
+	relsXML := string(savedPart(t, s, docID, "word/_rels/document.xml.rels"))
+	if !strings.Contains(relsXML, `Id="`+rID+`"`) {
+		t.Errorf("document.xml.rels has no relationship with Id=%q:\n%s", rID, relsXML)
+	}
+	if !strings.Contains(relsXML, `Target="`+url+`"`) {
+		t.Errorf("document.xml.rels has no relationship with Target=%q:\n%s", url, relsXML)
+	}
+}
+
 func TestHandleTableSetCell_TextAndParagraphsConflict(t *testing.T) {
 	s, docID := newEditTestDoc(t)
 
@@ -1139,6 +1191,13 @@ func TestHandleTableSetCell_TextAndParagraphsConflict(t *testing.T) {
 // output rather than just in-memory object counts.
 func documentSavedXML(t *testing.T, s *server, docID string) []byte {
 	t.Helper()
+	return savedPart(t, s, docID, "word/document.xml")
+}
+
+// savedPart saves docID via document.save (buffer) and returns the raw bytes
+// of the named part inside the resulting .docx archive.
+func savedPart(t *testing.T, s *server, docID, partName string) []byte {
+	t.Helper()
 	saveResp := s.dispatch(makeRequest(999, "document.save", map[string]interface{}{
 		"documentId": docID, "output": "buffer",
 	}))
@@ -1155,21 +1214,21 @@ func documentSavedXML(t *testing.T, s *server, docID string) []byte {
 		t.Fatalf("read docx as zip: %v", err)
 	}
 	for _, f := range zr.File {
-		if f.Name != "word/document.xml" {
+		if f.Name != partName {
 			continue
 		}
 		rc, err := f.Open()
 		if err != nil {
-			t.Fatalf("open document.xml: %v", err)
+			t.Fatalf("open %s: %v", partName, err)
 		}
 		defer rc.Close()
 		var buf bytes.Buffer
 		if _, err := buf.ReadFrom(rc); err != nil {
-			t.Fatalf("read document.xml: %v", err)
+			t.Fatalf("read %s: %v", partName, err)
 		}
 		return buf.Bytes()
 	}
-	t.Fatal("word/document.xml not found in saved docx")
+	t.Fatalf("%s not found in saved docx", partName)
 	return nil
 }
 

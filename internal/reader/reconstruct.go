@@ -77,7 +77,7 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 		return nil, errors.Errorf(errors.ErrCodeInvalidState, opReconstructDocument, "document body is missing")
 	}
 
-	doc := core.NewDocument()
+	doc := core.NewDocumentForReconstruction()
 	defaultSection, err := doc.DefaultSection()
 	if err != nil {
 		return nil, errors.Wrap(err, opReconstructDocument)

@@ -21,6 +21,7 @@
 package core
 
 import (
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +31,7 @@ import (
 	"github.com/mmonterroca/docxgo/v2/internal/manager"
 	"github.com/mmonterroca/docxgo/v2/internal/serializer"
 	"github.com/mmonterroca/docxgo/v2/internal/writer"
+	xmlstructs "github.com/mmonterroca/docxgo/v2/internal/xml"
 	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 	"github.com/mmonterroca/docxgo/v2/pkg/errors"
 )
@@ -73,9 +75,44 @@ type document struct {
 
 // NewDocument creates a new Document.
 func NewDocument() domain.Document {
+	doc := newBareDocument()
+
+	// Ensure core document relationships exist (styles, fonts, theme). Safe
+	// to assign rId1.. here because nothing else has claimed an ID yet.
+	doc.ensureDefaultRelationships()
+
+	return doc
+}
+
+// NewDocumentForReconstruction creates a new Document for the reader to
+// hydrate from an existing .docx package.
+//
+// Unlike NewDocument, it does NOT pre-populate the base relationships
+// (styles, fontTable, theme, settings, webSettings) -- those must wait until
+// after the source document's own relationships have been registered via
+// RegisterExistingRelationship. RegisterExisting is a no-op when a
+// relationship already exists under the given ID, so if NewDocument's rId1
+// (styles) collided with the source file's own rId1 (which, in a real Word
+// document, has no reason to be styles -- IDs are assigned in whatever order
+// the authoring application added them), the source's real rId1 relationship
+// would be silently dropped instead of registered, corrupting every part
+// that references it by that ID (e.g. a header's w:headerReference). See
+// issue #101's PR review.
+//
+// ensureDefaultRelationships still runs -- Document.WriteTo calls it again
+// before serialization, by which point the source relationships are already
+// registered under their real IDs, so its target-based deduplication
+// correctly recognizes an already-present styles.xml/etc. relationship
+// instead of creating a colliding one from scratch.
+func NewDocumentForReconstruction() domain.Document {
+	return newBareDocument()
+}
+
+// newBareDocument builds a *document with no relationships registered yet.
+func newBareDocument() *document {
 	idGen := manager.NewIDGenerator()
 	relManager := manager.NewRelationshipManager(idGen)
-	doc := &document{
+	return &document{
 		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
 		tables:       make([]domain.Table, 0, constants.DefaultTableCapacity),
 		sections:     make([]domain.Section, 0, 1),
@@ -86,11 +123,6 @@ func NewDocument() domain.Document {
 		mediaManager: manager.NewMediaManager(idGen),
 		styleManager: manager.NewStyleManager(),
 	}
-
-	// Ensure core document relationships exist (styles, fonts, theme)
-	doc.ensureDefaultRelationships()
-
-	return doc
 }
 
 // ensureActiveSection guarantees the document has a current section and returns it.
@@ -359,6 +391,40 @@ func (d *document) ensureDefaultRelationships() {
 	}
 }
 
+// docRelsNeedsRegeneration reports whether d.relManager holds a relationship
+// ID that is not present in the preserved word/_rels/document.xml.rels bytes.
+// Those bytes are written back verbatim on a round-tripped document (see
+// WriteTo); if something was added to the relationship manager after the
+// document was opened -- e.g. AddHyperlink -- writing the preserved bytes
+// unchanged would leave a dangling r:id in document.xml. See issue #101.
+func (d *document) docRelsNeedsRegeneration() bool {
+	if len(d.preservedDocRels) == 0 {
+		return false
+	}
+
+	var preserved xmlstructs.Relationships
+	if err := xml.Unmarshal(d.preservedDocRels, &preserved); err != nil {
+		// Malformed preserved bytes: keep the existing verbatim behavior
+		// rather than risk mangling a part that couldn't be parsed.
+		return false
+	}
+
+	known := make(map[string]bool, len(preserved.Relationships))
+	for _, rel := range preserved.Relationships {
+		if rel != nil {
+			known[rel.ID] = true
+		}
+	}
+
+	for _, rel := range d.relManager.All() {
+		if rel != nil && !known[rel.ID] {
+			return true
+		}
+	}
+
+	return false
+}
+
 // WriteTo writes the document to the provided writer in .docx format.
 func (d *document) WriteTo(w io.Writer) (int64, error) {
 	if len(d.sections) == 0 {
@@ -415,10 +481,21 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	// Build writer.PreservedParts from core.PreservedParts if available
 	var writerPreserved *writer.PreservedParts
 	if corePreserved := d.GetPreservedParts(); corePreserved != nil {
+		docRels := corePreserved.DocRels
+		if d.docRelsNeedsRegeneration() {
+			// A relationship was added since this document was opened (e.g.
+			// AddHyperlink). Leave DocRels empty so zip.go's non-round-trip
+			// branch regenerates word/_rels/document.xml.rels from
+			// d.relManager -- which was seeded with every original
+			// relationship on open, so this is lossless for the unchanged
+			// ones and adds the new one(s).
+			docRels = nil
+		}
+
 		writerPreserved = &writer.PreservedParts{
 			Headers:          corePreserved.Headers,
 			Footers:          corePreserved.Footers,
-			DocRels:          corePreserved.DocRels,
+			DocRels:          docRels,
 			ContentTypes:     corePreserved.ContentTypes,
 			Additional:       corePreserved.Additional,
 			Themes:           corePreserved.Themes,
