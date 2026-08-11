@@ -2166,6 +2166,8 @@ func preserveOriginalParts(doc domain.Document, pkg *Package) {
 	parts := &core.PreservedParts{
 		Headers:    make(map[string][]byte, len(pkg.Headers)),
 		Footers:    make(map[string][]byte, len(pkg.Footers)),
+		HeaderRels: make(map[string][]byte, len(pkg.HeaderRels)),
+		FooterRels: make(map[string][]byte, len(pkg.FooterRels)),
 		Additional: make(map[string][]byte, len(pkg.AdditionalParts)),
 		Themes:     make(map[string][]byte, len(pkg.ThemeParts)),
 	}
@@ -2178,6 +2180,14 @@ func preserveOriginalParts(doc domain.Document, pkg *Package) {
 	// Preserve footers
 	for name, data := range pkg.Footers {
 		parts.Footers[name] = data
+	}
+
+	// Preserve header/footer relationship parts
+	for name, data := range pkg.HeaderRels {
+		parts.HeaderRels[name] = data
+	}
+	for name, data := range pkg.FooterRels {
+		parts.FooterRels[name] = data
 	}
 
 	// Preserve document relationships

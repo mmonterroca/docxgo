@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Added
+
+- **Header/footer relationship parts (`word/_rels/headerN.xml.rels`, `word/_rels/footerN.xml.rels`) are now preserved through their own dedicated path instead of the opaque, unrelated-parts bucket.** Previously these files survived a round-trip only incidentally, as part of `PreservedParts.Additional` — indistinguishable from any other unrecognized part in the package. They're now read into `Package.HeaderRels`/`FooterRels`, threaded through `core.PreservedParts.HeaderRels`/`FooterRels`, and written back verbatim on an untouched resave. No behavior change yet (headers/footers still don't mint their own relationships); this is the plumbing PR 2c (per-part relationships) builds on.
+
 ### Fixed
 
 - **`Paragraph.AddHyperlink` now emits a real `<w:hyperlink>` element instead of an orphaned relationship (#101).** It minted a hyperlink relationship in `word/_rels/document.xml.rels` but never attached it to anything — the run it created carried no field, so the serializer had no signal to wrap it in `<w:hyperlink r:id="...">`. Word opened the file and rendered the run as plain blue, underlined text: not a link, and not visibly wrong either, so nothing caught it. `AddHyperlink` now builds the run through `NewHyperlinkField` + `run.AddField` — the same path `docx.NewHyperlinkField` already used correctly — which is what makes the serializer emit the real element. This also fixes the CLI/npm `{"hyperlink": {"url": ...}}` run shortcut (`paragraph.add`'s `runs`, `table.setCell`'s cell paragraphs), which was `AddHyperlink`'s only production caller.
