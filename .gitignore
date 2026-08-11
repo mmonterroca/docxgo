@@ -1,6 +1,7 @@
 docxlib
 .vscode/
 *.docx
+!internal/reader/testdata/**/*.docx
 /*.xml
 .DS_Store
 docxlib/

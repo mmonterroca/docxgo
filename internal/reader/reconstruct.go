@@ -561,6 +561,14 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
+	if capsElem := findChild(props, "caps"); capsElem != nil {
+		if val, ok := parseOnOff(capsElem); ok {
+			if err := run.SetCaps(val); err != nil {
+				return errors.Wrap(err, opApplyRunProperties)
+			}
+		}
+	}
+
 	if strikeElem := findChild(props, "strike"); strikeElem != nil {
 		if val, ok := parseOnOff(strikeElem); ok {
 			if err := run.SetStrike(val); err != nil {

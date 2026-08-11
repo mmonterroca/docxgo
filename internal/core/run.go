@@ -28,6 +28,7 @@ type run struct {
 	italic     bool
 	underline  domain.UnderlineStyle
 	strike     bool
+	caps       bool
 	highlight  domain.HighlightColor
 	language   *domain.Language
 	fields     []domain.Field     // Fields embedded in this run
@@ -156,6 +157,17 @@ func (r *run) Strike() bool {
 // SetStrike sets whether the text is struck through.
 func (r *run) SetStrike(strike bool) error {
 	r.strike = strike
+	return nil
+}
+
+// Caps returns whether the text is displayed in all capitals.
+func (r *run) Caps() bool {
+	return r.caps
+}
+
+// SetCaps sets whether the text is displayed in all capitals.
+func (r *run) SetCaps(caps bool) error {
+	r.caps = caps
 	return nil
 }
 

@@ -91,6 +91,11 @@ func (s *RunSerializer) serializeProperties(run domain.Run) *xml.RunProperties {
 		props.Italic = &xml.BoolValue{Val: boolPtr(true)}
 	}
 
+	// Caps
+	if run.Caps() {
+		props.Caps = &xml.BoolValue{Val: boolPtr(true)}
+	}
+
 	// Strike
 	if run.Strike() {
 		props.Strike = &xml.BoolValue{Val: boolPtr(true)}

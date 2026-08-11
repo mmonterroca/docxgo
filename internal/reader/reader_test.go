@@ -439,6 +439,9 @@ func TestReconstructDocumentFormatting(t *testing.T) {
 	if err := run.SetItalic(true); err != nil {
 		t.Fatalf("SetItalic: %v", err)
 	}
+	if err := run.SetCaps(true); err != nil {
+		t.Fatalf("SetCaps: %v", err)
+	}
 	if err := run.SetUnderline(domain.UnderlineDouble); err != nil {
 		t.Fatalf("SetUnderline: %v", err)
 	}
@@ -521,6 +524,9 @@ func TestReconstructDocumentFormatting(t *testing.T) {
 	}
 	if !recoveredRun.Italic() {
 		t.Fatalf("expected run to be italic")
+	}
+	if !recoveredRun.Caps() {
+		t.Fatalf("expected run to be caps")
 	}
 	if !recoveredRun.Strike() {
 		t.Fatalf("expected run to be strike")
@@ -1102,6 +1108,79 @@ func createTestPNG(t *testing.T) string {
 	}
 
 	return file.Name()
+}
+
+// TestReconstructRunCaps_AgainstHandAuthoredPackage is a regression for one
+// of the three losses reported in issue #102: a run's <w:caps> (Word's "All
+// Caps" display formatting, distinct from the text actually being typed in
+// capitals) was never hydrated at all -- absent from domain.Run entirely --
+// so it silently disappeared on the next save. The run's stored text is
+// untouched either way; only whether it renders forced-uppercase changes.
+func TestReconstructRunCaps_AgainstHandAuthoredPackage(t *testing.T) {
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p><w:r><w:rPr><w:caps/></w:rPr><w:t>tItLe</w:t></w:r></w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	paras := doc.Paragraphs()
+	if len(paras) != 1 || len(paras[0].Runs()) != 1 {
+		t.Fatalf("unexpected shape: %d paragraphs", len(paras))
+	}
+	run := paras[0].Runs()[0]
+	if !run.Caps() {
+		t.Error("Runs()[0].Caps() = false, want true")
+	}
+	// The stored text is untouched by w:caps -- it is a display override,
+	// not a transformation of the characters.
+	if got := run.Text(); got != "tItLe" {
+		t.Errorf("Runs()[0].Text() = %q, want %q (w:caps must not alter stored text)", got, "tItLe")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, "<w:caps") {
+		t.Errorf("resaved document.xml lost the run's w:caps:\n%s", written)
+	}
+	if !strings.Contains(written, "tItLe") {
+		t.Errorf("resaved document.xml altered the run's stored text:\n%s", written)
+	}
 }
 
 func TestReconstructDocumentTable(t *testing.T) {

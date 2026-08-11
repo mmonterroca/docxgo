@@ -32,6 +32,7 @@ type RunProperties struct {
 	Font      *Font      `xml:"w:rFonts,omitempty"`
 	Bold      *BoolValue `xml:"w:b,omitempty"`
 	Italic    *BoolValue `xml:"w:i,omitempty"`
+	Caps      *BoolValue `xml:"w:caps,omitempty"`
 	Strike    *BoolValue `xml:"w:strike,omitempty"`
 	Color     *Color     `xml:"w:color,omitempty"`
 	Size      *HalfPt    `xml:"w:sz,omitempty"`
