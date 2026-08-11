@@ -16,6 +16,10 @@
 - **`AddHyperlink` now returns an error on a header or footer paragraph**, where it previously produced a relationship that referenced nothing (see Fixed, above). docxgo does not yet write a per-part relationships file (`word/_rels/headerN.xml.rels`/`footerN.xml.rels`), so a hyperlink relationship minted there would reference a part that doesn't exist; real support is a follow-up.
 - **`Document.Paragraphs()` no longer includes a bare paragraph whose sole purpose was carrying a mid-document section break**, when the source document is opened via `OpenDocument`. Previously that paragraph was hydrated like any other (see Fixed, above); it is now represented purely by the section boundary, matching what the writer already produces for section breaks it creates itself.
 
+### Known limitations
+
+- **A section-ending paragraph that also carries real content still splits into two paragraphs on round-trip.** This fix (see above) only de-duplicates the *bare* case — a paragraph whose sole content is its `pPr`/`sectPr` — which is the shape the real `.docx` behind #102 uses and the shape Word produces when a section break sits on its own dedicated paragraph. It's also legal OOXML (ECMA-376 17.6.17) for the section-ending paragraph to carry text directly, which Word does whenever the boundary falls on an already-written paragraph rather than a fresh blank one; docxgo still hydrates that paragraph's text onto one `domain.Paragraph` and starts a new `domain.Section` as a separate block, and the writer always synthesizes its own empty carrier paragraph for a section break, so the source's one paragraph becomes two on resave — pre-existing behavior, not introduced or widened by this PR (confirmed against `master` before this change). Fixing it needs the writer to fold a section break into the *preceding* content paragraph instead of always minting a new one, a behavior change affecting every docxgo-authored document, not just round-tripped ones — out of scope here; see `TestReconstructSectionBreakWithContent_AgainstHandAuthoredPackage` in `internal/reader/reader_test.go`, which pins the current behavior.
+
 ## v2.12.0 — 2026-08-02
 
 ### Added

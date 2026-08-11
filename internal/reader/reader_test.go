@@ -391,6 +391,106 @@ func TestReconstructMidBodySectionBreak_AgainstHandAuthoredPackage(t *testing.T)
 	}
 }
 
+// TestReconstructSectionBreakWithContent_AgainstHandAuthoredPackage pins a
+// known, PRE-EXISTING limitation -- not something this fix introduces or
+// widens. Unlike the bare carrier paragraph above (no runs, pPr's only child
+// is sectPr), it is also legal OOXML for the paragraph that ends a section
+// to carry real content alongside its sectPr (ECMA-376 17.6.17): Word does
+// this whenever a section boundary falls on a paragraph that already has
+// text, rather than on its own dedicated blank paragraph.
+//
+// applyRunProperties/populateParagraph hydrates that paragraph's content
+// into one domain.Paragraph *and* calls applySectionProperties, which starts
+// a new domain.Section as its own block. DocumentSerializer.SerializeBody
+// (serializer.go) always synthesizes a fresh, separate <w:p> for every
+// SectionBreak block -- it has no way to attach a section's sectPr onto an
+// existing content paragraph -- so a single source paragraph carrying both
+// content and a section break is split into two on resave: the original
+// text, followed by an empty section-break carrier.
+//
+// Confirmed via the same repro run against master before this PR's changes:
+// the doubling already happens today, unconditionally, for every embedded
+// sectPr regardless of whether its paragraph has content -- this PR's
+// bareSectionBreakSectPr check only *removes* the double-count for the
+// no-content case, it does not add a new one for the with-content case.
+// Fixing this properly means teaching the writer to fold a SectionBreak
+// block's sectPr into the immediately preceding content paragraph instead
+// of always minting a new one -- a writer-wide behavior change (it would
+// affect every docxgo-authored document, not just round-tripped ones) that
+// belongs in its own PR, not bundled into this reader fix. See CHANGELOG.
+func TestReconstructSectionBreakWithContent_AgainstHandAuthoredPackage(t *testing.T) {
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p><w:pPr><w:sectPr><w:type w:val="nextPage"/><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr><w:r><w:t>First section</w:t></w:r></w:p>
+<w:p><w:r><w:t>Second section</w:t></w:r></w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	if got := len(doc.Sections()); got != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2 (the content-bearing sectPr must still start a new section)", got)
+	}
+
+	// The content survives, un-duplicated, on its own paragraph.
+	paras := doc.Paragraphs()
+	if len(paras) != 2 {
+		t.Fatalf("len(Paragraphs()) = %d, want 2", len(paras))
+	}
+	if got := paras[0].Runs()[0].Text(); got != "First section" {
+		t.Errorf("Paragraphs()[0].Runs()[0].Text() = %q, want %q", got, "First section")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+
+	// Pins the known limitation: 2 source paragraphs resave as 3 -- the
+	// original content paragraph (now without its own sectPr, which moved to
+	// section level) plus a synthetic empty section-break carrier, plus the
+	// second content paragraph. See the doc comment above: not a regression
+	// from this PR, not fixed by it either.
+	if got := len(paragraphOpenTagRE.FindAllString(written, -1)); got != 3 {
+		t.Errorf("resaved document.xml contains %d <w:p> elements, want 3 (known limitation: content+sectPr paragraphs still split in two -- see test doc comment)", got)
+	}
+	if got := strings.Count(written, "<w:sectPr"); got != 2 {
+		t.Errorf("resaved document.xml contains %d <w:sectPr> elements, want 2", got)
+	}
+}
+
 func TestLoadPackageFromBytes(t *testing.T) {
 	doc := core.NewDocument()
 	para, err := doc.AddParagraph()
