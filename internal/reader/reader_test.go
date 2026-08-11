@@ -297,6 +297,164 @@ func TestReconstructHyperlink_AnchorDoesNotMintRelationship(t *testing.T) {
 	}
 }
 
+// buildHeaderTableDocx assembles a hand-authored package (not through
+// docxgo's own writer, for the same reason documented on
+// TestReconstructHyperlink_AgainstHandAuthoredPackage) whose header1.xml
+// contains a paragraph followed by a table with the given number of
+// columns in its single row.
+func buildHeaderTableDocx(t *testing.T, cols int) []byte {
+	t.Helper()
+
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p><w:r><w:t>Body</w:t></w:r></w:p>
+<w:sectPr>
+<w:headerReference w:type="default" r:id="rId7"/>
+<w:pgSz w:w="12240" w:h="15840"/>
+</w:sectPr>
+</w:body>
+</w:document>`
+
+	docRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId7" Type="` + constants.RelTypeHeader + `" Target="header1.xml"/>
+</Relationships>`
+
+	var cells strings.Builder
+	for i := 0; i < cols; i++ {
+		fmt.Fprintf(&cells, "<w:tc><w:p><w:r><w:t>Cell%d</w:t></w:r></w:p></w:tc>", i)
+	}
+
+	headerXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:p><w:r><w:t>Before Table</w:t></w:r></w:p>
+<w:tbl><w:tr>` + cells.String() + `</w:tr></w:tbl>
+</w:hdr>`
+
+	return buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml":          contentTypesXML,
+		"_rels/.rels":                  rootRelsXML,
+		"word/document.xml":            mainDocumentXML,
+		"word/_rels/document.xml.rels": docRelsXML,
+		"word/header1.xml":             headerXML,
+	})
+}
+
+// TestReconstructDocument_HeaderTable pins that a table in a header (not
+// reachable at all before PR 2b -- header.Paragraphs() returned 0 for a
+// table-only header, see the plan for #101's follow-ups) hydrates into the
+// domain model: header.Tables() gets an entry, header.Blocks() preserves
+// insertion order, and cell text round-trips.
+func TestReconstructDocument_HeaderTable(t *testing.T) {
+	docxBytes := buildHeaderTableDocx(t, 2)
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	sections := doc.Sections()
+	if len(sections) == 0 {
+		t.Fatal("no sections")
+	}
+	header, err := sections[0].Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header(): %v", err)
+	}
+
+	tables := header.Tables()
+	if len(tables) != 1 {
+		t.Fatalf("len(header.Tables()) = %d, want 1", len(tables))
+	}
+
+	blocks := header.Blocks()
+	if len(blocks) != 2 {
+		t.Fatalf("len(header.Blocks()) = %d, want 2 (paragraph, table)", len(blocks))
+	}
+	if blocks[0].Paragraph == nil {
+		t.Errorf("Blocks()[0] is not a paragraph: %+v", blocks[0])
+	}
+	if blocks[1].Table == nil {
+		t.Errorf("Blocks()[1] is not a table: %+v", blocks[1])
+	}
+
+	row, err := tables[0].Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	cell0, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	cellParas := cell0.Paragraphs()
+	if len(cellParas) != 1 || cellParas[0].Text() != "Cell0" {
+		t.Fatalf("cell 0 text = %+v, want [\"Cell0\"]", cellParas)
+	}
+}
+
+// TestReconstructDocument_HeaderTableOversizedIsTolerated pins the
+// best-effort choice documented on hydratePartBlocks: a header table whose
+// grid exceeds constants.MaxTableCols must not fail OpenDocument the way an
+// oversized body table would -- TestOpenDocument_MalformedHeaderRelsIsTolerated
+// already establishes that header/footer parts tolerate malformed content the
+// body doesn't, and hydratePartBlocks extends that same tolerance to a table
+// it can't represent. The table itself is skipped, not partially added.
+func TestReconstructDocument_HeaderTableOversizedIsTolerated(t *testing.T) {
+	docxBytes := buildHeaderTableDocx(t, constants.MaxTableCols+1)
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v (an oversized header table must not fail the whole document)", err)
+	}
+
+	sections := doc.Sections()
+	if len(sections) == 0 {
+		t.Fatal("no sections")
+	}
+	header, err := sections[0].Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header(): %v", err)
+	}
+
+	if got := len(header.Tables()); got != 0 {
+		t.Errorf("len(header.Tables()) = %d, want 0 (oversized table skipped)", got)
+	}
+	// The paragraph before the skipped table must still have hydrated.
+	if got := len(header.Paragraphs()); got != 1 {
+		t.Errorf("len(header.Paragraphs()) = %d, want 1", got)
+	}
+}
+
 func TestLoadPackageFromBytes(t *testing.T) {
 	doc := core.NewDocument()
 	para, err := doc.AddParagraph()

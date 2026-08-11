@@ -59,7 +59,10 @@ type Location struct {
 	// EndOffset is the byte offset after the placeholder end within the run
 	// at EndRunIndex.
 	EndOffset int
-	// TableIndex, RowIndex, CellIndex are set when Type == LocationTableCell.
+	// TableIndex, RowIndex, CellIndex are set when Type == LocationTableCell,
+	// and also when the match is inside a table cell within a header or
+	// footer (Type == LocationHeader/LocationFooter) — in that case they're
+	// set alongside SectionIndex/HeaderType/FooterType below.
 	TableIndex int
 	RowIndex   int
 	CellIndex  int

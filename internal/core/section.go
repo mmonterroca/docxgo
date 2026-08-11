@@ -154,6 +154,8 @@ func (s *docxSection) Header(headerType domain.HeaderType) (domain.Header, error
 	header := &docxHeader{
 		headerType:   headerType,
 		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
+		tables:       make([]domain.Table, 0),
+		blocks:       make([]domain.Block, 0, constants.DefaultParagraphCapacity),
 		relationMgr:  s.relationMgr,
 		idGen:        s.idGen,
 		mediaManager: s.mediaManager,
@@ -177,6 +179,8 @@ func (s *docxSection) Footer(footerType domain.FooterType) (domain.Footer, error
 	footer := &docxFooter{
 		footerType:   footerType,
 		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
+		tables:       make([]domain.Table, 0),
+		blocks:       make([]domain.Block, 0, constants.DefaultParagraphCapacity),
 		relationMgr:  s.relationMgr,
 		idGen:        s.idGen,
 		mediaManager: s.mediaManager,
@@ -215,6 +219,8 @@ type docxHeader struct {
 	mu           sync.RWMutex
 	headerType   domain.HeaderType
 	paragraphs   []domain.Paragraph
+	tables       []domain.Table
+	blocks       []domain.Block
 	relationMgr  *manager.RelationshipManager
 	idGen        *manager.IDGenerator
 	relID        string
@@ -231,10 +237,11 @@ func (h *docxHeader) AddParagraph() (domain.Paragraph, error) {
 	para := NewParagraph(id, h.idGen, h.relationMgr, h.mediaManager)
 	markHeaderFooterParagraph(para)
 	h.paragraphs = append(h.paragraphs, para)
+	h.blocks = append(h.blocks, domain.Block{Paragraph: para})
 	return para, nil
 }
 
-// Paragraphs returns all paragraphs in the header.
+// Paragraphs returns all top-level paragraphs in the header.
 func (h *docxHeader) Paragraphs() []domain.Paragraph {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -242,6 +249,48 @@ func (h *docxHeader) Paragraphs() []domain.Paragraph {
 	// Return defensive copy
 	result := make([]domain.Paragraph, len(h.paragraphs))
 	copy(result, h.paragraphs)
+	return result
+}
+
+// AddTable adds a table with the given number of rows and columns to the header.
+func (h *docxHeader) AddTable(rows, cols int) (domain.Table, error) {
+	if rows < constants.MinTableRows || rows > constants.MaxTableRows {
+		return nil, errors.InvalidArgument("Header.AddTable", "rows", rows,
+			"rows must be between 1 and 1000")
+	}
+	if cols < constants.MinTableCols || cols > constants.MaxTableCols {
+		return nil, errors.InvalidArgument("Header.AddTable", "cols", cols,
+			"columns must be between 1 and 63")
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	id := h.idGen.NextTableID()
+	tbl := NewTable(id, rows, cols, h.idGen, h.relationMgr, h.mediaManager)
+	markHeaderFooterTable(tbl)
+	h.tables = append(h.tables, tbl)
+	h.blocks = append(h.blocks, domain.Block{Table: tbl})
+	return tbl, nil
+}
+
+// Tables returns all top-level tables in the header.
+func (h *docxHeader) Tables() []domain.Table {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	result := make([]domain.Table, len(h.tables))
+	copy(result, h.tables)
+	return result
+}
+
+// Blocks returns every top-level element in the header, in insertion order.
+func (h *docxHeader) Blocks() []domain.Block {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	result := make([]domain.Block, len(h.blocks))
+	copy(result, h.blocks)
 	return result
 }
 
@@ -280,6 +329,8 @@ type docxFooter struct {
 	mu           sync.RWMutex
 	footerType   domain.FooterType
 	paragraphs   []domain.Paragraph
+	tables       []domain.Table
+	blocks       []domain.Block
 	relationMgr  *manager.RelationshipManager
 	idGen        *manager.IDGenerator
 	relID        string
@@ -296,10 +347,11 @@ func (f *docxFooter) AddParagraph() (domain.Paragraph, error) {
 	para := NewParagraph(id, f.idGen, f.relationMgr, f.mediaManager)
 	markHeaderFooterParagraph(para)
 	f.paragraphs = append(f.paragraphs, para)
+	f.blocks = append(f.blocks, domain.Block{Paragraph: para})
 	return para, nil
 }
 
-// Paragraphs returns all paragraphs in the footer.
+// Paragraphs returns all top-level paragraphs in the footer.
 func (f *docxFooter) Paragraphs() []domain.Paragraph {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -307,6 +359,48 @@ func (f *docxFooter) Paragraphs() []domain.Paragraph {
 	// Return defensive copy
 	result := make([]domain.Paragraph, len(f.paragraphs))
 	copy(result, f.paragraphs)
+	return result
+}
+
+// AddTable adds a table with the given number of rows and columns to the footer.
+func (f *docxFooter) AddTable(rows, cols int) (domain.Table, error) {
+	if rows < constants.MinTableRows || rows > constants.MaxTableRows {
+		return nil, errors.InvalidArgument("Footer.AddTable", "rows", rows,
+			"rows must be between 1 and 1000")
+	}
+	if cols < constants.MinTableCols || cols > constants.MaxTableCols {
+		return nil, errors.InvalidArgument("Footer.AddTable", "cols", cols,
+			"columns must be between 1 and 63")
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	id := f.idGen.NextTableID()
+	tbl := NewTable(id, rows, cols, f.idGen, f.relationMgr, f.mediaManager)
+	markHeaderFooterTable(tbl)
+	f.tables = append(f.tables, tbl)
+	f.blocks = append(f.blocks, domain.Block{Table: tbl})
+	return tbl, nil
+}
+
+// Tables returns all top-level tables in the footer.
+func (f *docxFooter) Tables() []domain.Table {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	result := make([]domain.Table, len(f.tables))
+	copy(result, f.tables)
+	return result
+}
+
+// Blocks returns every top-level element in the footer, in insertion order.
+func (f *docxFooter) Blocks() []domain.Block {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	result := make([]domain.Block, len(f.blocks))
+	copy(result, f.blocks)
 	return result
 }
 

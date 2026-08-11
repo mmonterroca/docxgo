@@ -84,6 +84,9 @@ func walkParagraphs(doc domain.Document, fn func(para domain.Paragraph, ctx para
 					return err
 				}
 			}
+			if err := walkHeaderFooterTables(header.Tables(), LocationHeader, si, ht, 0, fn); err != nil {
+				return err
+			}
 		}
 
 		for ft, footer := range secMaps.FootersAll() {
@@ -101,8 +104,45 @@ func walkParagraphs(doc domain.Document, fn func(para domain.Paragraph, ctx para
 					return err
 				}
 			}
+			if err := walkHeaderFooterTables(footer.Tables(), LocationFooter, si, 0, ft, fn); err != nil {
+				return err
+			}
 		}
 	}
 
+	return nil
+}
+
+// walkHeaderFooterTables walks the cells of every top-level table in a
+// header or footer, calling fn for each paragraph found. loc is
+// LocationHeader or LocationFooter (never a distinct "table cell" type):
+// that keeps the existing skipHeaderFooter check in ReplaceText/MergeTemplate
+// — which only inspects ctx.locationType — correctly skipping these
+// paragraphs on a document whose headers/footers were preserved verbatim.
+// TableIndex/RowIndex/CellIndex are populated alongside SectionIndex/
+// HeaderType/FooterType so a caller can tell exactly which cell a match
+// came from.
+func walkHeaderFooterTables(tables []domain.Table, loc LocationType, sectionIdx int, ht domain.HeaderType, ft domain.FooterType, fn func(para domain.Paragraph, ctx paragraphContext) error) error {
+	for ti, table := range tables {
+		for ri, row := range table.Rows() {
+			for ci, cell := range row.Cells() {
+				for pi, para := range cell.Paragraphs() {
+					ctx := paragraphContext{
+						locationType: loc,
+						paraIdx:      pi,
+						tableIdx:     ti,
+						rowIdx:       ri,
+						cellIdx:      ci,
+						sectionIdx:   sectionIdx,
+						headerType:   ht,
+						footerType:   ft,
+					}
+					if err := fn(para, ctx); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
 	return nil
 }

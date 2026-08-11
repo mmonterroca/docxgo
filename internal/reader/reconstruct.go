@@ -1659,32 +1659,49 @@ func (ctx *reconstructContext) hydrateHeader(section domain.Section, headerType 
 		return nil
 	}
 
-	return ctx.hydratePartParagraphs(header, tree, target, opHydrateSectionHeader)
+	return ctx.hydratePartBlocks(header, tree, target, opHydrateSectionHeader)
 }
 
-// partParagraphContainer is satisfied by both domain.Header and domain.Footer,
-// letting hydratePartParagraphs drive either from the same code path.
-type partParagraphContainer interface {
+// partBlockContainer is satisfied by both domain.Header and domain.Footer,
+// letting hydratePartBlocks drive either from the same code path.
+type partBlockContainer interface {
 	AddParagraph() (domain.Paragraph, error)
+	AddTable(rows, cols int) (domain.Table, error)
 }
 
-// hydratePartParagraphs copies the paragraph children of a header/footer part
-// tree into container, resolving relationship IDs against that part's own
-// relationships (per-part scoping) with section hydration suppressed.
-func (ctx *reconstructContext) hydratePartParagraphs(container partParagraphContainer, tree *Element, target, op string) error {
+// hydratePartBlocks copies the paragraph and table children of a
+// header/footer part tree into container, resolving relationship IDs
+// against that part's own relationships (per-part scoping) with section
+// hydration suppressed.
+//
+// A table that fails to hydrate (e.g. a malformed or oversized grid) is
+// skipped rather than propagated, unlike the body path — an error here
+// would fail OpenDocument entirely for a document whose header/footer table
+// docxgo simply can't represent, and TestOpenDocument_MalformedHeaderRelsIsTolerated
+// already establishes that header/footer parts are tolerant of malformed
+// content in a way the body isn't. Do not "fix" this to match hydrateTable's
+// body-path error propagation.
+func (ctx *reconstructContext) hydratePartBlocks(container partBlockContainer, tree *Element, target, op string) error {
 	partRels := ctx.partRelationshipMap(target)
 	return ctx.withSectionHydrationDisabled(func() error {
 		return ctx.withPartRelationships(partRels, func() error {
 			for _, child := range tree.Children {
-				if child == nil || child.Name.Local != "p" {
+				if child == nil {
 					continue
 				}
-				para, err := container.AddParagraph()
-				if err != nil {
-					return errors.Wrap(err, op)
-				}
-				if err := populateParagraph(para, child, ctx); err != nil {
-					return err
+				switch child.Name.Local {
+				case "p":
+					para, err := container.AddParagraph()
+					if err != nil {
+						return errors.Wrap(err, op)
+					}
+					if err := populateParagraph(para, child, ctx); err != nil {
+						return err
+					}
+				case "tbl":
+					// Best-effort: skip a table docxgo can't hydrate rather
+					// than failing the whole document (see doc comment above).
+					_ = hydrateTable(container, child, ctx)
 				}
 			}
 			return nil
@@ -1715,7 +1732,7 @@ func (ctx *reconstructContext) hydrateFooter(section domain.Section, footerType 
 		return nil
 	}
 
-	return ctx.hydratePartParagraphs(footer, tree, target, opHydrateSectionFooter)
+	return ctx.hydratePartBlocks(footer, tree, target, opHydrateSectionFooter)
 }
 
 func (ctx *reconstructContext) withSectionHydrationDisabled(fn func() error) error {
@@ -2009,7 +2026,15 @@ func mapFooterType(value string) domain.FooterType {
 	}
 }
 
-func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) error {
+// tableAdder is the subset of domain.Document (and partBlockContainer) that
+// hydrateTable needs — just enough to add a table and hydrate into it,
+// regardless of whether it's being hydrated into the document body or a
+// header/footer part.
+type tableAdder interface {
+	AddTable(rows, cols int) (domain.Table, error)
+}
+
+func hydrateTable(doc tableAdder, elem *Element, ctx *reconstructContext) error {
 	if doc == nil || elem == nil {
 		return nil
 	}

@@ -663,6 +663,63 @@ func TestOpenDocument_MalformedHeaderRelsIsTolerated(t *testing.T) {
 	}
 }
 
+// TestOpenDocument_HeaderTableSurvivesRoundTrip pins the pre-PR-2b behavior
+// side by side with the new one: a table in a header now reaches the domain
+// model (header.Tables() is no longer empty for a table-only header, unlike
+// before this PR — see the plan for #101's follow-ups), AND an untouched
+// resave still writes the header verbatim via preserved bytes (Known
+// limitations: the model isn't consulted on resave for an *opened*
+// document's header/footer yet, only for one built fresh via AddTable).
+func TestOpenDocument_HeaderTableSurvivesRoundTrip(t *testing.T) {
+	const tableHeaderXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:p><w:r><w:t>Letterhead</w:t></w:r></w:p>
+<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Branded Cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+</w:hdr>`
+
+	docxBytes := buildCollidingRelationshipDocx(t, encodeTestPNG(t))
+	docxBytes = rewriteZipEntry(t, docxBytes, "word/header1.xml", []byte(tableHeaderXML))
+
+	doc, err := OpenDocumentFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	sections := doc.Sections()
+	if len(sections) == 0 {
+		t.Fatal("no sections")
+	}
+	header, err := sections[0].Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header(): %v", err)
+	}
+	tables := header.Tables()
+	if len(tables) != 1 {
+		t.Fatalf("len(header.Tables()) = %d, want 1 (table now reaches the domain model)", len(tables))
+	}
+	row, err := tables[0].Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	if paras := cell.Paragraphs(); len(paras) != 1 || paras[0].Text() != "Branded Cell" {
+		t.Fatalf("cell text = %+v, want [\"Branded Cell\"]", paras)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	resavedHeaderXML := string(zipPart(t, buf.Bytes(), "word/header1.xml"))
+	if !strings.Contains(resavedHeaderXML, "<w:tbl") || !strings.Contains(resavedHeaderXML, "Branded Cell") {
+		t.Errorf("resaved header1.xml lost the table: %s", resavedHeaderXML)
+	}
+}
+
 // rewriteZipEntry returns a copy of the zip archive in docxBytes with the entry
 // named target replaced by newData, leaving every other entry byte-for-byte.
 func rewriteZipEntry(t *testing.T, docxBytes []byte, target string, newData []byte) []byte {

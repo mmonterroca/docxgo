@@ -737,6 +737,166 @@ func TestParagraph_AddHyperlink_HeaderFooterRejected(t *testing.T) {
 	}
 }
 
+// TestHeaderTableCell_AddHyperlinkRejected extends the guard pinned by
+// TestParagraph_AddHyperlink_HeaderFooterRejected to paragraphs inside a
+// header/footer table's cells, including a table nested one level deeper.
+// Without markHeaderFooterTable propagating the flag down through
+// tableCell.AddParagraph/AddTable, a cell paragraph in a header table would
+// let AddHyperlink succeed, minting a relationship in
+// word/_rels/document.xml.rels that header1.xml can never resolve.
+//
+// AddHyperlink checks p.inHeaderFooter before it does anything else (see
+// paragraph.go), so an error return here is sufficient proof no relationship
+// was minted -- there's no code path between the check and the mint.
+func TestHeaderTableCell_AddHyperlinkRejected(t *testing.T) {
+	doc := core.NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection() error = %v", err)
+	}
+
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header() error = %v", err)
+	}
+	headerTable, err := header.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("header.AddTable() error = %v", err)
+	}
+	headerRow, err := headerTable.Row(0)
+	if err != nil {
+		t.Fatalf("headerTable.Row(0) error = %v", err)
+	}
+	headerCell, err := headerRow.Cell(0)
+	if err != nil {
+		t.Fatalf("headerRow.Cell(0) error = %v", err)
+	}
+	headerCellPara, err := headerCell.AddParagraph()
+	if err != nil {
+		t.Fatalf("headerCell.AddParagraph() error = %v", err)
+	}
+	if _, err := headerCellPara.AddHyperlink("https://example.com", "text"); err == nil {
+		t.Error("header table cell paragraph AddHyperlink() error = nil, want an error")
+	}
+
+	// One level deeper: a table nested inside the header table's cell.
+	nestedTable, err := headerCell.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("headerCell.AddTable() error = %v", err)
+	}
+	nestedRow, err := nestedTable.Row(0)
+	if err != nil {
+		t.Fatalf("nestedTable.Row(0) error = %v", err)
+	}
+	nestedCell, err := nestedRow.Cell(0)
+	if err != nil {
+		t.Fatalf("nestedRow.Cell(0) error = %v", err)
+	}
+	nestedCellPara, err := nestedCell.AddParagraph()
+	if err != nil {
+		t.Fatalf("nestedCell.AddParagraph() error = %v", err)
+	}
+	if _, err := nestedCellPara.AddHyperlink("https://example.com", "text"); err == nil {
+		t.Error("nested header table cell paragraph AddHyperlink() error = nil, want an error")
+	}
+
+	footer, err := section.Footer(domain.FooterDefault)
+	if err != nil {
+		t.Fatalf("Footer() error = %v", err)
+	}
+	footerTable, err := footer.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("footer.AddTable() error = %v", err)
+	}
+	footerRow, err := footerTable.Row(0)
+	if err != nil {
+		t.Fatalf("footerTable.Row(0) error = %v", err)
+	}
+	footerCell, err := footerRow.Cell(0)
+	if err != nil {
+		t.Fatalf("footerRow.Cell(0) error = %v", err)
+	}
+	footerCellPara, err := footerCell.AddParagraph()
+	if err != nil {
+		t.Fatalf("footerCell.AddParagraph() error = %v", err)
+	}
+	if _, err := footerCellPara.AddHyperlink("https://example.com", "text"); err == nil {
+		t.Error("footer table cell paragraph AddHyperlink() error = nil, want an error")
+	}
+}
+
+// TestHeader_BlocksOrdering pins the Header/Footer Blocks/Paragraphs/Tables
+// contract: Blocks preserves insertion order across mixed paragraph/table
+// content, Paragraphs/Tables are top-level-only filters over the same
+// content, and AddTable validates its bounds the same way Document.AddTable
+// does.
+func TestHeader_BlocksOrdering(t *testing.T) {
+	doc := core.NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection() error = %v", err)
+	}
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header() error = %v", err)
+	}
+
+	if _, err := header.AddParagraph(); err != nil {
+		t.Fatalf("header.AddParagraph() [1] error = %v", err)
+	}
+	table, err := header.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("header.AddTable() error = %v", err)
+	}
+	if _, err := header.AddParagraph(); err != nil {
+		t.Fatalf("header.AddParagraph() [2] error = %v", err)
+	}
+
+	blocks := header.Blocks()
+	if len(blocks) != 3 {
+		t.Fatalf("len(Blocks()) = %d, want 3", len(blocks))
+	}
+	if blocks[0].Paragraph == nil || blocks[0].Table != nil {
+		t.Errorf("Blocks()[0] = %+v, want a paragraph block", blocks[0])
+	}
+	if blocks[1].Table == nil || blocks[1].Paragraph != nil {
+		t.Errorf("Blocks()[1] = %+v, want a table block", blocks[1])
+	}
+	if blocks[2].Paragraph == nil || blocks[2].Table != nil {
+		t.Errorf("Blocks()[2] = %+v, want a paragraph block", blocks[2])
+	}
+
+	if got := len(header.Paragraphs()); got != 2 {
+		t.Errorf("len(Paragraphs()) = %d, want 2 (top-level only)", got)
+	}
+	if got := len(header.Tables()); got != 1 {
+		t.Errorf("len(Tables()) = %d, want 1", got)
+	}
+
+	// A cell paragraph must not leak into the top-level Paragraphs() view.
+	row, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("table.Row(0) error = %v", err)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("row.Cell(0) error = %v", err)
+	}
+	if _, err := cell.AddParagraph(); err != nil {
+		t.Fatalf("cell.AddParagraph() error = %v", err)
+	}
+	if got := len(header.Paragraphs()); got != 2 {
+		t.Errorf("len(Paragraphs()) after cell.AddParagraph() = %d, want still 2", got)
+	}
+
+	if _, err := header.AddTable(0, 1); err == nil {
+		t.Error("header.AddTable(0, 1) error = nil, want an InvalidArgument error")
+	}
+	if _, err := header.AddTable(1, 64); err == nil {
+		t.Error("header.AddTable(1, 64) error = nil, want an InvalidArgument error")
+	}
+}
+
 func TestParagraph_InsertRunAt_OutOfRange(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()

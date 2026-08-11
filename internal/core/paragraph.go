@@ -99,6 +99,17 @@ func markHeaderFooterParagraph(p domain.Paragraph) {
 	}
 }
 
+// markHeaderFooterTable flags a table as living inside a header or footer
+// part, so its cells' paragraphs inherit the same AddHyperlink restriction as
+// markHeaderFooterParagraph. t is always a *table in practice -- NewTable is
+// the only constructor -- so a failed type assertion is silently ignored
+// rather than panicking.
+func markHeaderFooterTable(t domain.Table) {
+	if concrete, ok := t.(*table); ok {
+		concrete.inHeaderFooter = true
+	}
+}
+
 // AddRun adds a new text run to the paragraph.
 func (p *paragraph) AddRun() (domain.Run, error) {
 	id := p.idGen.NextRunID()

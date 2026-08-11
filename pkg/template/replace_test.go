@@ -135,6 +135,42 @@ func TestReplaceText_InTableCell(t *testing.T) {
 	}
 }
 
+// TestReplaceText_InHeaderTableCell pins that ReplaceText reaches a
+// paragraph inside a header table's cell (via walkHeaderFooterTables) on a
+// freshly built document -- as opposed to TestReplaceText_SkipsPreservedHeaderAndFooter,
+// which pins the opposite for a document opened from an existing .docx.
+func TestReplaceText_InHeaderTableCell(t *testing.T) {
+	doc := core.NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection: %v", err)
+	}
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	table, err := header.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("header.AddTable: %v", err)
+	}
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+	para, _ := cell.AddParagraph()
+	r, _ := para.AddRun()
+	r.SetText("{company}")
+
+	result, err := ReplaceText(doc, "{company}", "Acme Corp")
+	if err != nil {
+		t.Fatalf("ReplaceText: %v", err)
+	}
+	if result.Replaced != 1 {
+		t.Errorf("replaced = %d, want 1", result.Replaced)
+	}
+	if got := para.Text(); got != "Acme Corp" {
+		t.Errorf("header table cell paragraph text = %q, want %q", got, "Acme Corp")
+	}
+}
+
 func TestReplaceText_SkipsSpanOverNonTextRun(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()

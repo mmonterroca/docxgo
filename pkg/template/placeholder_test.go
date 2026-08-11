@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/mmonterroca/docxgo/v2/domain"
 	"github.com/mmonterroca/docxgo/v2/internal/core"
 )
 
@@ -134,6 +135,50 @@ func TestFindPlaceholders_InTable(t *testing.T) {
 	}
 	if results[0].Location.Type != LocationTableCell {
 		t.Errorf("expected LocationTableCell, got %d", results[0].Location.Type)
+	}
+}
+
+// TestFindPlaceholders_InHeaderTableCell pins walkHeaderFooterTables: before
+// PR 2b, a header table's cells weren't reached by walkParagraphs at all
+// (the header/footer arm only ever called Paragraphs()), so a placeholder
+// there was invisible to FindPlaceholders. Location.Type stays LocationHeader
+// (not a distinct table-cell type) so the existing skipHeaderFooter check in
+// ReplaceText/MergeTemplate keeps working, but TableIndex/RowIndex/CellIndex
+// are populated alongside it.
+func TestFindPlaceholders_InHeaderTableCell(t *testing.T) {
+	doc := core.NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection: %v", err)
+	}
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	table, err := header.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("header.AddTable: %v", err)
+	}
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+	para, _ := cell.AddParagraph()
+	r, _ := para.AddRun()
+	r.SetText("{{HeaderCellValue}}")
+
+	results := FindPlaceholders(doc)
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 placeholder, got %d", len(results))
+	}
+	if results[0].Name != "HeaderCellValue" {
+		t.Errorf("expected \"HeaderCellValue\", got %q", results[0].Name)
+	}
+	if results[0].Location.Type != LocationHeader {
+		t.Errorf("expected LocationHeader, got %d", results[0].Location.Type)
+	}
+	if results[0].Location.TableIndex != 0 || results[0].Location.RowIndex != 0 || results[0].Location.CellIndex != 0 {
+		t.Errorf("expected TableIndex/RowIndex/CellIndex = 0/0/0, got %d/%d/%d",
+			results[0].Location.TableIndex, results[0].Location.RowIndex, results[0].Location.CellIndex)
 	}
 }
 
