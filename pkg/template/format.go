@@ -9,7 +9,7 @@ package template
 import "github.com/mmonterroca/docxgo/v2/domain"
 
 // formatsEqual returns true if two runs have identical visible formatting.
-// It compares the 8 visual formatting attributes plus Language — not
+// It compares the 9 visual formatting attributes plus Language — not
 // visible, but ConsolidateRuns must not merge two runs with different
 // language overrides, since the merge keeps only the leader's formatting
 // (see ConsolidateRuns) and silently discarding one run's Language would
@@ -25,6 +25,7 @@ func formatsEqual(a, b domain.Run) bool {
 		a.Italic() == b.Italic() &&
 		a.Underline() == b.Underline() &&
 		a.Strike() == b.Strike() &&
+		a.Caps() == b.Caps() &&
 		a.Highlight() == b.Highlight() &&
 		languagesEqual(a.Language(), b.Language())
 }
