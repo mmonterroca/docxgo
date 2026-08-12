@@ -33,6 +33,9 @@ type ZipWriter struct {
 	zipWriter  *zip.Writer
 	serializer *serializer.DocumentSerializer
 	language   *domain.Language
+	// written records every entry name already created, so a later write
+	// path can tell that an earlier one already claimed the name.
+	written map[string]bool
 }
 
 // NumberingPart represents numbering.xml data that should be preserved in the DOCX package.
@@ -265,8 +268,20 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 	}
 
 	// Write additional preserved parts (comments, footnotes, customXml, etc.)
+	//
+	// This is the bucket for parts docxgo does not recognize, so anything
+	// already written under the same name was written by code that *did*
+	// recognize it and wins. The reader claims a header's .rels by the literal
+	// prefix "word/_rels/header", so one belonging to a header in a
+	// subdirectory ("word/headers/_rels/header1.xml.rels") lands here instead
+	// -- and writing it after that part was regenerated would leave two
+	// entries under one name, with the stale copy's r:ids among them.
+	// archive/zip accepts the duplicate silently and lets Word pick.
 	if roundTrip && len(preserved.Additional) > 0 {
 		for name, data := range preserved.Additional {
+			if zw.written[name] {
+				continue
+			}
 			if err := zw.writeRaw(name, data); err != nil {
 				return fmt.Errorf("write additional part %s: %w", name, err)
 			}
@@ -666,6 +681,7 @@ func (zw *ZipWriter) writeXML(path string, v interface{}) error {
 	if err != nil {
 		return err
 	}
+	zw.markWritten(path)
 
 	// Write XML header
 	if _, err := w.Write([]byte(xml.Header)); err != nil {
@@ -834,9 +850,26 @@ func PartArchivePath(target string) string {
 	return path.Clean("word/" + cleaned)
 }
 
+// PartRelsPath maps a header/footer relationship target to the archive path of
+// that part's own .rels, which lives in a _rels directory beside the part:
+// "headers/header1.xml" -> "word/headers/_rels/header1.xml.rels".
+//
+// Derived from PartArchivePath rather than spelled out again, so a part and
+// its .rels can never be resolved to different directories. Exported for the
+// same reason PartArchivePath is: internal/core builds the generated rels map
+// and the writer decides where each entry goes, and the two have to agree.
+func PartRelsPath(target string) string {
+	part := PartArchivePath(target)
+	if part == "" {
+		return ""
+	}
+	return path.Join(path.Dir(part), "_rels", path.Base(part)+".rels")
+}
+
 // relsOwnerPath maps a part's .rels archive path back to the part it belongs
 // to: "word/_rels/header1.xml.rels" -> "word/header1.xml", and
-// "word/headers/_rels/header1.xml.rels" -> "word/headers/header1.xml".
+// "word/headers/_rels/header1.xml.rels" -> "word/headers/header1.xml". The
+// inverse of PartRelsPath.
 func relsOwnerPath(relsPath string) string {
 	dir := path.Dir(relsPath) // ".../_rels"
 	base := strings.TrimSuffix(path.Base(relsPath), ".rels")
@@ -914,8 +947,20 @@ func (zw *ZipWriter) writeRaw(path string, data []byte) error {
 	if err != nil {
 		return err
 	}
+	zw.markWritten(path)
 	_, err = w.Write(data)
 	return err
+}
+
+// markWritten records an entry name. archive/zip accepts duplicate names
+// without complaint and leaves the reader to pick one, so the write paths that
+// can legitimately overlap consult this rather than relying on their loops
+// running in the right order.
+func (zw *ZipWriter) markWritten(path string) {
+	if zw.written == nil {
+		zw.written = make(map[string]bool, 32)
+	}
+	zw.written[path] = true
 }
 
 // writeMediaFiles writes all media assets into the DOCX package.

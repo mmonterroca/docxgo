@@ -479,17 +479,13 @@ func nextPartTarget(prefix string, counter *int, used map[string]bool) string {
 // partRelsPathFor maps a header/footer target name to the archive path of that
 // part's own relationships file: "header1.xml" -> "word/_rels/header1.xml.rels".
 //
-// Header and footer target paths are stored bare (just the file name) all the
-// way through core and the serializer -- see prepareHeaderFooterRelationships,
-// which assigns them, and zip.go, which prepends "word/" when writing the part
-// itself. PreservedParts.HeaderRels, by contrast, is keyed by the full archive
-// path, so this normalizes to that shape and the two can be compared directly.
-//
-// path.Base defends against a target that already carries a directory (an
-// opened document's target comes from the source file's own rels, so it is not
-// guaranteed to be bare) -- without it the result would nest a second "word/".
+// A target docxgo assigned itself is bare, but an opened document's comes from
+// the source file's own rels and can carry a directory, so resolving it is the
+// writer's job -- the same resolution the part itself gets, which is what keeps
+// a part and its .rels in the same directory. PreservedParts.HeaderRels is
+// keyed by the full archive path, so the result compares directly against it.
 func partRelsPathFor(target string) string {
-	return "word/_rels/" + path.Base(target) + ".rels"
+	return writer.PartRelsPath(target)
 }
 
 // partArchivePath maps a header/footer target to the archive path of the part

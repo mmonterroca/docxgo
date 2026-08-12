@@ -1710,6 +1710,29 @@ func TestOpenDocument_HeaderInASubdirectoryIsNotDuplicated(t *testing.T) {
 	if got := string(zipPart(t, resaved, "word/headers/header1.xml")); !strings.Contains(got, "edited") {
 		t.Errorf("the referenced header did not pick up the edit:\n%s", got)
 	}
+
+	// No name in the package may be written twice: writeRaw is a bare
+	// zip.Create and archive/zip accepts a duplicate silently, leaving Word
+	// to pick between them.
+	assertNoDuplicateEntries(t, resaved)
+}
+
+// assertNoDuplicateEntries fails if any archive name appears more than once.
+func assertNoDuplicateEntries(t *testing.T, docxBytes []byte) {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
+	if err != nil {
+		t.Fatalf("zip.NewReader: %v", err)
+	}
+	seen := make(map[string]int, len(zr.File))
+	for _, f := range zr.File {
+		seen[f.Name]++
+	}
+	for name, n := range seen {
+		if n > 1 {
+			t.Errorf("archive holds %d entries named %s, want exactly 1", n, name)
+		}
+	}
 }
 
 // TestOpenDocument_FirstImageAddedGetsItsContentTypeDefault covers the other
@@ -2042,6 +2065,14 @@ func docxWithHeaderAt(t *testing.T, target, partPath string) []byte {
 <w:p><w:r><w:t>original</w:t></w:r></w:p>
 </w:hdr>`,
 	}
+
+	// Deliberately no .rels for the header. A subdirectory header that owns
+	// relationships hits a separate, deeper problem: the reader claims parts
+	// by literal prefix, and "word/headers/_rels/header1.xml.rels" matches
+	// the header *content* prefix "word/header", so it is preserved as though
+	// it were a header rather than as that header's relationships. Tightening
+	// that taxonomy is a reader change well outside this branch; see the
+	// known limitation in the CHANGELOG.
 
 	// The Override has to name where the part actually is, not where a
 	// base-name reading of the target would put it.
