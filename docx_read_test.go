@@ -1024,6 +1024,41 @@ func TestOpenDocument_AddHyperlink_RegeneratesRelsWithoutLosingOriginal(t *testi
 	})
 }
 
+// TestOpenDocument_PreservesTableStyle is the end-to-end regression for one
+// of the three losses reported in issue #102: opening a real, Word-authored
+// document whose table borders come from a named table style (<w:tblStyle>,
+// not an explicit <w:tblBorders> on the table itself) and resaving it
+// dropped the style reference, orphaning the borders even though the style
+// definition itself survived untouched in styles.xml.
+//
+// testdata/word/issue-102-input.docx is the reporter's own attachment. Only
+// the table-style loss is asserted here; the section-break and w:caps losses
+// reported in the same issue are separate, not fixed here.
+func TestOpenDocument_PreservesTableStyle(t *testing.T) {
+	doc, err := OpenDocument(filepath.Join("internal", "reader", "testdata", "word", "issue-102-input.docx"))
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+
+	tables := doc.Tables()
+	if len(tables) != 1 {
+		t.Fatalf("len(Tables()) = %d, want 1", len(tables))
+	}
+	if got := tables[0].Style().Name; got != "TableGrid" {
+		t.Errorf("Tables()[0].Style().Name = %q, want %q", got, "TableGrid")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	if !strings.Contains(written, `<w:tblStyle w:val="TableGrid">`) {
+		t.Errorf("resaved document.xml lost the table's tblStyle reference:\n%s", written)
+	}
+}
+
 // TestOpenDocument_PreservesMidBodySectionBreak is the end-to-end regression
 // for one of the three losses reported in issue #102: opening a real,
 // Word-authored document with a section break in the middle of its body (a

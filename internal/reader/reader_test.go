@@ -1459,6 +1459,80 @@ func TestReconstructDocumentTable(t *testing.T) {
 	}
 }
 
+// TestReconstructTableStyle_AgainstHandAuthoredPackage is a regression for
+// one of the three losses reported in issue #102: a table's <w:tblStyle>
+// reference (e.g. Word's built-in "TableGrid") was never hydrated, so it
+// silently disappeared on the next save even though the style definition
+// itself survived untouched in styles.xml. TableGrid's own definition
+// carries the table's visible borders (<w:tblBorders>) -- there is no
+// explicit <w:tblBorders> on the table itself, which is exactly why this
+// was reported as "table borders removed" rather than "table style lost".
+//
+// Uses buildRawZipPackage rather than a docxgo-written-then-read fixture:
+// TestReconstructDocumentTable never sets a style, so it can't catch a
+// hydration gap that a docxgo round-trip wouldn't exercise either way.
+func TestReconstructTableStyle_AgainstHandAuthoredPackage(t *testing.T) {
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:tbl>
+<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>
+<w:tblGrid><w:gridCol w:w="918"/></w:tblGrid>
+<w:tr><w:tc><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc></w:tr>
+</w:tbl>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	tables := doc.Tables()
+	if len(tables) != 1 {
+		t.Fatalf("len(Tables()) = %d, want 1", len(tables))
+	}
+	if got := tables[0].Style().Name; got != "TableGrid" {
+		t.Errorf("Tables()[0].Style().Name = %q, want %q", got, "TableGrid")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `<w:tblStyle w:val="TableGrid">`) {
+		t.Errorf("resaved document.xml lost the table's tblStyle reference:\n%s", written)
+	}
+}
+
 // indElementXML returns the self-closing <w:ind .../> tag from a
 // word/document.xml string. Page margins (<w:pgMar>) also carry
 // left/right/header/footer attributes, so callers must not grep the whole

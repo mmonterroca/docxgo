@@ -2120,6 +2120,10 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 		return errors.Wrap(err, opHydrateTable)
 	}
 
+	if err := applyTableStyle(table, elem); err != nil {
+		return errors.Wrap(err, opHydrateTable)
+	}
+
 	for i, cells := range rowCells {
 		row, err := table.Row(i)
 		if err != nil {
@@ -2146,6 +2150,31 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 	}
 
 	return nil
+}
+
+// applyTableStyle hydrates a table's <w:tblPr>/<w:tblStyle> reference (e.g.
+// "TableGrid") into the domain model. A table style commonly carries visible
+// properties -- borders, shading, banding -- defined once in styles.xml and
+// referenced by name rather than repeated on every table; dropping the
+// reference orphans that rendering even though the style definition itself
+// survives untouched in styles.xml.
+func applyTableStyle(table domain.Table, elem *Element) error {
+	if table == nil || elem == nil {
+		return nil
+	}
+	tblPr := findChild(elem, "tblPr")
+	if tblPr == nil {
+		return nil
+	}
+	styleElem := findChild(tblPr, "tblStyle")
+	if styleElem == nil {
+		return nil
+	}
+	val, ok := getAttr(styleElem, "val")
+	if !ok || val == "" {
+		return nil
+	}
+	return table.SetStyle(domain.TableStyle{Name: val})
 }
 
 func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructContext) error {
