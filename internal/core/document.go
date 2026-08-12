@@ -60,11 +60,15 @@ type document struct {
 
 	// Preserved parts for round-trip operations (read-modify-write).
 	// When set, these parts are written verbatim to preserve original content.
-	preservedStylesPart   []byte            // Original styles.xml
-	preservedHeaders      map[string][]byte // Original headers (e.g., "word/header1.xml" -> bytes)
-	preservedFooters      map[string][]byte // Original footers (e.g., "word/footer1.xml" -> bytes)
-	preservedHeaderRels   map[string][]byte // Original word/_rels/headerN.xml.rels, keyed by archive path
-	preservedFooterRels   map[string][]byte // Original word/_rels/footerN.xml.rels, keyed by archive path
+	preservedStylesPart []byte            // Original styles.xml
+	preservedHeaders    map[string][]byte // Original headers (e.g., "word/header1.xml" -> bytes)
+	preservedFooters    map[string][]byte // Original footers (e.g., "word/footer1.xml" -> bytes)
+	preservedHeaderRels map[string][]byte // Original word/_rels/headerN.xml.rels, keyed by archive path
+	preservedFooterRels map[string][]byte // Original word/_rels/footerN.xml.rels, keyed by archive path
+	// headerFooterSnapshots holds serialize(model) for each header/footer as
+	// it stood right after the document was opened, keyed by archive path.
+	// See SnapshotHeaderFooterParts.
+	headerFooterSnapshots map[string]string
 	preservedDocRels      []byte            // Original word/_rels/document.xml.rels
 	preservedContentTypes []byte            // Original [Content_Types].xml
 	preservedAdditional   map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
@@ -342,6 +346,8 @@ func (d *document) generateHeadingBookmarks() {
 // package. This must run before serialization so both section references and the
 // document relationships list are consistent.
 func (d *document) prepareHeaderFooterRelationships() {
+	usedHeaders, usedFooters := d.usedPartTargets()
+
 	for _, sec := range d.sections {
 		coreSection, ok := sec.(*docxSection)
 		if !ok {
@@ -356,8 +362,7 @@ func (d *document) prepareHeaderFooterRelationships() {
 			}
 
 			if header.TargetPath() == "" {
-				d.headerCount++
-				target := fmt.Sprintf("header%d.xml", d.headerCount)
+				target := nextPartTarget("header", &d.headerCount, usedHeaders)
 				header.setRelationship(header.RelationshipID(), target)
 			}
 
@@ -374,8 +379,7 @@ func (d *document) prepareHeaderFooterRelationships() {
 			}
 
 			if footer.TargetPath() == "" {
-				d.footerCount++
-				target := fmt.Sprintf("footer%d.xml", d.footerCount)
+				target := nextPartTarget("footer", &d.footerCount, usedFooters)
 				footer.setRelationship(footer.RelationshipID(), target)
 			}
 
@@ -387,6 +391,65 @@ func (d *document) prepareHeaderFooterRelationships() {
 		}
 
 		coreSection.mu.Unlock()
+	}
+}
+
+// usedPartTargets collects the header and footer part names already spoken
+// for, so a part added later cannot be handed a name that is taken.
+//
+// Two sources, both necessary on an opened document. The model's own headers
+// hold the targets the source file gave them; the preserved maps cover names
+// the archive uses but the model does not point at, which includes a header
+// the reader could not hydrate.
+func (d *document) usedPartTargets() (headers, footers map[string]bool) {
+	headers = make(map[string]bool)
+	footers = make(map[string]bool)
+
+	for preservedPath := range d.preservedHeaders {
+		headers[path.Base(preservedPath)] = true
+	}
+	for preservedPath := range d.preservedFooters {
+		footers[path.Base(preservedPath)] = true
+	}
+
+	for _, sec := range d.sections {
+		coreSection, ok := sec.(*docxSection)
+		if !ok {
+			continue
+		}
+		coreSection.mu.RLock()
+		for _, header := range coreSection.headers {
+			if header != nil && header.TargetPath() != "" {
+				headers[path.Base(header.TargetPath())] = true
+			}
+		}
+		for _, footer := range coreSection.footers {
+			if footer != nil && footer.TargetPath() != "" {
+				footers[path.Base(footer.TargetPath())] = true
+			}
+		}
+		coreSection.mu.RUnlock()
+	}
+
+	return headers, footers
+}
+
+// nextPartTarget hands out the first "<prefix><n>.xml" name that is not
+// already in used, advancing counter past it.
+//
+// The skip matters only for a document opened from a file: counter starts at
+// zero there while header1.xml and header2.xml already exist, so a header
+// added afterwards used to be handed "header1.xml" -- two relationships
+// pointing at one part name, and the new header's content silently discarded
+// when the two collapsed into a single archive entry.
+func nextPartTarget(prefix string, counter *int, used map[string]bool) string {
+	for {
+		*counter++
+		target := fmt.Sprintf("%s%d.xml", prefix, *counter)
+		if !used[target] {
+			used[target] = true
+			return target
+		}
 	}
 }
 
@@ -404,6 +467,79 @@ func (d *document) prepareHeaderFooterRelationships() {
 // guaranteed to be bare) -- without it the result would nest a second "word/".
 func partRelsPathFor(target string) string {
 	return "word/_rels/" + path.Base(target) + ".rels"
+}
+
+// partArchivePath maps a header/footer target to the archive path of the part
+// itself, the shape PreservedParts.Headers/Footers are keyed by. Same
+// path.Base normalization, and for the same reason: an opened document's
+// target is whatever the source file's rels said, which may legally be
+// "header1.xml", "/word/header1.xml" or "word/header1.xml".
+func partArchivePath(target string) string {
+	return "word/" + path.Base(target)
+}
+
+// SnapshotHeaderFooterParts records the serialized form of every header and
+// footer as the model currently holds it. WriteTo compares against this to
+// tell a part the caller never touched -- which must go back to the file
+// byte-for-byte from the preserved original -- from one that was edited,
+// which has to be regenerated or the edit never reaches the saved file.
+//
+// Called once, by the reader, after an opened document has been fully
+// hydrated. A document built from scratch has no snapshots and therefore no
+// preserved parts to protect, so every part is written from the model.
+//
+// Comparing model-against-model is the whole point. The preserved bytes and
+// docxgo's own serialization of the same header never match -- different
+// attribute order, different whitespace, and content the reader does not
+// model at all -- so comparing the model against the *file* would mark every
+// header dirty and regenerate the lot.
+func (d *document) SnapshotHeaderFooterParts() {
+	if d == nil {
+		return
+	}
+	ser := serializer.NewDocumentSerializer()
+	headers, footers := ser.SerializeSectionParts(d)
+	d.headerFooterSnapshots = headerFooterPartBytes(headers, footers)
+}
+
+// headerFooterPartBytes marshals each serialized header/footer part, keyed by
+// archive path. A part that fails to marshal is omitted, which makes it
+// compare as changed -- the safe direction, since a part we cannot serialize
+// is one we should not claim is untouched.
+func headerFooterPartBytes(headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer) map[string]string {
+	out := make(map[string]string, len(headers)+len(footers))
+	for target, part := range headers {
+		if data, err := xml.Marshal(part); err == nil {
+			out[partArchivePath(target)] = string(data)
+		}
+	}
+	for target, part := range footers {
+		if data, err := xml.Marshal(part); err == nil {
+			out[partArchivePath(target)] = string(data)
+		}
+	}
+	return out
+}
+
+// regeneratedHeaderFooterParts returns the archive paths of the header and
+// footer parts whose model has diverged from the snapshot taken when the
+// document was opened -- the ones that must be written from the model rather
+// than from their preserved bytes.
+//
+// A part with no snapshot entry counts as regenerated: either the document
+// was built from scratch (nothing to preserve) or the header was added after
+// it was opened (nothing preserved for it either).
+func (d *document) regeneratedHeaderFooterParts(headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer) map[string]bool {
+	current := headerFooterPartBytes(headers, footers)
+
+	out := make(map[string]bool, len(current))
+	for name, data := range current {
+		snapshot, ok := d.headerFooterSnapshots[name]
+		if !ok || snapshot != data {
+			out[name] = true
+		}
+	}
+	return out
 }
 
 // collectPartRelationships gathers the relationships each header and footer
@@ -625,8 +761,12 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 		}
 	}
 
+	// Header/footer parts the caller has edited since the document was
+	// opened. Everything else keeps its preserved bytes.
+	regenerated := d.regeneratedHeaderFooterParts(headers, footers)
+
 	// Use preserved styles and parts if available (from reading an existing document)
-	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers, partRels, numberingPart, d.preservedStylesPart, writerPreserved); err != nil {
+	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers, partRels, regenerated, numberingPart, d.preservedStylesPart, writerPreserved); err != nil {
 		return 0, errors.WrapWithCode(err, errors.ErrCodeIO, "Document.WriteTo")
 	}
 

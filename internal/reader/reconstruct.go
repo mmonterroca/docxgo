@@ -165,6 +165,15 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 		}
 	}
 
+	// Record what each header and footer looks like straight out of
+	// hydration, so the writer can tell an untouched part (write its
+	// preserved bytes back verbatim) from an edited one (regenerate it, or
+	// the edit never reaches the saved file). Must run last: a header has to
+	// be fully hydrated before it is snapshotted.
+	if snapshotter, ok := doc.(interface{ SnapshotHeaderFooterParts() }); ok {
+		snapshotter.SnapshotHeaderFooterParts()
+	}
+
 	return doc, nil
 }
 

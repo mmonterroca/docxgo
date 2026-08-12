@@ -14,7 +14,9 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -79,9 +81,16 @@ func (zw *ZipWriter) SetLanguage(lang *domain.Language) {
 // partRels holds the relationships owned by individual header/footer parts,
 // keyed by the archive path of the .rels file itself (e.g.
 // "word/_rels/header1.xml.rels"). It is the generated counterpart to
-// PreservedParts.HeaderRels/FooterRels; an entry is written only when no
-// preserved part already claims that name.
-func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Relationships, coreProps *xmlstructs.CoreProperties, appProps *xmlstructs.AppProperties, styles *xmlstructs.Styles, media []*manager.MediaFile, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, partRels map[string]*xmlstructs.Relationships, numbering *NumberingPart, preservedStyles []byte, preserved *PreservedParts) error {
+// PreservedParts.HeaderRels/FooterRels; an entry is written only when the
+// part it belongs to is being regenerated, or when no preserved part claims
+// that name.
+//
+// regenerated names the header/footer content parts (by archive path, e.g.
+// "word/header1.xml") whose in-memory model has diverged from the file they
+// were read from. Those are written from the model; every other preserved
+// part goes back byte-for-byte. Empty for a document built from scratch,
+// where there is nothing preserved to choose between.
+func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Relationships, coreProps *xmlstructs.CoreProperties, appProps *xmlstructs.AppProperties, styles *xmlstructs.Styles, media []*manager.MediaFile, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, partRels map[string]*xmlstructs.Relationships, regenerated map[string]bool, numbering *NumberingPart, preservedStyles []byte, preserved *PreservedParts) error {
 	numberingPart := sanitizeNumberingPart(numbering)
 
 	// Determine if we're in round-trip mode (have preserved parts)
@@ -89,7 +98,7 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 
 	// Write [Content_Types].xml
 	if roundTrip && len(preserved.ContentTypes) > 0 {
-		if err := zw.writeRaw("[Content_Types].xml", preserved.ContentTypes); err != nil {
+		if err := zw.writeRaw("[Content_Types].xml", amendContentTypes(preserved.ContentTypes, headers, footers)); err != nil {
 			return fmt.Errorf("write preserved content types: %w", err)
 		}
 	} else {
@@ -195,75 +204,56 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 		return fmt.Errorf("write media: %w", err)
 	}
 
-	// Write headers - use preserved if available, otherwise serialized
-	if roundTrip && len(preserved.Headers) > 0 {
-		for name, data := range preserved.Headers {
-			if err := zw.writeRaw(name, data); err != nil {
-				return fmt.Errorf("write preserved header %s: %w", name, err)
-			}
-		}
-	} else {
-		for name, header := range headers {
-			if err := zw.writeXML(fmt.Sprintf("word/%s", name), header); err != nil {
-				return fmt.Errorf("write header %s: %w", name, err)
-			}
-		}
+	// Write headers and footers, merging generated and preserved per name.
+	// See writeHeaderFooterParts for why this is not all-or-nothing.
+	fromModel, err := zw.writeHeaderFooterParts(headers, footers, regenerated, preserved, roundTrip)
+	if err != nil {
+		return err
 	}
 
-	// Write footers - use preserved if available, otherwise serialized
-	if roundTrip && len(preserved.Footers) > 0 {
-		for name, data := range preserved.Footers {
-			if err := zw.writeRaw(name, data); err != nil {
-				return fmt.Errorf("write preserved footer %s: %w", name, err)
-			}
-		}
-	} else {
-		for name, footer := range footers {
-			if err := zw.writeXML(fmt.Sprintf("word/%s", name), footer); err != nil {
-				return fmt.Errorf("write footer %s: %w", name, err)
-			}
-		}
-	}
-
-	// Write preserved header/footer relationship parts (word/_rels/headerN.xml.rels,
-	// word/_rels/footerN.xml.rels). Kept separate from the header/footer content
-	// above and from Additional (below) so each can be reasoned about on its own.
-	if roundTrip && len(preserved.HeaderRels) > 0 {
-		for name, data := range preserved.HeaderRels {
-			if err := zw.writeRaw(name, data); err != nil {
-				return fmt.Errorf("write preserved header rels %s: %w", name, err)
-			}
-		}
-	}
-	if roundTrip && len(preserved.FooterRels) > 0 {
-		for name, data := range preserved.FooterRels {
-			if err := zw.writeRaw(name, data); err != nil {
-				return fmt.Errorf("write preserved footer rels %s: %w", name, err)
-			}
-		}
-	}
-
-	// Write generated header/footer relationship parts, for relationships a
-	// header or footer owns itself (an image or hyperlink placed in it). These
-	// cannot go in word/_rels/document.xml.rels: a header is its own OPC part
-	// and cannot resolve an r:id declared there.
+	// Write the relationship parts each header/footer owns (an image or
+	// hyperlink placed in one). These cannot live in
+	// word/_rels/document.xml.rels: a header is its own OPC part and cannot
+	// resolve an r:id declared there.
 	//
-	// A name already written from the preserved maps above is skipped rather
-	// than written twice -- writeRaw is a bare zip.Create and archive/zip
-	// accepts duplicate entry names silently, leaving Word to pick one
-	// unpredictably. Today the two sets cannot actually overlap (a generated
-	// header is only produced when no preserved header exists), but the guard
-	// is here so that stops being load-bearing once headers regenerate on
-	// opened documents.
+	// The generated set wins for a part written from the model -- its r:ids
+	// come from the model and will not match the preserved rels, and pairing
+	// new content with old relationships is exactly the dangling-r:id package
+	// #101 was about. For an untouched part the preserved bytes win.
+	//
+	// Whichever loses is skipped rather than also written: writeRaw is a bare
+	// zip.Create and archive/zip accepts duplicate entry names silently,
+	// leaving Word to pick one unpredictably.
+	writtenRels := make(map[string]bool, len(partRels))
 	for name, partRel := range partRels {
 		if partRel == nil {
 			continue
 		}
-		if roundTrip && (hasPart(preserved.HeaderRels, name) || hasPart(preserved.FooterRels, name)) {
+		if roundTrip && !fromModel[relsOwnerPath(name)] &&
+			(hasPart(preserved.HeaderRels, name) || hasPart(preserved.FooterRels, name)) {
 			continue
 		}
 		if err := zw.writeXML(name, partRel); err != nil {
 			return fmt.Errorf("write part rels %s: %w", name, err)
+		}
+		writtenRels[name] = true
+	}
+
+	if roundTrip {
+		for _, preservedRels := range []map[string][]byte{preserved.HeaderRels, preserved.FooterRels} {
+			for name, data := range preservedRels {
+				// Skip a rels part already written from the model, and one
+				// whose part was regenerated but owns no relationships at all
+				// -- keeping the old rels there would leave r:ids the new
+				// content never references.
+				if writtenRels[name] || fromModel[relsOwnerPath(name)] {
+					continue
+				}
+				if err := zw.writeRaw(name, data); err != nil {
+					return fmt.Errorf("write preserved part rels %s: %w", name, err)
+				}
+				writtenRels[name] = true
+			}
 		}
 	}
 
@@ -698,6 +688,159 @@ func (zw *ZipWriter) writeXML(path string, v interface{}) error {
 func hasPart(parts map[string][]byte, name string) bool {
 	_, ok := parts[name]
 	return ok
+}
+
+// amendContentTypes returns the preserved [Content_Types].xml with an Override
+// added for any header or footer part that does not already have one.
+//
+// A round-tripped package writes this part verbatim, which is correct while
+// its part list cannot change -- but a header *added* to an opened document
+// gets no Override that way, and a part with no declared content type makes
+// the whole package invalid. Only the missing entries are added; the preserved
+// bytes are returned untouched when nothing is missing, so an unmodified
+// document still round-trips byte-for-byte here.
+//
+// Malformed preserved bytes are returned unchanged rather than replaced: the
+// same call the document-rels path makes, for the same reason -- better to
+// keep a part that could not be parsed than to risk mangling it.
+func amendContentTypes(preservedBytes []byte, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer) []byte {
+	if len(headers) == 0 && len(footers) == 0 {
+		return preservedBytes
+	}
+
+	var types xmlstructs.ContentTypes
+	if err := xml.Unmarshal(preservedBytes, &types); err != nil {
+		return preservedBytes
+	}
+
+	declared := make(map[string]bool, len(types.Overrides))
+	for _, override := range types.Overrides {
+		if override != nil {
+			declared[strings.ToLower(override.PartName)] = true
+		}
+	}
+
+	// Sorted so the appended entries land in a stable order regardless of
+	// map iteration.
+	missing := make([]*xmlstructs.Override, 0, len(headers)+len(footers))
+	collect := func(targets []string, contentType string) {
+		sort.Strings(targets)
+		for _, target := range targets {
+			partName := "/" + partArchivePath(target)
+			if declared[strings.ToLower(partName)] {
+				continue
+			}
+			declared[strings.ToLower(partName)] = true
+			missing = append(missing, &xmlstructs.Override{PartName: partName, ContentType: contentType})
+		}
+	}
+	collect(mapKeys(headers), constants.ContentTypeHeader)
+	collect(mapKeys(footers), constants.ContentTypeFooter)
+
+	if len(missing) == 0 {
+		return preservedBytes
+	}
+
+	types.Overrides = append(types.Overrides, missing...)
+	out, err := xml.MarshalIndent(&types, "", "  ")
+	if err != nil {
+		return preservedBytes
+	}
+	return append([]byte(xml.Header), out...)
+}
+
+// mapKeys returns m's keys, for the callers that need to iterate in a stable
+// order rather than Go's randomized map order.
+func mapKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// partArchivePath maps a header/footer target -- which for an opened document
+// is whatever the source file's rels said, legally any of "header1.xml",
+// "word/header1.xml" or "/word/header1.xml" -- to the archive path the part is
+// written under, the same shape PreservedParts.Headers is keyed by.
+//
+// path.Base is what makes the three forms agree. Without it an absolute target
+// produced the entry name "word//word/header1.xml"; that was unreachable only
+// because the generated branch never ran for an opened document, which is
+// exactly what stopped being true here.
+func partArchivePath(target string) string {
+	return "word/" + path.Base(target)
+}
+
+// relsOwnerPath maps a part's .rels archive path back to the part it belongs
+// to: "word/_rels/header1.xml.rels" -> "word/header1.xml".
+func relsOwnerPath(relsPath string) string {
+	return "word/" + strings.TrimSuffix(path.Base(relsPath), ".rels")
+}
+
+// writeHeaderFooterParts writes every header and footer, choosing per name
+// between the model and the preserved original, and returns the archive paths
+// it wrote from the model.
+//
+// This used to be all-or-nothing: a single preserved header discarded the
+// entire generated map, so a header modified -- or newly added -- on an opened
+// document was silently dropped. Merging per name is what lets an edit reach
+// the file while every part the caller never touched still goes back
+// byte-for-byte.
+//
+// A part is written from the model when regenerated says its model diverged
+// from the file, or when nothing preserved claims that name (a header added
+// after the document was opened). Otherwise the preserved bytes win.
+func (zw *ZipWriter) writeHeaderFooterParts(headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, regenerated map[string]bool, preserved *PreservedParts, roundTrip bool) (map[string]bool, error) {
+	fromModel := make(map[string]bool, len(headers)+len(footers))
+
+	writeGenerated := func(target string, part interface{}, preservedParts map[string][]byte, kind string) error {
+		name := partArchivePath(target)
+		if roundTrip && hasPart(preservedParts, name) && !regenerated[name] {
+			return nil
+		}
+		if err := zw.writeXML(name, part); err != nil {
+			return fmt.Errorf("write %s %s: %w", kind, name, err)
+		}
+		fromModel[name] = true
+		return nil
+	}
+
+	for target, header := range headers {
+		var preservedHeaders map[string][]byte
+		if roundTrip {
+			preservedHeaders = preserved.Headers
+		}
+		if err := writeGenerated(target, header, preservedHeaders, "header"); err != nil {
+			return nil, err
+		}
+	}
+	for target, footer := range footers {
+		var preservedFooters map[string][]byte
+		if roundTrip {
+			preservedFooters = preserved.Footers
+		}
+		if err := writeGenerated(target, footer, preservedFooters, "footer"); err != nil {
+			return nil, err
+		}
+	}
+
+	if !roundTrip {
+		return fromModel, nil
+	}
+
+	for _, preservedParts := range []map[string][]byte{preserved.Headers, preserved.Footers} {
+		for name, data := range preservedParts {
+			if fromModel[name] {
+				continue
+			}
+			if err := zw.writeRaw(name, data); err != nil {
+				return nil, fmt.Errorf("write preserved part %s: %w", name, err)
+			}
+		}
+	}
+
+	return fromModel, nil
 }
 
 // writeRaw writes raw bytes to the ZIP.

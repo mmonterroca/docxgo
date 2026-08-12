@@ -1304,6 +1304,328 @@ func TestOpenDocument_PreservesTableCellWidths(t *testing.T) {
 	}
 }
 
+// TestOpenDocument_OnlyTheEditedHeaderIsRegenerated is the core of the
+// per-name merge. WriteTo used to be all-or-nothing: one preserved header
+// discarded the entire generated map, so a header edited on an opened
+// document was silently dropped on save. Regenerating everything instead
+// would be just as wrong in the other direction -- a regenerated part is
+// rebuilt from what docxgo can model, so anything the reader does not
+// understand is lost from it.
+//
+// Both halves are asserted here: the edited header carries the new text, and
+// the untouched one is byte-for-byte what it was.
+func TestOpenDocument_OnlyTheEditedHeaderIsRegenerated(t *testing.T) {
+	built := docxWithTwoHeaders(t)
+
+	doc, err := OpenDocumentFromBytes(built)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	section := doc.Sections()[0]
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	paras := header.Paragraphs()
+	if len(paras) != 1 {
+		t.Fatalf("default header has %d paragraphs, want 1", len(paras))
+	}
+	runs := paras[0].Runs()
+	if len(runs) != 1 {
+		t.Fatalf("default header paragraph has %d runs, want 1", len(runs))
+	}
+	if err := runs[0].SetText("edited default header"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	resaved := buf.Bytes()
+
+	edited := string(zipPart(t, resaved, "word/header1.xml"))
+	if !strings.Contains(edited, "edited default header") {
+		t.Errorf("header1.xml did not pick up the edit:\n%s", edited)
+	}
+
+	if before, after := zipPart(t, built, "word/header2.xml"), zipPart(t, resaved, "word/header2.xml"); !bytes.Equal(before, after) {
+		t.Errorf("header2.xml was regenerated even though nothing touched it:\nbefore: %s\nafter:  %s", before, after)
+	}
+
+	for _, name := range []string{"word/header1.xml", "word/header2.xml"} {
+		if got := countZipEntries(t, resaved, name); got != 1 {
+			t.Errorf("resaved package contains %d entries named %s, want exactly 1", got, name)
+		}
+	}
+}
+
+// TestOpenDocument_HeaderAddedAfterOpenGetsContentTypeOverride covers the
+// second mutation surface. [Content_Types].xml is written back verbatim on a
+// round-trip, which is correct while the package's part list cannot change --
+// but a header *added* to an opened document then has no Override, and a part
+// with no declared content type makes the whole package invalid.
+func TestOpenDocument_HeaderAddedAfterOpenGetsContentTypeOverride(t *testing.T) {
+	built := docxWithTwoHeaders(t)
+
+	doc, err := OpenDocumentFromBytes(built)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	section := doc.Sections()[0]
+	evenHeader, err := section.Header(domain.HeaderEven)
+	if err != nil {
+		t.Fatalf("Header(HeaderEven): %v", err)
+	}
+	para, err := evenHeader.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("brand new header"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	resaved := buf.Bytes()
+
+	// The new part is header3.xml -- header1 and header2 are taken.
+	added := string(zipPart(t, resaved, "word/header3.xml"))
+	if !strings.Contains(added, "brand new header") {
+		t.Errorf("header3.xml is missing the new content:\n%s", added)
+	}
+
+	contentTypes := string(zipPart(t, resaved, "[Content_Types].xml"))
+	if !strings.Contains(contentTypes, `PartName="/word/header3.xml"`) {
+		t.Errorf("[Content_Types].xml has no Override for the newly added header:\n%s", contentTypes)
+	}
+	for _, existing := range []string{"/word/header1.xml", "/word/header2.xml", "/word/document.xml"} {
+		if !strings.Contains(contentTypes, `PartName="`+existing+`"`) {
+			t.Errorf("[Content_Types].xml lost the Override for %s:\n%s", existing, contentTypes)
+		}
+	}
+}
+
+// TestOpenDocument_AbsoluteHeaderTargetIsNormalized covers a hazard that only
+// became reachable once headers regenerate on opened documents. A header's
+// target comes from the source file's own rels, where "/word/header1.xml" is
+// as legal as "header1.xml"; the writer used to build the entry name by
+// blindly prepending "word/", which for the absolute form yields
+// "word//word/header1.xml" -- a part nothing references, and no header where
+// one is expected.
+func TestOpenDocument_AbsoluteHeaderTargetIsNormalized(t *testing.T) {
+	built := docxWithHeaderTarget(t, "/word/header1.xml")
+
+	doc, err := OpenDocumentFromBytes(built)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	section := doc.Sections()[0]
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	paras := header.Paragraphs()
+	if len(paras) != 1 {
+		t.Fatalf("header has %d paragraphs, want 1 (was it hydrated at all?)", len(paras))
+	}
+	if err := paras[0].Runs()[0].SetText("edited"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	resaved := buf.Bytes()
+
+	if got := countZipEntries(t, resaved, "word//word/header1.xml"); got != 0 {
+		t.Errorf("resaved package contains %d entries named word//word/header1.xml -- the target was not normalized", got)
+	}
+	edited := string(zipPart(t, resaved, "word/header1.xml"))
+	if !strings.Contains(edited, "edited") {
+		t.Errorf("word/header1.xml did not pick up the edit:\n%s", edited)
+	}
+}
+
+// TestOpenDocument_EditedHeaderKeepsItsImageAndRels is the relationship half
+// of regeneration. Writing new header content next to the *preserved* rels
+// would leave the r:ids the model minted pointing at nothing -- the same
+// dangling-r:id package #101 was about, one part further down. The generated
+// rels must win for a regenerated part, and win exclusively: writeRaw is a
+// bare zip.Create, so writing both would leave two entries under one name and
+// let Word pick.
+func TestOpenDocument_EditedHeaderKeepsItsImageAndRels(t *testing.T) {
+	pngBytes := encodeTestPNG(t)
+	built := buildCollidingRelationshipDocx(t, pngBytes)
+
+	doc, err := OpenDocumentFromBytes(built)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	header, err := doc.Sections()[0].Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header: %v", err)
+	}
+	para, err := header.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("appended line"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	resaved := buf.Bytes()
+
+	headerXML := string(zipPart(t, resaved, "word/header1.xml"))
+	if !strings.Contains(headerXML, "appended line") {
+		t.Errorf("header1.xml did not pick up the edit:\n%s", headerXML)
+	}
+
+	if got := countZipEntries(t, resaved, "word/_rels/header1.xml.rels"); got != 1 {
+		t.Fatalf("resaved package contains %d entries named word/_rels/header1.xml.rels, want exactly 1", got)
+	}
+	headerRels := string(zipPart(t, resaved, "word/_rels/header1.xml.rels"))
+
+	embeds := regexp.MustCompile(`r:embed="([^"]+)"`).FindAllStringSubmatch(headerXML, -1)
+	if len(embeds) != 1 {
+		t.Fatalf("regenerated header1.xml has %d r:embed references, want 1 (the image should survive regeneration):\n%s", len(embeds), headerXML)
+	}
+	for _, embed := range embeds {
+		if !strings.Contains(headerRels, `Id="`+embed[1]+`"`) {
+			t.Errorf("header1.xml references %s but word/_rels/header1.xml.rels does not declare it:\n%s", embed[1], headerRels)
+		}
+	}
+	if !strings.Contains(headerRels, "media/image1.png") {
+		t.Errorf("word/_rels/header1.xml.rels lost the image target:\n%s", headerRels)
+	}
+}
+
+// docxWithTwoHeaders builds a package with a default and a first-page header,
+// each holding one run, through docxgo's own writer -- the shape a caller
+// gets from OpenDocument on a real two-header document.
+func docxWithTwoHeaders(t *testing.T) []byte {
+	t.Helper()
+
+	doc := NewDocument()
+	bodyPara, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	bodyRun, err := bodyPara.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := bodyRun.SetText("body"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection: %v", err)
+	}
+	for _, hdr := range []struct {
+		kind domain.HeaderType
+		text string
+	}{
+		{domain.HeaderDefault, "default header"},
+		{domain.HeaderFirst, "first-page header"},
+	} {
+		header, err := section.Header(hdr.kind)
+		if err != nil {
+			t.Fatalf("Header(%v): %v", hdr.kind, err)
+		}
+		para, err := header.AddParagraph()
+		if err != nil {
+			t.Fatalf("AddParagraph: %v", err)
+		}
+		run, err := para.AddRun()
+		if err != nil {
+			t.Fatalf("AddRun: %v", err)
+		}
+		if err := run.SetText(hdr.text); err != nil {
+			t.Fatalf("SetText: %v", err)
+		}
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// docxWithHeaderTarget hand-authors a minimal package whose header
+// relationship uses the given Target verbatim, so a test can exercise the
+// forms a real producer may write ("header1.xml", "word/header1.xml",
+// "/word/header1.xml") rather than only the one docxgo emits.
+func docxWithHeaderTarget(t *testing.T, target string) []byte {
+	t.Helper()
+
+	parts := map[string]string{
+		"[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+</Types>`,
+		"_rels/.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`,
+		"word/document.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>
+<w:p><w:r><w:t>body</w:t></w:r></w:p>
+<w:sectPr><w:headerReference w:type="default" r:id="rId5"/><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`,
+		"word/_rels/document.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="` + target + `"/>
+</Relationships>`,
+		"word/header1.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:p><w:r><w:t>original</w:t></w:r></w:p>
+</w:hdr>`,
+	}
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for name, content := range parts {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("zip.Create(%s): %v", name, err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip.Close: %v", err)
+	}
+	return buf.Bytes()
+}
+
 // zipPart returns the named entry from a .docx archive.
 func zipPart(t *testing.T, docxBytes []byte, name string) []byte {
 	t.Helper()
