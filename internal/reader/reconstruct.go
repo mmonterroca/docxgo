@@ -2516,26 +2516,43 @@ func applyCellBorders(cell domain.TableCell, tcPr *Element) error {
 	return nil
 }
 
-// applyCellShading hydrates <w:shd> when it is a plain solid fill, which is
-// all domain.TableCell.SetShading can hold. A pattern fill or w:fill="auto"
-// has no single colour to map onto, and inventing one paints a background the
-// source never had.
+// applyCellShading hydrates <w:shd> when it resolves to one flat colour, which
+// is all domain.TableCell.SetShading can hold. A pattern fill or an "auto"
+// colour has no single colour to map onto, and inventing one paints a
+// background the source never had.
 func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 	shdElem := findChild(tcPr, "shd")
 	if shdElem == nil {
 		return nil
 	}
-	if val, ok := getAttr(shdElem, "val"); ok && val != "" &&
-		!strings.EqualFold(val, "clear") && !strings.EqualFold(val, "solid") {
+
+	// w:shd paints a w:val pattern in w:color over a w:fill background, so
+	// which attribute carries the colour a reader actually sees depends on the
+	// pattern -- the two are not interchangeable. "clear" draws no pattern and
+	// leaves the background showing, so w:fill is the visible colour. "solid"
+	// is the opposite extreme, a 100% foreground fill that hides the
+	// background entirely, so w:color is. Reading w:fill for both turns a
+	// solid red-on-blue cell blue.
+	val, _ := getAttr(shdElem, "val")
+	source := "fill"
+	switch {
+	case val == "" || strings.EqualFold(val, "clear"):
+		source = "fill"
+	case strings.EqualFold(val, "solid"):
+		source = "color"
+	default:
+		// Any real pattern (pct25, thinDiagStripe, ...) blends the two
+		// colours, and the domain holds one flat colour, so neither
+		// attribute on its own is the right answer.
 		return nil
 	}
 
-	fill, ok := getAttr(shdElem, "fill")
-	if !ok || !isHexRGB(fill) {
-		// Covers absent, "auto", and w:themeFill-only shading.
+	raw, ok := getAttr(shdElem, source)
+	if !ok || !isHexRGB(raw) {
+		// Covers absent, "auto", and w:themeFill/w:themeColor-only shading.
 		return nil
 	}
-	clr, err := pkgcolor.FromHex(fill)
+	clr, err := pkgcolor.FromHex(raw)
 	if err != nil {
 		return nil
 	}

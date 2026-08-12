@@ -2314,6 +2314,11 @@ func TestReconstructTableCellShading_OnlySolidFillsAreHydrated(t *testing.T) {
 		{"pattern fill", `<w:shd w:val="pct25" w:color="auto" w:fill="DDEEFF"/>`},
 		{"auto fill", `<w:shd w:val="clear" w:color="auto" w:fill="auto"/>`},
 		{"theme fill only", `<w:shd w:val="clear" w:color="auto" w:themeFill="accent1"/>`},
+		// A solid pattern takes its colour from w:color, so an "auto" one is
+		// exactly as unhydratable as an "auto" w:fill is under "clear" --
+		// even though this shd does carry a concrete w:fill, which a solid
+		// pattern covers completely.
+		{"solid with auto colour", `<w:shd w:val="solid" w:color="auto" w:fill="DDEEFF"/>`},
 	}
 
 	for _, tc := range cases {
@@ -2334,6 +2339,60 @@ func TestReconstructTableCellShading_OnlySolidFillsAreHydrated(t *testing.T) {
 			}
 			if got := cell.Shading(); got != domain.ColorWhite {
 				t.Errorf("Cell(0).Shading() = %+v, want the untouched default (%+v)", got, domain.ColorWhite)
+			}
+		})
+	}
+}
+
+// TestReconstructTableCellShading_ColourSourceDependsOnThePattern pins which
+// attribute the visible colour comes from. w:shd paints a w:val pattern in
+// w:color over a w:fill background: "clear" draws no pattern so w:fill shows,
+// while "solid" is a 100% foreground fill that hides w:fill entirely so
+// w:color shows. Both cases below carry *both* attributes with different
+// colours, so reading the wrong one is a wrong colour rather than no colour --
+// which is why a test that only ever set one attribute could not catch it.
+func TestReconstructTableCellShading_ColourSourceDependsOnThePattern(t *testing.T) {
+	cases := []struct {
+		name string
+		shd  string
+		want domain.Color
+	}{
+		{
+			name: "clear takes the fill",
+			shd:  `<w:shd w:val="clear" w:color="FF0000" w:fill="0000FF"/>`,
+			want: domain.Color{R: 0x00, G: 0x00, B: 0xFF},
+		},
+		{
+			name: "solid takes the colour",
+			shd:  `<w:shd w:val="solid" w:color="FF0000" w:fill="0000FF"/>`,
+			want: domain.Color{R: 0xFF, G: 0x00, B: 0x00},
+		},
+		{
+			// No w:val at all defaults to "clear" per ST_Shd.
+			name: "absent val takes the fill",
+			shd:  `<w:shd w:fill="00FF00"/>`,
+			want: domain.Color{R: 0x00, G: 0xFF, B: 0x00},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tableXML := `<w:tbl>
+<w:tblGrid><w:gridCol/></w:tblGrid>
+<w:tr><w:tc><w:tcPr>` + tc.shd + `</w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr>
+</w:tbl>`
+
+			table, _ := reconstructTableFromXML(t, tableXML)
+			row, err := table.Row(0)
+			if err != nil {
+				t.Fatalf("Row(0): %v", err)
+			}
+			cell, err := row.Cell(0)
+			if err != nil {
+				t.Fatalf("Cell(0): %v", err)
+			}
+			if got := cell.Shading(); got != tc.want {
+				t.Errorf("Cell(0).Shading() = %+v, want %+v", got, tc.want)
 			}
 		})
 	}
