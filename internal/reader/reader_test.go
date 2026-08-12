@@ -2302,6 +2302,45 @@ func TestReconstructTableCellWidth_NonDxaIsNotHydrated(t *testing.T) {
 	}
 }
 
+// TestReconstructTableCellShading_ThemedFillKeepsItsCachedColour pins a
+// deliberate choice that reads the other way at first glance. When w:themeFill
+// is present it, not w:fill, is what a theme-aware consumer resolves the
+// colour from -- so the tempting reading is that w:fill must be ignored and
+// the shading dropped as unresolvable, the way a themeFill with no w:fill
+// already is.
+//
+// Dropping it would be worse output, not more caution. A producer writes the
+// resolved theme colour into w:fill precisely so consumers that do not resolve
+// themes still render correctly, and a table is always rebuilt from the model
+// on save, so declining to hydrate does not preserve the theme link -- it
+// deletes the shading and the cell comes back white. Keeping the cached colour
+// costs the theme *linkage*: the cell stops following a later theme change.
+// That is a real loss and it is in the CHANGELOG, but it is strictly less loss
+// than discarding a colour the source spelled out.
+//
+// The rule is the same one the no-colour cases below follow: hydrate a
+// concrete colour when the source gives one, skip when it does not.
+func TestReconstructTableCellShading_ThemedFillKeepsItsCachedColour(t *testing.T) {
+	tableXML := `<w:tbl>
+<w:tblGrid><w:gridCol/></w:tblGrid>
+<w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:fill="FF0000" w:themeFill="accent1"/></w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr>
+</w:tbl>`
+
+	table, _ := reconstructTableFromXML(t, tableXML)
+	row, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	want := domain.Color{R: 0xFF, G: 0x00, B: 0x00}
+	if got := cell.Shading(); got != want {
+		t.Errorf("Cell(0).Shading() = %+v, want %+v (the cached w:fill, not the untouched default)", got, want)
+	}
+}
+
 // TestReconstructTableCellShading_OnlySolidFillsAreHydrated pins the other
 // deliberate omission: domain.TableCell.SetShading holds a single colour, so a
 // pattern fill or w:fill="auto" has nothing to map onto, and picking a colour
@@ -2313,6 +2352,8 @@ func TestReconstructTableCellShading_OnlySolidFillsAreHydrated(t *testing.T) {
 	}{
 		{"pattern fill", `<w:shd w:val="pct25" w:color="auto" w:fill="DDEEFF"/>`},
 		{"auto fill", `<w:shd w:val="clear" w:color="auto" w:fill="auto"/>`},
+		// No w:fill at all, so there is no cached colour to fall back on --
+		// unlike the themed-with-fill case pinned above, which keeps one.
 		{"theme fill only", `<w:shd w:val="clear" w:color="auto" w:themeFill="accent1"/>`},
 		// A solid pattern takes its colour from w:color, so an "auto" one is
 		// exactly as unhydratable as an "auto" w:fill is under "clear" --
