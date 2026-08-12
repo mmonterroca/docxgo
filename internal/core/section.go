@@ -16,6 +16,13 @@ import (
 )
 
 // docxSection implements the Section interface.
+//
+// Note there is no document-level relationship manager here: a section's only
+// relationship-bearing children are its headers and footers, and each of those
+// owns its own manager because each is a separate OPC part (see
+// newPartRelationshipManager). The w:headerReference/w:footerReference r:id
+// values, which *are* document-level, are minted straight from the document's
+// manager in prepareHeaderFooterRelationships.
 type docxSection struct {
 	mu           sync.RWMutex
 	pageSize     domain.PageSize
@@ -24,13 +31,12 @@ type docxSection struct {
 	columns      int
 	headers      map[domain.HeaderType]*docxHeader
 	footers      map[domain.FooterType]*docxFooter
-	relationMgr  *manager.RelationshipManager
 	idGen        *manager.IDGenerator
 	mediaManager *manager.MediaManager
 }
 
 // NewSection creates a new section with default settings.
-func NewSection(relationMgr *manager.RelationshipManager, idGen *manager.IDGenerator, mediaManager *manager.MediaManager) domain.Section {
+func NewSection(idGen *manager.IDGenerator, mediaManager *manager.MediaManager) domain.Section {
 	return &docxSection{
 		pageSize:     domain.PageSizeA4,
 		margins:      domain.DefaultMargins,
@@ -38,10 +44,33 @@ func NewSection(relationMgr *manager.RelationshipManager, idGen *manager.IDGener
 		columns:      1,
 		headers:      make(map[domain.HeaderType]*docxHeader),
 		footers:      make(map[domain.FooterType]*docxFooter),
-		relationMgr:  relationMgr,
 		idGen:        idGen,
 		mediaManager: mediaManager,
 	}
+}
+
+// newPartRelationshipManager builds the relationship manager that a single
+// header or footer part owns.
+//
+// A header/footer is its own OPC part, so a relationship referenced from
+// word/header1.xml has to live in word/_rels/header1.xml.rels -- putting it in
+// word/_rels/document.xml.rels leaves an r:id the header part cannot resolve,
+// which is a package Word offers to repair. Every object built underneath the
+// header inherits this manager: docxHeader.AddParagraph and AddTable both pass
+// h.relationMgr down, and NewTable threads it on through rows, cells, their
+// paragraphs and runs, so redirecting the field here redirects the whole
+// subtree, nested tables included.
+//
+// The manager gets its OWN IDGenerator, used by nothing else and only ever for
+// NextRelID: relationship IDs are scoped per part, so a header's first
+// relationship should be rId1 rather than continuing the document's numbering.
+// That also keeps RegisterExisting's EnsureRelCounterAtLeast (which bumps the
+// generator to avoid collisions) from letting an ID seeded into one part
+// perturb the numbering of another. Paragraph, run and table IDs are NOT
+// scoped this way -- those keep using the document's generator, passed in
+// separately as idGen.
+func newPartRelationshipManager() *manager.RelationshipManager {
+	return manager.NewRelationshipManager(manager.NewIDGenerator())
 }
 
 // PageSize returns the page size for this section.
@@ -156,7 +185,7 @@ func (s *docxSection) Header(headerType domain.HeaderType) (domain.Header, error
 		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
 		tables:       make([]domain.Table, 0),
 		blocks:       make([]domain.Block, 0, constants.DefaultParagraphCapacity),
-		relationMgr:  s.relationMgr,
+		relationMgr:  newPartRelationshipManager(),
 		idGen:        s.idGen,
 		mediaManager: s.mediaManager,
 	}
@@ -181,7 +210,7 @@ func (s *docxSection) Footer(footerType domain.FooterType) (domain.Footer, error
 		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
 		tables:       make([]domain.Table, 0),
 		blocks:       make([]domain.Block, 0, constants.DefaultParagraphCapacity),
-		relationMgr:  s.relationMgr,
+		relationMgr:  newPartRelationshipManager(),
 		idGen:        s.idGen,
 		mediaManager: s.mediaManager,
 	}
@@ -235,7 +264,6 @@ func (h *docxHeader) AddParagraph() (domain.Paragraph, error) {
 
 	id := h.idGen.NextParagraphID()
 	para := NewParagraph(id, h.idGen, h.relationMgr, h.mediaManager)
-	markHeaderFooterParagraph(para)
 	h.paragraphs = append(h.paragraphs, para)
 	h.blocks = append(h.blocks, domain.Block{Paragraph: para})
 	return para, nil
@@ -268,7 +296,6 @@ func (h *docxHeader) AddTable(rows, cols int) (domain.Table, error) {
 
 	id := h.idGen.NextTableID()
 	tbl := NewTable(id, rows, cols, h.idGen, h.relationMgr, h.mediaManager)
-	markHeaderFooterTable(tbl)
 	h.tables = append(h.tables, tbl)
 	h.blocks = append(h.blocks, domain.Block{Table: tbl})
 	return tbl, nil
@@ -372,7 +399,6 @@ func (f *docxFooter) AddParagraph() (domain.Paragraph, error) {
 
 	id := f.idGen.NextParagraphID()
 	para := NewParagraph(id, f.idGen, f.relationMgr, f.mediaManager)
-	markHeaderFooterParagraph(para)
 	f.paragraphs = append(f.paragraphs, para)
 	f.blocks = append(f.blocks, domain.Block{Paragraph: para})
 	return para, nil
@@ -405,7 +431,6 @@ func (f *docxFooter) AddTable(rows, cols int) (domain.Table, error) {
 
 	id := f.idGen.NextTableID()
 	tbl := NewTable(id, rows, cols, f.idGen, f.relationMgr, f.mediaManager)
-	markHeaderFooterTable(tbl)
 	f.tables = append(f.tables, tbl)
 	f.blocks = append(f.blocks, domain.Block{Table: tbl})
 	return tbl, nil

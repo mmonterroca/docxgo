@@ -24,12 +24,6 @@ type table struct {
 	idGen        *manager.IDGenerator
 	relManager   *manager.RelationshipManager
 	mediaManager *manager.MediaManager
-	// inHeaderFooter is true for a table that lives in a header or footer
-	// part (set via markHeaderFooterTable). Read dynamically by
-	// tableCell.inHeaderFooterPart at AddParagraph/AddTable time, never
-	// cached at construction, since a table's rows/cells are built eagerly
-	// before AddTable can set this flag.
-	inHeaderFooter bool
 }
 
 // NewTable creates a new Table.
@@ -259,21 +253,10 @@ func NewTableCell(row *tableRow, id string, idGen *manager.IDGenerator, relManag
 	}
 }
 
-// inHeaderFooterPart reports whether this cell belongs to a table living in
-// a header or footer part. Resolved dynamically via the row/table back
-// pointers rather than cached, since a header table's rows and cells are
-// built eagerly before markHeaderFooterTable can run.
-func (c *tableCell) inHeaderFooterPart() bool {
-	return c.row != nil && c.row.table != nil && c.row.table.inHeaderFooter
-}
-
 // AddParagraph adds a paragraph to this cell.
 func (c *tableCell) AddParagraph() (domain.Paragraph, error) {
 	id := c.idGen.NextParagraphID()
 	para := NewParagraph(id, c.idGen, c.relManager, c.mediaManager)
-	if c.inHeaderFooterPart() {
-		markHeaderFooterParagraph(para)
-	}
 	c.paragraphs = append(c.paragraphs, para)
 	return para, nil
 }
@@ -515,9 +498,6 @@ func (c *tableCell) AddTable(rows, cols int) (domain.Table, error) {
 	}
 
 	table := NewTable(c.idGen.GenerateID("table"), rows, cols, c.idGen, c.relManager, c.mediaManager)
-	if c.inHeaderFooterPart() {
-		markHeaderFooterTable(table)
-	}
 	c.tables = append(c.tables, table)
 	return table, nil
 }
