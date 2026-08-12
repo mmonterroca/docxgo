@@ -21,6 +21,7 @@ type table struct {
 	width        domain.TableWidth
 	alignment    domain.Alignment
 	style        domain.TableStyle
+	borders      domain.TableLevelBorders
 	idGen        *manager.IDGenerator
 	relManager   *manager.RelationshipManager
 	mediaManager *manager.MediaManager
@@ -149,6 +150,17 @@ func (t *table) Style() domain.TableStyle {
 // SetStyle sets the table style.
 func (t *table) SetStyle(style domain.TableStyle) error {
 	t.style = style
+	return nil
+}
+
+// Borders returns the table-level borders.
+func (t *table) Borders() domain.TableLevelBorders {
+	return t.borders
+}
+
+// SetBorders sets the table-level borders.
+func (t *table) SetBorders(borders domain.TableLevelBorders) error {
+	t.borders = borders
 	return nil
 }
 

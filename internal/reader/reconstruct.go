@@ -2170,13 +2170,17 @@ func hydrateTable(doc tableAdder, elem *Element, ctx *reconstructContext) error 
 		return errors.Wrap(err, opHydrateTable)
 	}
 
-	if err := applyTableStyle(table, elem); err != nil {
+	if err := applyTableProperties(table, elem); err != nil {
 		return errors.Wrap(err, opHydrateTable)
 	}
 
 	for i, cells := range rowCells {
 		row, err := table.Row(i)
 		if err != nil {
+			return errors.Wrap(err, opHydrateTable)
+		}
+
+		if err := applyRowProperties(row, rows[i]); err != nil {
 			return errors.Wrap(err, opHydrateTable)
 		}
 
@@ -2202,13 +2206,11 @@ func hydrateTable(doc tableAdder, elem *Element, ctx *reconstructContext) error 
 	return nil
 }
 
-// applyTableStyle hydrates a table's <w:tblPr>/<w:tblStyle> reference (e.g.
-// "TableGrid") into the domain model. A table style commonly carries visible
-// properties -- borders, shading, banding -- defined once in styles.xml and
-// referenced by name rather than repeated on every table; dropping the
-// reference orphans that rendering even though the style definition itself
-// survives untouched in styles.xml.
-func applyTableStyle(table domain.Table, elem *Element) error {
+// applyTableProperties hydrates the <w:tblPr> children the domain model can
+// hold. Everything else in tblPr (tblInd, tblCellMar, tblLayout, tblLook,
+// table-level shd, ...) has no domain representation and is dropped, which
+// also means it is rewritten from defaults on save -- see the CHANGELOG.
+func applyTableProperties(table domain.Table, elem *Element) error {
 	if table == nil || elem == nil {
 		return nil
 	}
@@ -2216,6 +2218,25 @@ func applyTableStyle(table domain.Table, elem *Element) error {
 	if tblPr == nil {
 		return nil
 	}
+
+	if err := applyTableStyle(table, tblPr); err != nil {
+		return err
+	}
+	if err := applyTableWidth(table, tblPr); err != nil {
+		return err
+	}
+	if err := applyTableAlignment(table, tblPr); err != nil {
+		return err
+	}
+	return applyTableBorders(table, tblPr)
+}
+
+// applyTableStyle hydrates a table's <w:tblStyle> reference (e.g. "TableGrid").
+// A table style commonly carries visible properties -- borders, shading,
+// banding -- defined once in styles.xml and referenced by name rather than
+// repeated on every table; dropping the reference orphans that rendering even
+// though the style definition itself survives untouched in styles.xml.
+func applyTableStyle(table domain.Table, tblPr *Element) error {
 	styleElem := findChild(tblPr, "tblStyle")
 	if styleElem == nil {
 		return nil
@@ -2227,13 +2248,368 @@ func applyTableStyle(table domain.Table, elem *Element) error {
 	return table.SetStyle(domain.TableStyle{Name: val})
 }
 
+// applyTableWidth hydrates <w:tblW>. Unlike a cell width, domain.TableWidth
+// carries its own type, so pct and auto round-trip as themselves.
+func applyTableWidth(table domain.Table, tblPr *Element) error {
+	widthElem := findChild(tblPr, "tblW")
+	if widthElem == nil {
+		return nil
+	}
+
+	typeVal, _ := getAttr(widthElem, "type")
+	widthType, ok := mapWidthType(typeVal)
+	if !ok {
+		return nil
+	}
+	if widthType == domain.WidthAuto {
+		// w:w is ignored for auto, and auto is already the domain default.
+		return nil
+	}
+
+	val, ok := getAttr(widthElem, "w")
+	if !ok || val == "" {
+		return nil
+	}
+	n, err := strconv.Atoi(val)
+	if err != nil {
+		return errors.WrapWithContext(err, opHydrateTable, map[string]interface{}{"attr": "tblW/w", "value": val})
+	}
+	if n < 0 {
+		return nil
+	}
+
+	return table.SetWidth(domain.TableWidth{Type: widthType, Value: n})
+}
+
+// applyTableAlignment hydrates <w:jc>, which positions the table itself within
+// the text column -- not the text inside its cells.
+func applyTableAlignment(table domain.Table, tblPr *Element) error {
+	jcElem := findChild(tblPr, "jc")
+	if jcElem == nil {
+		return nil
+	}
+	val, ok := getAttr(jcElem, "val")
+	if !ok || val == "" {
+		return nil
+	}
+	align, mapped := mapAlignment(val)
+	if !mapped {
+		return nil
+	}
+	return table.SetAlignment(align)
+}
+
+// applyTableBorders hydrates <w:tblBorders>, the borders drawn around and
+// inside the table as a whole. A table can carry these instead of (or on top
+// of) per-cell w:tcBorders, so reading only the cell borders leaves a
+// hand-bordered table looking borderless.
+func applyTableBorders(table domain.Table, tblPr *Element) error {
+	bordersElem := findChild(tblPr, "tblBorders")
+	if bordersElem == nil {
+		return nil
+	}
+
+	borders := domain.TableLevelBorders{
+		Top:     parseBorder(findChild(bordersElem, "top")),
+		Left:    parseBorder(findChild(bordersElem, "left")),
+		Bottom:  parseBorder(findChild(bordersElem, "bottom")),
+		Right:   parseBorder(findChild(bordersElem, "right")),
+		InsideH: parseBorder(findChild(bordersElem, "insideH")),
+		InsideV: parseBorder(findChild(bordersElem, "insideV")),
+	}
+	if borders == (domain.TableLevelBorders{}) {
+		return nil
+	}
+
+	return table.SetBorders(borders)
+}
+
+// applyRowProperties hydrates the <w:trPr> children the domain model can hold.
+// Row properties were not read at all before this: hydration collected a row's
+// <w:tc> children and nothing else.
+func applyRowProperties(row domain.TableRow, elem *Element) error {
+	if row == nil || elem == nil {
+		return nil
+	}
+	trPr := findChild(elem, "trPr")
+	if trPr == nil {
+		return nil
+	}
+
+	heightElem := findChild(trPr, "trHeight")
+	if heightElem == nil {
+		return nil
+	}
+	val, ok := getAttr(heightElem, "val")
+	if !ok || val == "" {
+		return nil
+	}
+	n, err := strconv.Atoi(val)
+	if err != nil {
+		return errors.WrapWithContext(err, opHydrateTable, map[string]interface{}{"attr": "trHeight/val", "value": val})
+	}
+	if n <= 0 {
+		return nil
+	}
+
+	// w:hRule is dropped: the domain holds a bare twip count and the
+	// serializer always writes hRule="atLeast", so "exact" and "auto" both
+	// come back as a minimum height.
+	return row.SetHeight(n)
+}
+
+// parseBorder converts one w:top/w:left/... border element into the domain
+// shape, returning the zero BorderStyle for anything with no representation.
+func parseBorder(elem *Element) domain.BorderStyle {
+	if elem == nil {
+		return domain.BorderStyle{}
+	}
+
+	val, _ := getAttr(elem, "val")
+	style, ok := mapBorderLineStyle(val)
+	if !ok {
+		return domain.BorderStyle{}
+	}
+
+	border := domain.BorderStyle{Style: style}
+	if sz, ok := getAttr(elem, "sz"); ok && sz != "" {
+		if n, err := strconv.Atoi(sz); err == nil && n > 0 {
+			border.Width = n
+		}
+	}
+	if c, ok := getAttr(elem, "color"); ok && c != "" && !strings.EqualFold(c, "auto") {
+		if clr, err := pkgcolor.FromHex(c); err == nil {
+			border.Color = clr
+		}
+	}
+
+	return border
+}
+
+// mapBorderLineStyle maps ST_Border onto the seven line styles the domain
+// models. The false return means "nothing to hydrate", not "unknown": an
+// absent, "nil" or "none" border is indistinguishable from BorderNone (the
+// zero value), so an explicit w:val="none" that suppresses a style-supplied
+// border cannot be represented and is dropped.
+func mapBorderLineStyle(value string) (domain.BorderLineStyle, bool) {
+	switch strings.ToLower(value) {
+	case "", "nil", "none":
+		return domain.BorderNone, false
+	case "single":
+		return domain.BorderSingle, true
+	case "dotted":
+		return domain.BorderDotted, true
+	case "dashed":
+		return domain.BorderDashed, true
+	case "double":
+		return domain.BorderDouble, true
+	case "triple":
+		return domain.BorderTriple, true
+	case "thick":
+		return domain.BorderThick, true
+	default:
+		// ST_Border has on the order of 180 members. Approximating the rest
+		// as a plain line keeps the border visible; dropping it would erase a
+		// line the author drew.
+		return domain.BorderSingle, true
+	}
+}
+
+// mapWidthType maps ST_TblWidth onto domain.WidthType. "nil" and any unknown
+// value report false -- there is no domain way to say "no width at all", and
+// guessing one changes the layout.
+func mapWidthType(value string) (domain.WidthType, bool) {
+	switch strings.ToLower(value) {
+	case "", "auto":
+		return domain.WidthAuto, true
+	case "dxa":
+		return domain.WidthDXA, true
+	case "pct":
+		return domain.WidthPct, true
+	default:
+		return domain.WidthAuto, false
+	}
+}
+
+// applyCellProperties hydrates the <w:tcPr> children that describe how a cell
+// looks. Merge state (gridSpan, vMerge) is handled by the caller because it
+// also drives how many grid columns the cell consumes.
+func applyCellProperties(cell domain.TableCell, tcPr *Element) error {
+	if err := applyCellWidth(cell, tcPr); err != nil {
+		return err
+	}
+	if err := applyCellBorders(cell, tcPr); err != nil {
+		return err
+	}
+	if err := applyCellShading(cell, tcPr); err != nil {
+		return err
+	}
+	return applyCellVerticalAlignment(cell, tcPr)
+}
+
+// applyCellWidth hydrates <w:tcW>, but only when it is expressed in twips.
+//
+// domain.TableCell.SetWidth takes a bare twip count with no type, and the
+// serializer writes w:type="dxa" for any positive width. Hydrating
+// <w:tcW w:type="pct" w:w="2500"/> -- half the table -- would therefore write
+// it back as 2500 twips, a fixed 1.7 inches. That is wrong, not merely lossy,
+// so a non-dxa width is left alone: it degrades to auto, which still lays out
+// sensibly.
+func applyCellWidth(cell domain.TableCell, tcPr *Element) error {
+	widthElem := findChild(tcPr, "tcW")
+	if widthElem == nil {
+		return nil
+	}
+	if typeVal, ok := getAttr(widthElem, "type"); ok && !strings.EqualFold(typeVal, constants.WidthTypeDXA) {
+		return nil
+	}
+
+	val, ok := getAttr(widthElem, "w")
+	if !ok || val == "" {
+		return nil
+	}
+	n, err := strconv.Atoi(val)
+	if err != nil {
+		return errors.WrapWithContext(err, opHydrateTableCell, map[string]interface{}{"attr": "tcW/w", "value": val})
+	}
+	if n <= 0 {
+		return nil
+	}
+
+	if err := cell.SetWidth(n); err != nil {
+		return errors.Wrap(err, opHydrateTableCell)
+	}
+	return nil
+}
+
+// applyCellBorders hydrates <w:tcBorders>. Only the four outer sides are read:
+// domain.TableBorders has no insideH/insideV, and those are meaningless on a
+// single cell anyway.
+func applyCellBorders(cell domain.TableCell, tcPr *Element) error {
+	bordersElem := findChild(tcPr, "tcBorders")
+	if bordersElem == nil {
+		return nil
+	}
+
+	borders := domain.TableBorders{
+		Top:    parseBorder(findChild(bordersElem, "top")),
+		Left:   parseBorder(findChild(bordersElem, "left")),
+		Bottom: parseBorder(findChild(bordersElem, "bottom")),
+		Right:  parseBorder(findChild(bordersElem, "right")),
+	}
+	if borders == (domain.TableBorders{}) {
+		return nil
+	}
+
+	if err := cell.SetBorders(borders); err != nil {
+		return errors.Wrap(err, opHydrateTableCell)
+	}
+	return nil
+}
+
+// applyCellShading hydrates <w:shd> when it resolves to one flat colour, which
+// is all domain.TableCell.SetShading can hold. A pattern fill or an "auto"
+// colour has no single colour to map onto, and inventing one paints a
+// background the source never had.
+func applyCellShading(cell domain.TableCell, tcPr *Element) error {
+	shdElem := findChild(tcPr, "shd")
+	if shdElem == nil {
+		return nil
+	}
+
+	// w:shd paints a w:val pattern in w:color over a w:fill background, so
+	// which attribute carries the colour a reader actually sees depends on the
+	// pattern -- the two are not interchangeable. "clear" draws no pattern and
+	// leaves the background showing, so w:fill is the visible colour. "solid"
+	// is the opposite extreme, a 100% foreground fill that hides the
+	// background entirely, so w:color is. Reading w:fill for both turns a
+	// solid red-on-blue cell blue.
+	val, _ := getAttr(shdElem, "val")
+	var source string
+	switch {
+	case val == "" || strings.EqualFold(val, "clear"):
+		source = "fill"
+	case strings.EqualFold(val, "solid"):
+		source = "color"
+	default:
+		// Any real pattern (pct25, thinDiagStripe, ...) blends the two
+		// colours, and the domain holds one flat colour, so neither
+		// attribute on its own is the right answer.
+		return nil
+	}
+
+	raw, ok := getAttr(shdElem, source)
+	if !ok || !isHexRGB(raw) {
+		// Covers absent, "auto", and w:themeFill/w:themeColor-only shading.
+		return nil
+	}
+	clr, err := pkgcolor.FromHex(raw)
+	if err != nil {
+		return nil
+	}
+
+	if err := cell.SetShading(clr); err != nil {
+		return errors.Wrap(err, opHydrateTableCell)
+	}
+	return nil
+}
+
+// applyCellVerticalAlignment hydrates <w:vAlign>. ST_VerticalJc's "both"
+// (distribute vertically) has no domain equivalent and is dropped.
+func applyCellVerticalAlignment(cell domain.TableCell, tcPr *Element) error {
+	vAlignElem := findChild(tcPr, "vAlign")
+	if vAlignElem == nil {
+		return nil
+	}
+	val, ok := getAttr(vAlignElem, "val")
+	if !ok || val == "" {
+		return nil
+	}
+
+	var align domain.VerticalAlignment
+	switch strings.ToLower(val) {
+	case "top":
+		align = domain.VerticalAlignTop
+	case "center":
+		align = domain.VerticalAlignCenter
+	case "bottom":
+		align = domain.VerticalAlignBottom
+	default:
+		return nil
+	}
+
+	if err := cell.SetVerticalAlignment(align); err != nil {
+		return errors.Wrap(err, opHydrateTableCell)
+	}
+	return nil
+}
+
+// isHexRGB reports whether s is exactly six hex digits -- the only form Word
+// writes for w:fill. pkgcolor.FromHex also accepts the three-digit shorthand,
+// which in a .docx is far more likely to be garbage than a colour.
+func isHexRGB(s string) bool {
+	if len(s) != 6 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
+			return false
+		}
+	}
+	return true
+}
+
 func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructContext) error {
 	if cell == nil || elem == nil {
 		return nil
 	}
 
-	// Parse cell properties (w:tcPr) for merge info.
+	// Parse cell properties (w:tcPr) for merge info and appearance.
 	if tcPr := findChild(elem, "tcPr"); tcPr != nil {
+		if err := applyCellProperties(cell, tcPr); err != nil {
+			return err
+		}
 		if gs := findChild(tcPr, "gridSpan"); gs != nil {
 			if val, ok := getAttr(gs, "val"); ok && val != "" {
 				span, err := strconv.Atoi(val)

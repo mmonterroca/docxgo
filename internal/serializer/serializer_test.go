@@ -9,6 +9,7 @@ package serializer_test
 import (
 	stdxml "encoding/xml"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -1426,4 +1427,87 @@ func mapKeys[V any](m map[string]V) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// TestTableSerializer_PropertyChildOrder pins the child order of w:tblPr and
+// w:tcPr. CT_TblPrBase and CT_TcPrBase are xsd:sequence, and this package has
+// no custom MarshalXML, so struct field order *is* document order -- a
+// misordered child is a schema error, not a cosmetic difference. Before this
+// was fixed, a centre-aligned table emitted w:jc after w:tblLook and a shaded
+// cell emitted w:vAlign before w:tcBorders, and the Open XML SDK rejected
+// both ("The element has unexpected child element ...").
+func TestTableSerializer_PropertyChildOrder(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 1)
+
+	table.SetStyle(domain.TableStyle{Name: "TableGrid"})
+	table.SetWidth(domain.TableWidth{Type: domain.WidthDXA, Value: 5000})
+	table.SetAlignment(domain.AlignmentCenter)
+	table.SetBorders(domain.TableLevelBorders{
+		Top:     domain.BorderStyle{Style: domain.BorderSingle, Width: 4},
+		InsideV: domain.BorderStyle{Style: domain.BorderDotted, Width: 2},
+	})
+
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+	cell.SetWidth(918)
+	cell.SetBorders(domain.TableBorders{Top: domain.BorderStyle{Style: domain.BorderSingle, Width: 4}})
+	cell.SetShading(domain.Color{R: 0xDD, G: 0xEE, B: 0xFF})
+	cell.SetVerticalAlignment(domain.VerticalAlignCenter)
+
+	out, err := stdxml.Marshal(serializer.NewTableSerializer().Serialize(table))
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	got := string(out)
+
+	for _, seq := range [][2]string{
+		// CT_TblPrBase: tblStyle, tblW, jc, tblBorders, tblLook.
+		{"<w:tblStyle", "<w:tblW"},
+		{"<w:tblW", "<w:jc"},
+		{"<w:jc", "<w:tblBorders"},
+		{"<w:tblBorders", "<w:tblLook"},
+		// CT_TcPrBase: tcW, gridSpan, vMerge, tcBorders, shd, vAlign.
+		{"<w:tcW", "<w:tcBorders"},
+		{"<w:tcBorders", "<w:shd"},
+		{"<w:shd", "<w:vAlign"},
+	} {
+		first, second := strings.Index(got, seq[0]), strings.Index(got, seq[1])
+		if first < 0 {
+			t.Fatalf("%s not emitted at all:\n%s", seq[0], got)
+		}
+		if second < 0 {
+			t.Fatalf("%s not emitted at all:\n%s", seq[1], got)
+		}
+		if first > second {
+			t.Errorf("%s must precede %s:\n%s", seq[0], seq[1], got)
+		}
+	}
+}
+
+// TestTableSerializer_TableLevelBorders covers w:tblBorders, which the domain
+// could not express at all before: xml.TableProperties.Borders existed but
+// only the styles.xml path ever populated it, so a table carrying its own
+// hand-drawn borders had nowhere to put them.
+func TestTableSerializer_TableLevelBorders(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 1)
+
+	if err := table.SetBorders(domain.TableLevelBorders{
+		InsideH: domain.BorderStyle{Style: domain.BorderDashed, Width: 6, Color: domain.Color{R: 0xFF}},
+	}); err != nil {
+		t.Fatalf("SetBorders: %v", err)
+	}
+
+	xmlTable := serializer.NewTableSerializer().Serialize(table)
+	if xmlTable.Properties == nil || xmlTable.Properties.Borders == nil {
+		t.Fatal("expected w:tblBorders to be emitted for an inside-only border set")
+	}
+	inside := xmlTable.Properties.Borders.InsideH
+	if inside == nil {
+		t.Fatal("expected w:insideH to be emitted")
+	}
+	if inside.Val != "dashed" || inside.Sz != 6 || inside.Color != "FF0000" {
+		t.Errorf("insideH = %+v, want dashed/6/FF0000", inside)
+	}
 }
