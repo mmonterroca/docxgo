@@ -57,6 +57,15 @@ type Run interface {
 	// SetStrike sets whether the text is struck through.
 	SetStrike(strike bool) error
 
+	// Caps returns whether the text is displayed in all capitals. This is a
+	// display-only override (w:caps): it does not change the run's stored
+	// text, only how it renders — the same distinction as Word's own "All
+	// Caps" character formatting versus actually typing in capitals.
+	Caps() bool
+
+	// SetCaps sets whether the text is displayed in all capitals.
+	SetCaps(caps bool) error
+
 	// Highlight returns the highlight color.
 	Highlight() HighlightColor
 

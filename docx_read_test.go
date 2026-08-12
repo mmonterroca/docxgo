@@ -502,6 +502,69 @@ func buildCollidingRelationshipDocx(t *testing.T, pngBytes []byte) []byte {
 	return buf.Bytes()
 }
 
+// TestOpenDocument_PreservesHeaderRelsBytesOnUntouchedResave is a regression
+// for the round-trip property that PR 2 (per-header/footer relationships,
+// tracked as a follow-up to #101/#102) is about to put at risk: a header's
+// own word/_rels/header1.xml.rels currently survives a save only
+// incidentally, as an opaque entry in PreservedParts.Additional (it doesn't
+// match the "word/header"/"word/footer" prefix isKnownPart uses to route
+// content into PreservedParts.Headers/Footers, so it fell through to the
+// generic bucket). Nothing previously asserted this as a property in its own
+// right -- TestOpenDocument_CollidingRelationshipIDsAcrossParts, which uses
+// the same fixture, only calls Validate() after a round-trip, which cannot
+// catch either of the two ways this could silently break once headers start
+// being regenerated instead of always preserved verbatim: (1) the rels part
+// going missing or changing bytes, or (2) a duplicate zip entry under the
+// same name (archive/zip does not dedupe; a corrupt/ambiguous package that
+// most tools still open, silently preferring one of the two copies).
+func TestOpenDocument_PreservesHeaderRelsBytesOnUntouchedResave(t *testing.T) {
+	pngBytes := encodeTestPNG(t)
+	docxBytes := buildCollidingRelationshipDocx(t, pngBytes)
+
+	doc, err := OpenDocumentFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	resaved := buf.Bytes()
+
+	origRels := zipPart(t, docxBytes, "word/_rels/header1.xml.rels")
+	resavedRels := zipPart(t, resaved, "word/_rels/header1.xml.rels")
+	if !bytes.Equal(origRels, resavedRels) {
+		t.Errorf("word/_rels/header1.xml.rels changed on an untouched resave:\noriginal: %s\nresaved:  %s", origRels, resavedRels)
+	}
+
+	if got := countZipEntries(t, resaved, "word/_rels/header1.xml.rels"); got != 1 {
+		t.Errorf("resaved package contains %d entries named word/_rels/header1.xml.rels, want exactly 1", got)
+	}
+
+	origCT := zipPart(t, docxBytes, "[Content_Types].xml")
+	resavedCT := zipPart(t, resaved, "[Content_Types].xml")
+	if !bytes.Equal(origCT, resavedCT) {
+		t.Errorf("[Content_Types].xml changed on an untouched resave:\noriginal: %s\nresaved:  %s", origCT, resavedCT)
+	}
+}
+
+// countZipEntries returns how many entries in a .docx archive are named exactly name.
+func countZipEntries(t *testing.T, docxBytes []byte, name string) int {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
+	if err != nil {
+		t.Fatalf("zip.NewReader: %v", err)
+	}
+	count := 0
+	for _, f := range zr.File {
+		if f.Name == name {
+			count++
+		}
+	}
+	return count
+}
+
 // TestOpenDocument_AddHyperlink_PreservesForeignRelationshipIDs pins a fix
 // found in this PR's own review: NewDocument() -- used internally to build
 // the domain.Document that ReconstructDocument hydrates into -- used to
@@ -1079,6 +1142,115 @@ func TestOpenDocument_AddHyperlink_RegeneratesRelsWithoutLosingOriginal(t *testi
 			}
 		}
 	})
+}
+
+// TestOpenDocument_PreservesRunCaps is the end-to-end regression for one of
+// the three losses reported in issue #102: opening a real, Word-authored
+// document whose title uses "All Caps" character formatting (<w:caps>, a
+// display override -- the stored text is genuinely mixed-case) and resaving
+// it dropped the formatting, so the title would render in its literal
+// mixed-case text instead of forced uppercase.
+//
+// testdata/word/issue-102-input.docx is the reporter's own attachment. Only
+// the w:caps loss is asserted here; the section-break and table-style losses
+// reported in the same issue are fixed separately.
+func TestOpenDocument_PreservesRunCaps(t *testing.T) {
+	doc, err := OpenDocument(filepath.Join("internal", "reader", "testdata", "word", "issue-102-input.docx"))
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+
+	var titleRun domain.Run
+	for _, para := range doc.Paragraphs() {
+		for _, run := range para.Runs() {
+			if strings.Contains(run.Text(), "TiTlE") {
+				titleRun = run
+			}
+		}
+	}
+	if titleRun == nil {
+		t.Fatal("did not find the title run (looked for text containing \"TiTlE\")")
+	}
+	if !titleRun.Caps() {
+		t.Error("title run Caps() = false, want true")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	if !strings.Contains(written, "<w:caps") {
+		t.Errorf("resaved document.xml lost the title's w:caps:\n%s", written)
+	}
+}
+
+// TestOpenDocument_PreservesTableStyle is the end-to-end regression for one
+// of the three losses reported in issue #102: opening a real, Word-authored
+// document whose table borders come from a named table style (<w:tblStyle>,
+// not an explicit <w:tblBorders> on the table itself) and resaving it
+// dropped the style reference, orphaning the borders even though the style
+// definition itself survived untouched in styles.xml.
+//
+// testdata/word/issue-102-input.docx is the reporter's own attachment. Only
+// the table-style loss is asserted here; the section-break and w:caps losses
+// reported in the same issue are separate, not fixed here.
+func TestOpenDocument_PreservesTableStyle(t *testing.T) {
+	doc, err := OpenDocument(filepath.Join("internal", "reader", "testdata", "word", "issue-102-input.docx"))
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+
+	tables := doc.Tables()
+	if len(tables) != 1 {
+		t.Fatalf("len(Tables()) = %d, want 1", len(tables))
+	}
+	if got := tables[0].Style().Name; got != "TableGrid" {
+		t.Errorf("Tables()[0].Style().Name = %q, want %q", got, "TableGrid")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	if !strings.Contains(written, `<w:tblStyle w:val="TableGrid">`) {
+		t.Errorf("resaved document.xml lost the table's tblStyle reference:\n%s", written)
+	}
+}
+
+// TestOpenDocument_PreservesMidBodySectionBreak is the end-to-end regression
+// for one of the three losses reported in issue #102: opening a real,
+// Word-authored document with a section break in the middle of its body (a
+// <w:sectPr> embedded in a paragraph's own pPr, not the body's last child)
+// and resaving it dropped the break, collapsing two sections into one.
+//
+// testdata/word/issue-102-input.docx is the reporter's own attachment: a
+// title page, a mid-body section break (with no explicit w:sectPr/w:type --
+// its schema default is "nextPage"), and a table using a named style for its
+// borders. Only the section-break loss is asserted here; the table style and
+// w:caps losses reported in the same issue are separate, not yet fixed here.
+func TestOpenDocument_PreservesMidBodySectionBreak(t *testing.T) {
+	doc, err := OpenDocument(filepath.Join("internal", "reader", "testdata", "word", "issue-102-input.docx"))
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+
+	if got := len(doc.Sections()); got != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2 (the source has a mid-body section break)", got)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	if got := strings.Count(written, "<w:sectPr"); got != 2 {
+		t.Errorf("resaved document.xml contains %d <w:sectPr> elements, want 2 (the mid-body break plus the document's final section)", got)
+	}
 }
 
 // zipPart returns the named entry from a .docx archive.

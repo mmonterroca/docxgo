@@ -42,9 +42,16 @@ type Package struct {
 	AppProperties         []byte
 	CustomProperties      []byte
 
-	// Header/Footer content indexed by file name (e.g. "word/header1.xml").
+	// Header/Footer content indexed by archive path (e.g. "word/header1.xml").
 	Headers map[string][]byte
 	Footers map[string][]byte
+
+	// Header/Footer relationship parts, indexed by archive path (e.g.
+	// "word/_rels/header1.xml.rels"). Kept separate from AdditionalParts so
+	// they can be matched up with their owning header/footer by name instead
+	// of being preserved as an opaque, unrelated blob.
+	HeaderRels map[string][]byte
+	FooterRels map[string][]byte
 
 	// Media assets keyed by archive path (e.g. "word/media/image1.png").
 	Media map[string]*MediaPart
