@@ -98,7 +98,7 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 
 	// Write [Content_Types].xml
 	if roundTrip && len(preserved.ContentTypes) > 0 {
-		if err := zw.writeRaw("[Content_Types].xml", amendContentTypes(preserved.ContentTypes, headers, footers)); err != nil {
+		if err := zw.writeRaw("[Content_Types].xml", amendContentTypes(preserved.ContentTypes, headers, footers, media)); err != nil {
 			return fmt.Errorf("write preserved content types: %w", err)
 		}
 	} else {
@@ -691,20 +691,29 @@ func hasPart(parts map[string][]byte, name string) bool {
 }
 
 // amendContentTypes returns the preserved [Content_Types].xml with an Override
-// added for any header or footer part that does not already have one.
+// added for any header or footer part that does not already have one, and a
+// Default added for any media extension it does not already declare.
 //
 // A round-tripped package writes this part verbatim, which is correct while
-// its part list cannot change -- but a header *added* to an opened document
-// gets no Override that way, and a part with no declared content type makes
-// the whole package invalid. Only the missing entries are added; the preserved
-// bytes are returned untouched when nothing is missing, so an unmodified
-// document still round-trips byte-for-byte here.
+// its part list cannot change -- but a part with no declared content type
+// makes the whole package invalid, and two things can add one after the
+// document was opened. A header *added* to an opened document needs an
+// Override. An image added to a document whose source held none needs a
+// Default for its extension: the media part is written either way, so without
+// this the first image added to an image-free document produces a package Word
+// offers to repair. That second one predates the header work here -- it is
+// reachable on any released version through OpenDocument + AddImage -- but
+// this is the function that owns the problem now.
+//
+// Only the missing entries are added; the preserved bytes are returned
+// untouched when nothing is missing, so an unmodified document still
+// round-trips byte-for-byte here.
 //
 // Malformed preserved bytes are returned unchanged rather than replaced: the
 // same call the document-rels path makes, for the same reason -- better to
 // keep a part that could not be parsed than to risk mangling it.
-func amendContentTypes(preservedBytes []byte, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer) []byte {
-	if len(headers) == 0 && len(footers) == 0 {
+func amendContentTypes(preservedBytes []byte, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, media []*manager.MediaFile) []byte {
+	if len(headers) == 0 && len(footers) == 0 && len(media) == 0 {
 		return preservedBytes
 	}
 
@@ -726,7 +735,7 @@ func amendContentTypes(preservedBytes []byte, headers map[string]*xmlstructs.Hea
 	collect := func(targets []string, contentType string) {
 		sort.Strings(targets)
 		for _, target := range targets {
-			partName := "/" + partArchivePath(target)
+			partName := "/" + PartArchivePath(target)
 			if declared[strings.ToLower(partName)] {
 				continue
 			}
@@ -737,10 +746,39 @@ func amendContentTypes(preservedBytes []byte, headers map[string]*xmlstructs.Hea
 	collect(mapKeys(headers), constants.ContentTypeHeader)
 	collect(mapKeys(footers), constants.ContentTypeFooter)
 
-	if len(missing) == 0 {
+	declaredExt := make(map[string]bool, len(types.Defaults))
+	for _, def := range types.Defaults {
+		if def != nil {
+			declaredExt[strings.ToLower(def.Extension)] = true
+		}
+	}
+
+	// Sorted by part name so the appended defaults land in a stable order:
+	// media arrives in whatever order the manager holds it, and two saves of
+	// the same document should produce the same bytes.
+	ordered := make([]*manager.MediaFile, 0, len(media))
+	for _, file := range media {
+		if file != nil && len(file.Data) > 0 && file.ContentType != "" {
+			ordered = append(ordered, file)
+		}
+	}
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Name < ordered[j].Name })
+
+	missingDefaults := make([]*xmlstructs.Default, 0, len(ordered))
+	for _, file := range ordered {
+		ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(file.Name)), ".")
+		if ext == "" || declaredExt[ext] {
+			continue
+		}
+		declaredExt[ext] = true
+		missingDefaults = append(missingDefaults, &xmlstructs.Default{Extension: ext, ContentType: file.ContentType})
+	}
+
+	if len(missing) == 0 && len(missingDefaults) == 0 {
 		return preservedBytes
 	}
 
+	types.Defaults = append(types.Defaults, missingDefaults...)
 	types.Overrides = append(types.Overrides, missing...)
 	out, err := xml.MarshalIndent(&types, "", "  ")
 	if err != nil {
@@ -759,23 +797,50 @@ func mapKeys[V any](m map[string]V) []string {
 	return keys
 }
 
-// partArchivePath maps a header/footer target -- which for an opened document
-// is whatever the source file's rels said, legally any of "header1.xml",
-// "word/header1.xml" or "/word/header1.xml" -- to the archive path the part is
-// written under, the same shape PreservedParts.Headers is keyed by.
+// PartArchivePath maps a header/footer relationship target -- which for an
+// opened document is whatever the source file's rels said -- to the archive
+// path the part is written under, the same shape PreservedParts.Headers is
+// keyed by.
 //
-// path.Base is what makes the three forms agree. Without it an absolute target
-// produced the entry name "word//word/header1.xml"; that was unreachable only
-// because the generated branch never ran for an opened document, which is
-// exactly what stopped being true here.
-func partArchivePath(target string) string {
-	return "word/" + path.Base(target)
+// A relationship target is either package-absolute ("/word/header1.xml"),
+// which names the entry directly, or relative to the part that owns the
+// relationship, which for a header or footer reference is word/document.xml
+// and so resolves under "word/". Resolving rather than collapsing to the base
+// name matters: a target naming a subdirectory ("headers/header1.xml") is
+// legal, and treating it as "word/header1.xml" writes the part to a path
+// nothing references while the real one is still written from its preserved
+// bytes -- one junk part in the package, and the caller's edit lost.
+//
+// Exported because internal/core has to key its header/footer snapshots by
+// exactly the same paths the writer uses; two copies of this that drifted
+// apart would silently break the per-name merge.
+func PartArchivePath(target string) string {
+	t := strings.TrimSpace(strings.ReplaceAll(target, `\`, "/"))
+	if t == "" {
+		return ""
+	}
+	if strings.HasPrefix(t, "/") {
+		return path.Clean(strings.TrimPrefix(t, "/"))
+	}
+	cleaned := path.Clean(t)
+	// Tolerate a producer that spelled a relative target from the package
+	// root anyway ("word/header1.xml"). Resolving that under "word/" a second
+	// time would invent word/word/header1.xml; it is technically wrong of the
+	// producer, but it round-tripped before and there is nothing to gain by
+	// breaking it.
+	if cleaned == "word" || strings.HasPrefix(cleaned, "word/") {
+		return cleaned
+	}
+	return path.Clean("word/" + cleaned)
 }
 
 // relsOwnerPath maps a part's .rels archive path back to the part it belongs
-// to: "word/_rels/header1.xml.rels" -> "word/header1.xml".
+// to: "word/_rels/header1.xml.rels" -> "word/header1.xml", and
+// "word/headers/_rels/header1.xml.rels" -> "word/headers/header1.xml".
 func relsOwnerPath(relsPath string) string {
-	return "word/" + strings.TrimSuffix(path.Base(relsPath), ".rels")
+	dir := path.Dir(relsPath) // ".../_rels"
+	base := strings.TrimSuffix(path.Base(relsPath), ".rels")
+	return path.Join(path.Dir(dir), base)
 }
 
 // writeHeaderFooterParts writes every header and footer, choosing per name
@@ -795,7 +860,7 @@ func (zw *ZipWriter) writeHeaderFooterParts(headers map[string]*xmlstructs.Heade
 	fromModel := make(map[string]bool, len(headers)+len(footers))
 
 	writeGenerated := func(target string, part interface{}, preservedParts map[string][]byte, kind string) error {
-		name := partArchivePath(target)
+		name := PartArchivePath(target)
 		if roundTrip && hasPart(preservedParts, name) && !regenerated[name] {
 			return nil
 		}

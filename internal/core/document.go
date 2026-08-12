@@ -26,6 +26,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -341,10 +342,30 @@ func (d *document) generateHeadingBookmarks() {
 	}
 }
 
+// sortedKeys returns m's keys in ascending order, so a map-backed collection
+// can be walked deterministically.
+func sortedKeys[K ~int, V any](m map[K]V) []K {
+	keys := make([]K, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys
+}
+
 // prepareHeaderFooterRelationships ensures that every header/footer defined in the
 // document has an associated relationship and target part name within the DOCX
 // package. This must run before serialization so both section references and the
 // document relationships list are consistent.
+//
+// A section's headers and footers live in maps, and handing out part names
+// while ranging one gave a different header "header1.xml" from run to run of
+// the same program. Each save was internally consistent, so nothing broke
+// outright, but two saves of the same document differed, and the per-name
+// merge that decides whether a part is written from the model or from its
+// preserved bytes is keyed on exactly that filename. Both loops therefore walk
+// their map in key order, which puts the default part first -- the order Word
+// itself emits.
 func (d *document) prepareHeaderFooterRelationships() {
 	usedHeaders, usedFooters := d.usedPartTargets()
 
@@ -356,7 +377,8 @@ func (d *document) prepareHeaderFooterRelationships() {
 
 		coreSection.mu.Lock()
 
-		for _, header := range coreSection.headers {
+		for _, kind := range sortedKeys(coreSection.headers) {
+			header := coreSection.headers[kind]
 			if header == nil {
 				continue
 			}
@@ -373,7 +395,8 @@ func (d *document) prepareHeaderFooterRelationships() {
 			}
 		}
 
-		for _, footer := range coreSection.footers {
+		for _, kind := range sortedKeys(coreSection.footers) {
+			footer := coreSection.footers[kind]
 			if footer == nil {
 				continue
 			}
@@ -470,12 +493,13 @@ func partRelsPathFor(target string) string {
 }
 
 // partArchivePath maps a header/footer target to the archive path of the part
-// itself, the shape PreservedParts.Headers/Footers are keyed by. Same
-// path.Base normalization, and for the same reason: an opened document's
-// target is whatever the source file's rels said, which may legally be
-// "header1.xml", "/word/header1.xml" or "word/header1.xml".
+// itself, the shape PreservedParts.Headers/Footers are keyed by.
+//
+// Delegated to the writer rather than reimplemented here: these snapshot keys
+// and the names the writer chooses have to agree exactly, or the per-name
+// merge stops recognizing a part as the same one it snapshotted.
 func partArchivePath(target string) string {
-	return "word/" + path.Base(target)
+	return writer.PartArchivePath(target)
 }
 
 // SnapshotHeaderFooterParts records the serialized form of every header and

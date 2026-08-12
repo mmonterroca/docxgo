@@ -281,7 +281,26 @@ func (r *run) AddField(field domain.Field) error {
 
 		switch {
 		case hasExistingRelID && existingRelID != "":
-			// Already has a relationship ID, skip creating new one.
+			// The ID came from the source document and must not be reissued
+			// -- but it does have to be declared in *this part's* manager.
+			// Hydration loads the source's relationships into the document's
+			// manager only, and a header or footer owns a separate one that
+			// starts empty, so a hydrated header hyperlink's r:id was
+			// declared nowhere. That stayed invisible while a preserved
+			// header was always written back verbatim; once the part is
+			// regenerated it emits <w:hyperlink r:id="..."> against a .rels
+			// that does not declare it, which is the dangling reference Word
+			// offers to repair.
+			//
+			// RegisterExisting is a no-op when the ID is already present, so
+			// the body path -- where the document's manager was loaded at
+			// hydration -- is unaffected. An anchor is skipped for the same
+			// reason it is skipped below: it owns no relationship at all.
+			if r.relManager != nil && !isAnchor && hasURL && url != "" {
+				if err := r.relManager.RegisterExisting(existingRelID, constants.RelTypeHyperlink, url, "External"); err != nil {
+					return errors.Wrap(err, "Run.AddField")
+				}
+			}
 		case isAnchor:
 			// An internal link (w:anchor) has no relationship of its own --
 			// the serializer resolves it from the "url"/"anchor" property
