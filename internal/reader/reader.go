@@ -232,17 +232,24 @@ func (p *Package) extractKnownParts() {
 	p.CustomProperties = extract(constants.PathCustomProps)
 
 	for key, original := range p.normalizedPaths {
-		// Header/footer .rels parts (e.g. "word/_rels/header1.xml.rels") must
-		// be checked before the plain header/footer prefixes below: they live
-		// under "word/_rels/", not "word/header"/"word/footer", so they never
-		// collide with those, but must still be claimed here rather than
-		// falling through to AdditionalParts as an opaque, unrelated blob.
-		if strings.HasPrefix(key, normalizePartName(constants.PathHeaderRelsPrefix)) {
-			p.HeaderRels[original] = p.RawParts[original]
-			continue
-		}
-		if strings.HasPrefix(key, normalizePartName(constants.PathFooterRelsPrefix)) {
-			p.FooterRels[original] = p.RawParts[original]
+		// A header/footer .rels part must be claimed before the header/footer
+		// *content* prefixes below, and that order is load-bearing rather
+		// than merely tidy: "word/header" is a prefix of "word/headers/", so
+		// the relationships file of a header stored in a subdirectory matches
+		// the content test too. Preserved as a phantom header it is then
+		// written twice -- once under that name, once as the real rels --
+		// leaving two entries under one name in the saved package, which
+		// archive/zip accepts silently.
+		//
+		// Matched by shape rather than by a literal prefix for the same
+		// reason: a relationship target may name a subdirectory, so a part
+		// and the _rels directory beside it can sit anywhere under word/.
+		if kind, ok := headerFooterRelsKind(key); ok {
+			if kind == relsKindHeader {
+				p.HeaderRels[original] = p.RawParts[original]
+			} else {
+				p.FooterRels[original] = p.RawParts[original]
+			}
 			continue
 		}
 		if strings.HasPrefix(key, normalizePartName(constants.PathHeaderPrefix)) {

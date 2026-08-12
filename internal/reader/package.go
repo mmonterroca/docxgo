@@ -9,6 +9,7 @@
 package reader
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -121,4 +122,39 @@ func normalizePartName(name string) string {
 	name = strings.TrimPrefix(name, "/")
 	name = strings.TrimSpace(name)
 	return strings.ToLower(name)
+}
+
+// Which kind of part a .rels file belongs to.
+const (
+	relsKindHeader = "header"
+	relsKindFooter = "footer"
+)
+
+// headerFooterRelsKind reports whether a normalized part name is the
+// relationships file of a header or a footer, and which.
+//
+// Decided by shape -- a "_rels" directory, a ".rels" suffix, and an owner
+// named headerN.xml or footerN.xml -- rather than by a literal path prefix,
+// because a relationship target may name a subdirectory: the part and the
+// _rels directory beside it can sit anywhere under word/, so
+// "word/headers/_rels/header1.xml.rels" is as legal as
+// "word/_rels/header1.xml.rels" and both have to land in the same bucket.
+//
+// word/_rels/document.xml.rels and the package's own _rels/.rels are not
+// header or footer rels and fall through to their existing handling.
+func headerFooterRelsKind(normalized string) (string, bool) {
+	if !strings.HasSuffix(normalized, ".rels") {
+		return "", false
+	}
+	if path.Base(path.Dir(normalized)) != "_rels" {
+		return "", false
+	}
+	owner := strings.TrimSuffix(path.Base(normalized), ".rels")
+	switch {
+	case strings.HasPrefix(owner, relsKindHeader):
+		return relsKindHeader, true
+	case strings.HasPrefix(owner, relsKindFooter):
+		return relsKindFooter, true
+	}
+	return "", false
 }

@@ -14,6 +14,7 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -1436,8 +1437,9 @@ func TestOpenDocument_AbsoluteHeaderTargetIsNormalized(t *testing.T) {
 		t.Fatalf("Header: %v", err)
 	}
 	paras := header.Paragraphs()
-	if len(paras) != 1 {
-		t.Fatalf("header has %d paragraphs, want 1 (was it hydrated at all?)", len(paras))
+	// The text paragraph plus the one holding the header's hyperlink.
+	if len(paras) != 2 {
+		t.Fatalf("header has %d paragraphs, want 2 (was it hydrated at all?)", len(paras))
 	}
 	if err := paras[0].Runs()[0].SetText("edited"); err != nil {
 		t.Fatalf("SetText: %v", err)
@@ -1675,46 +1677,106 @@ func TestOpenDocument_EditedHeaderKeepsItsHyperlinkRels(t *testing.T) {
 // unconditionally, then writes the real part from its preserved bytes as well:
 // two headers in the package, the referenced one still holding the old text.
 // Both come from regenerating headers at all, so both are new here.
+// The header here owns a relationship, which is what makes the classification
+// matter: the reader claims preserved parts by path, and "word/header" is a
+// prefix of "word/headers/", so "word/headers/_rels/header1.xml.rels" matches
+// the header *content* test as well. Kept as a phantom header it is written
+// under that name and then again as the real rels -- two entries under one
+// name, which archive/zip accepts silently and Word resolves by picking one.
+//
+// Both halves are asserted, and the untouched one is the load-bearing case: a
+// resave that changes nothing at all must not produce an ambiguous package.
 func TestOpenDocument_HeaderInASubdirectoryIsNotDuplicated(t *testing.T) {
-	built := docxWithHeaderAt(t, "headers/header1.xml", "word/headers/header1.xml")
+	const (
+		target   = "headers/header1.xml"
+		partPath = "word/headers/header1.xml"
+		relsPath = "word/headers/_rels/header1.xml.rels"
+	)
 
-	doc, err := OpenDocumentFromBytes(built)
-	if err != nil {
-		t.Fatalf("OpenDocumentFromBytes: %v", err)
-	}
+	t.Run("untouched resave", func(t *testing.T) {
+		built := docxWithHeaderAt(t, target, partPath)
 
-	header, err := doc.Sections()[0].Header(domain.HeaderDefault)
-	if err != nil {
-		t.Fatalf("Header: %v", err)
-	}
-	paras := header.Paragraphs()
-	if len(paras) != 1 {
-		t.Fatalf("header has %d paragraphs, want 1 (was it hydrated at all?)", len(paras))
-	}
-	if err := paras[0].Runs()[0].SetText("edited"); err != nil {
-		t.Fatalf("SetText: %v", err)
-	}
+		doc, err := OpenDocumentFromBytes(built)
+		if err != nil {
+			t.Fatalf("OpenDocumentFromBytes: %v", err)
+		}
 
-	var buf bytes.Buffer
-	if _, err := doc.WriteTo(&buf); err != nil {
-		t.Fatalf("WriteTo: %v", err)
-	}
-	resaved := buf.Bytes()
+		var buf bytes.Buffer
+		if _, err := doc.WriteTo(&buf); err != nil {
+			t.Fatalf("WriteTo: %v", err)
+		}
+		resaved := buf.Bytes()
 
-	if got := countZipEntries(t, resaved, "word/header1.xml"); got != 0 {
-		t.Errorf("resaved package invented %d entries at word/header1.xml; the header lives in a subdirectory and nothing references that path", got)
-	}
-	if got := countZipEntries(t, resaved, "word/headers/header1.xml"); got != 1 {
-		t.Fatalf("resaved package contains %d entries named word/headers/header1.xml, want exactly 1", got)
-	}
-	if got := string(zipPart(t, resaved, "word/headers/header1.xml")); !strings.Contains(got, "edited") {
-		t.Errorf("the referenced header did not pick up the edit:\n%s", got)
-	}
+		assertNoDuplicateEntries(t, resaved)
+		if got := countZipEntries(t, resaved, relsPath); got != 1 {
+			t.Errorf("resaved package contains %d entries named %s, want exactly 1", got, relsPath)
+		}
+		if before, after := zipPart(t, built, partPath), zipPart(t, resaved, partPath); !bytes.Equal(before, after) {
+			t.Errorf("%s was regenerated even though nothing touched it:\nbefore: %s\n\nafter:  %s", partPath, before, after)
+		}
+	})
 
-	// No name in the package may be written twice: writeRaw is a bare
-	// zip.Create and archive/zip accepts a duplicate silently, leaving Word
-	// to pick between them.
-	assertNoDuplicateEntries(t, resaved)
+	t.Run("edited header", func(t *testing.T) {
+		built := docxWithHeaderAt(t, target, partPath)
+
+		doc, err := OpenDocumentFromBytes(built)
+		if err != nil {
+			t.Fatalf("OpenDocumentFromBytes: %v", err)
+		}
+
+		header, err := doc.Sections()[0].Header(domain.HeaderDefault)
+		if err != nil {
+			t.Fatalf("Header: %v", err)
+		}
+		paras := header.Paragraphs()
+		// The text paragraph plus the one holding the header's hyperlink.
+		if len(paras) != 2 {
+			t.Fatalf("header has %d paragraphs, want 2 (was it hydrated at all?)", len(paras))
+		}
+		if err := paras[0].Runs()[0].SetText("edited"); err != nil {
+			t.Fatalf("SetText: %v", err)
+		}
+
+		var buf bytes.Buffer
+		if _, err := doc.WriteTo(&buf); err != nil {
+			t.Fatalf("WriteTo: %v", err)
+		}
+		resaved := buf.Bytes()
+
+		assertNoDuplicateEntries(t, resaved)
+
+		if got := countZipEntries(t, resaved, "word/header1.xml"); got != 0 {
+			t.Errorf("resaved package invented %d entries at word/header1.xml; the header lives in a subdirectory and nothing references that path", got)
+		}
+		if got := countZipEntries(t, resaved, partPath); got != 1 {
+			t.Fatalf("resaved package contains %d entries named %s, want exactly 1", got, partPath)
+		}
+		hdr := string(zipPart(t, resaved, partPath))
+		if !strings.Contains(hdr, "edited") {
+			t.Errorf("the referenced header did not pick up the edit:\n%s", hdr)
+		}
+
+		// The regenerated header's r:id has to be declared in the .rels
+		// sitting beside it -- not in word/_rels/, where nothing would
+		// resolve it.
+		if got := countZipEntries(t, resaved, "word/_rels/header1.xml.rels"); got != 0 {
+			t.Errorf("resaved package invented %d rels entries at word/_rels/header1.xml.rels; the header is not there", got)
+		}
+		if got := countZipEntries(t, resaved, relsPath); got != 1 {
+			t.Fatalf("resaved package contains %d entries named %s, want exactly 1", got, relsPath)
+		}
+		rels := string(zipPart(t, resaved, relsPath))
+		refs := regexp.MustCompile(`<w:hyperlink[^>]*r:id="([^"]+)"`).FindAllStringSubmatch(hdr, -1)
+		if len(refs) != 1 {
+			t.Fatalf("regenerated header has %d hyperlink references, want 1:\n%s", len(refs), hdr)
+		}
+		if !strings.Contains(rels, `Id="`+refs[0][1]+`"`) {
+			t.Errorf("the header references %s but its rels does not declare it:\n%s", refs[0][1], rels)
+		}
+		if !strings.Contains(rels, "https://example.com/") {
+			t.Errorf("%s lost the hyperlink target:\n%s", relsPath, rels)
+		}
+	})
 }
 
 // assertNoDuplicateEntries fails if any archive name appears more than once.
@@ -2063,16 +2125,19 @@ func docxWithHeaderAt(t *testing.T, target, partPath string) []byte {
 		partPath: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
 <w:p><w:r><w:t>original</w:t></w:r></w:p>
+<w:p><w:hyperlink r:id="rId1"><w:r><w:t>Our site</w:t></w:r></w:hyperlink></w:p>
 </w:hdr>`,
 	}
 
-	// Deliberately no .rels for the header. A subdirectory header that owns
-	// relationships hits a separate, deeper problem: the reader claims parts
-	// by literal prefix, and "word/headers/_rels/header1.xml.rels" matches
-	// the header *content* prefix "word/header", so it is preserved as though
-	// it were a header rather than as that header's relationships. Tightening
-	// that taxonomy is a reader change well outside this branch; see the
-	// known limitation in the CHANGELOG.
+	// The header owns a relationship, so the package also holds its .rels --
+	// in a _rels directory beside the part, wherever that part is. This is
+	// what exercises the classification: "word/header" is a prefix of
+	// "word/headers/", so a rels file here matches the header *content* test
+	// too unless the rels shape is claimed first.
+	parts[path.Join(path.Dir(partPath), "_rels", path.Base(partPath)+".rels")] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/>
+</Relationships>`
 
 	// The Override has to name where the part actually is, not where a
 	// base-name reading of the target would put it.
