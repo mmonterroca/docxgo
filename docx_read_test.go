@@ -1059,6 +1059,38 @@ func TestOpenDocument_PreservesTableStyle(t *testing.T) {
 	}
 }
 
+// TestOpenDocument_PreservesMidBodySectionBreak is the end-to-end regression
+// for one of the three losses reported in issue #102: opening a real,
+// Word-authored document with a section break in the middle of its body (a
+// <w:sectPr> embedded in a paragraph's own pPr, not the body's last child)
+// and resaving it dropped the break, collapsing two sections into one.
+//
+// testdata/word/issue-102-input.docx is the reporter's own attachment: a
+// title page, a mid-body section break (with no explicit w:sectPr/w:type --
+// its schema default is "nextPage"), and a table using a named style for its
+// borders. Only the section-break loss is asserted here; the table style and
+// w:caps losses reported in the same issue are separate, not yet fixed here.
+func TestOpenDocument_PreservesMidBodySectionBreak(t *testing.T) {
+	doc, err := OpenDocument(filepath.Join("internal", "reader", "testdata", "word", "issue-102-input.docx"))
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+
+	if got := len(doc.Sections()); got != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2 (the source has a mid-body section break)", got)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	if got := strings.Count(written, "<w:sectPr"); got != 2 {
+		t.Errorf("resaved document.xml contains %d <w:sectPr> elements, want 2 (the mid-body break plus the document's final section)", got)
+	}
+}
+
 // zipPart returns the named entry from a .docx archive.
 func zipPart(t *testing.T, docxBytes []byte, name string) []byte {
 	t.Helper()
