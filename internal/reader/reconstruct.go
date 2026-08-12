@@ -2519,7 +2519,9 @@ func applyCellBorders(cell domain.TableCell, tcPr *Element) error {
 // applyCellShading hydrates <w:shd> when it resolves to one flat colour, which
 // is all domain.TableCell.SetShading can hold. A pattern fill or an "auto"
 // colour has no single colour to map onto, and inventing one paints a
-// background the source never had.
+// background the source never had. When the shading is also theme-linked, the
+// link is captured too (see HydrateThemeFill) so the writer can keep it
+// following the document's theme instead of freezing the cached colour.
 func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 	shdElem := findChild(tcPr, "shd")
 	if shdElem == nil {
@@ -2560,6 +2562,30 @@ func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 	if err := cell.SetShading(clr); err != nil {
 		return errors.Wrap(err, opHydrateTableCell)
 	}
+
+	// A producer writes the resolved colour into w:fill/w:color as a cached
+	// fallback for a consumer that doesn't resolve themes, alongside the
+	// theme reference itself in w:themeFill/w:themeColor (+ tint/shade) --
+	// SetShading above already captured the fallback. Capture the link too,
+	// on the same "fill" side regardless of which attribute it actually came
+	// from, matching how the writer already normalizes every shading to
+	// clear+w:fill on output (see the "solid" comment below): a source using
+	// w:val="solid"+w:themeColor and one using w:val="clear"+w:themeFill are
+	// visually identical outputs, so they collapse onto one representation
+	// instead of the domain needing to track which pattern the link came
+	// paired with.
+	themeAttr, tintAttr, shadeAttr := "themeFill", "themeFillTint", "themeFillShade"
+	if source == "color" {
+		themeAttr, tintAttr, shadeAttr = "themeColor", "themeTint", "themeShade"
+	}
+	if themeVal, ok := getAttr(shdElem, themeAttr); ok && themeVal != "" {
+		if hydrator, ok := cell.(interface{ HydrateThemeFill(string, string, string) }); ok {
+			tint, _ := getAttr(shdElem, tintAttr)
+			shade, _ := getAttr(shdElem, shadeAttr)
+			hydrator.HydrateThemeFill(themeVal, tint, shade)
+		}
+	}
+
 	return nil
 }
 

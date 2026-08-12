@@ -1511,3 +1511,75 @@ func TestTableSerializer_TableLevelBorders(t *testing.T) {
 		t.Errorf("insideH = %+v, want dashed/6/FF0000", inside)
 	}
 }
+
+// TestTableSerializer_CellShading_UntouchedCellEmitsNoShading covers the
+// other half of the ColorWhite-as-sentinel fix below: a cell nobody ever
+// called SetShading on must still emit nothing, or every table in the
+// codebase would suddenly carry an explicit white w:shd on every cell.
+func TestTableSerializer_CellShading_UntouchedCellEmitsNoShading(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 1)
+
+	xmlTable := serializer.NewTableSerializer().Serialize(table)
+	props := xmlTable.Rows[0].Cells[0].Properties
+	if props != nil && props.Shading != nil {
+		t.Errorf("untouched cell emitted w:shd = %+v, want none", props.Shading)
+	}
+}
+
+// TestTableSerializer_CellShading_ExplicitWhiteIsRepresentable pins the
+// ColorWhite-as-sentinel fix: ColorWhite doubles as both "never touched"
+// (see the untouched-cell test above) and a legitimate colour a caller can
+// set on purpose, and only ShadingSet can tell those apart. Before this,
+// the serializer suppressed any shading equal to ColorWhite outright, so a
+// cell explicitly shaded white came back indistinguishable from one nobody
+// touched.
+func TestTableSerializer_CellShading_ExplicitWhiteIsRepresentable(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 1)
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+
+	if err := cell.SetShading(domain.ColorWhite); err != nil {
+		t.Fatalf("SetShading: %v", err)
+	}
+
+	xmlTable := serializer.NewTableSerializer().Serialize(table)
+	props := xmlTable.Rows[0].Cells[0].Properties
+	if props == nil || props.Shading == nil {
+		t.Fatal("expected w:shd to be emitted for an explicitly white-shaded cell")
+	}
+	if props.Shading.Fill != "FFFFFF" {
+		t.Errorf("w:shd fill = %q, want \"FFFFFF\"", props.Shading.Fill)
+	}
+}
+
+// TestTableSerializer_CellShading_SetShadingClearsHydratedThemeLink pins
+// SetShading's other new effect: an explicit colour from a caller means the
+// cell no longer follows the source document's theme, so any theme link
+// hydration attached must be cleared, not left dangling alongside a colour
+// the theme no longer actually produced.
+func TestTableSerializer_CellShading_SetShadingClearsHydratedThemeLink(t *testing.T) {
+	doc := core.NewDocument()
+	table, _ := doc.AddTable(1, 1)
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+
+	hydrator, ok := cell.(interface{ HydrateThemeFill(string, string, string) })
+	if !ok {
+		t.Fatal("cell does not expose HydrateThemeFill")
+	}
+	hydrator.HydrateThemeFill("accent1", "", "")
+	if err := cell.SetShading(domain.Color{R: 0x11, G: 0x22, B: 0x33}); err != nil {
+		t.Fatalf("SetShading: %v", err)
+	}
+
+	xmlTable := serializer.NewTableSerializer().Serialize(table)
+	props := xmlTable.Rows[0].Cells[0].Properties
+	if props == nil || props.Shading == nil {
+		t.Fatal("expected w:shd to be emitted")
+	}
+	if props.Shading.ThemeFill != "" {
+		t.Errorf("w:shd still carries w:themeFill=%q after an explicit SetShading", props.Shading.ThemeFill)
+	}
+}

@@ -149,8 +149,17 @@ type Border struct {
 }
 
 // Shading represents w:shd element.
+//
+// Attribute order follows CT_Shd: val, color, fill, then the theme*
+// attributes -- themeFill and its tint/shade are the only theme attributes
+// this package ever writes (see internal/reader's applyCellShading and
+// internal/core.tableCell.ThemeFill for why a w:themeColor source still ends
+// up here rather than on its own field).
 type Shading struct {
-	Val   string `xml:"w:val,attr,omitempty"`
-	Color string `xml:"w:color,attr,omitempty"`
-	Fill  string `xml:"w:fill,attr,omitempty"`
+	Val            string `xml:"w:val,attr,omitempty"`
+	Color          string `xml:"w:color,attr,omitempty"`
+	Fill           string `xml:"w:fill,attr,omitempty"`
+	ThemeFill      string `xml:"w:themeFill,attr,omitempty"`
+	ThemeFillTint  string `xml:"w:themeFillTint,attr,omitempty"`
+	ThemeFillShade string `xml:"w:themeFillShade,attr,omitempty"`
 }

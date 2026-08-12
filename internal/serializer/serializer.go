@@ -1003,12 +1003,29 @@ func (s *TableSerializer) serializeCellProperties(cell domain.TableCell) *xml.Ta
 		}
 	}
 
-	// Shading
-	if cell.Shading() != domain.ColorWhite {
-		props.Shading = &xml.Shading{
+	// Shading. ColorWhite doubles as "shading never touched" -- the zero
+	// value every new cell starts with -- so on its own it can't tell that
+	// apart from a cell explicitly shaded white on purpose. ShadingSet
+	// resolves it, the same explicit-vs-unset shape CapsSet uses for w:caps.
+	shouldEmitShading := cell.Shading() != domain.ColorWhite
+	if setter, ok := cell.(interface{ ShadingSet() bool }); ok && setter.ShadingSet() {
+		shouldEmitShading = true
+	}
+	if shouldEmitShading {
+		shd := &xml.Shading{
 			Val:  "clear",
 			Fill: color.ToHex(cell.Shading()),
 		}
+		if themed, ok := cell.(interface {
+			ThemeFill() (string, string, string)
+		}); ok {
+			if fill, tint, shade := themed.ThemeFill(); fill != "" {
+				shd.ThemeFill = fill
+				shd.ThemeFillTint = tint
+				shd.ThemeFillShade = shade
+			}
+		}
+		props.Shading = shd
 	}
 
 	// Borders

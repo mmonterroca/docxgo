@@ -237,13 +237,31 @@ type tableCell struct {
 	verticalAlignment domain.VerticalAlignment
 	borders           domain.TableBorders
 	shading           domain.Color
-	gridSpan          int
-	vMerge            domain.VerticalMergeType
-	row               *tableRow
-	hMergeParent      *tableCell
-	idGen             *manager.IDGenerator
-	relManager        *manager.RelationshipManager
-	mediaManager      *manager.MediaManager
+	// shadingSet mirrors capsSetter (internal/serializer): whether SetShading
+	// was ever called, so the serializer can tell "never touched" from
+	// "explicitly shaded white" -- the only way to represent a cell shaded
+	// pure white on purpose, distinct from the auto-white every new cell
+	// starts with.
+	shadingSet bool
+	// themeFill/themeFillTint/themeFillShade cache a theme reference
+	// hydrated for this cell's shading -- domain.Color is a bare, comparable
+	// {R,G,B} struct compared with != as a sentinel throughout this package
+	// and the serializer, so it cannot itself carry a theme link without
+	// becoming a breaking change to public API. Always the "fill" slot
+	// regardless of whether the source used w:val="solid"+w:themeColor or
+	// w:val="clear"+w:themeFill -- see HydrateThemeFill. SetShading clears
+	// these: an explicit caller colour means the cell no longer follows the
+	// theme.
+	themeFill      string
+	themeFillTint  string
+	themeFillShade string
+	gridSpan       int
+	vMerge         domain.VerticalMergeType
+	row            *tableRow
+	hMergeParent   *tableCell
+	idGen          *manager.IDGenerator
+	relManager     *manager.RelationshipManager
+	mediaManager   *manager.MediaManager
 }
 
 // NewTableCell creates a new TableCell.
@@ -337,10 +355,45 @@ func (c *tableCell) Shading() domain.Color {
 	return c.shading
 }
 
-// SetShading sets the cell background color.
+// SetShading sets the cell background color, clearing any theme link a
+// hydrated shading may have carried -- an explicit colour from the caller
+// means the cell no longer follows the document's theme. See
+// HydrateThemeFill.
 func (c *tableCell) SetShading(color domain.Color) error {
 	c.shading = color
+	c.shadingSet = true
+	c.themeFill = ""
+	c.themeFillTint = ""
+	c.themeFillShade = ""
 	return nil
+}
+
+// ShadingSet reports whether SetShading was ever called on this cell. This
+// is an internal method used by the serializer to distinguish a cell
+// explicitly shaded white from one that was simply never touched (both
+// otherwise report Shading() == domain.ColorWhite).
+func (c *tableCell) ShadingSet() bool {
+	return c.shadingSet
+}
+
+// ThemeFill returns the theme reference cached for this cell's shading --
+// hydrated from a source w:themeFill (or, for a w:val="solid" pattern,
+// w:themeColor, normalized onto this same slot) -- and its tint/shade, or
+// three empty strings if none was hydrated. This is an internal method used
+// by the serializer.
+func (c *tableCell) ThemeFill() (fill, tint, shade string) {
+	return c.themeFill, c.themeFillTint, c.themeFillShade
+}
+
+// HydrateThemeFill records the theme reference a source document's cell
+// shading resolved from, alongside the concrete colour SetShading also
+// received for it (see applyCellShading). Only the reader should call this
+// -- SetShading clears it, since a caller-supplied colour has nothing to do
+// with the source's theme. This is an internal method used by the reader.
+func (c *tableCell) HydrateThemeFill(fill, tint, shade string) {
+	c.themeFill = fill
+	c.themeFillTint = tint
+	c.themeFillShade = shade
 }
 
 // Merge merges this cell with adjacent cells.

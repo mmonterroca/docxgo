@@ -2302,31 +2302,27 @@ func TestReconstructTableCellWidth_NonDxaIsNotHydrated(t *testing.T) {
 	}
 }
 
-// TestReconstructTableCellShading_ThemedFillKeepsItsCachedColour pins a
-// deliberate choice that reads the other way at first glance. When w:themeFill
-// is present it, not w:fill, is what a theme-aware consumer resolves the
-// colour from -- so the tempting reading is that w:fill must be ignored and
-// the shading dropped as unresolvable, the way a themeFill with no w:fill
-// already is.
+// TestReconstructTableCellShading_ThemedFillKeepsItsCachedColourAndTheLink
+// pins a themed cell's round trip: both the resolved colour a
+// theme-unaware consumer needs (w:fill) and the theme reference itself
+// (w:themeFill, and its tint/shade) survive, because a producer writes the
+// resolved colour into w:fill precisely so consumers that do not resolve
+// themes still render correctly, while w:themeFill is what a theme-aware
+// one actually resolves the colour from. Neither on its own is the whole
+// picture, and a table is always rebuilt from the model on save, so
+// declining to hydrate the link would not have preserved it -- it would
+// have deleted the shading and returned the cell white.
 //
-// Dropping it would be worse output, not more caution. A producer writes the
-// resolved theme colour into w:fill precisely so consumers that do not resolve
-// themes still render correctly, and a table is always rebuilt from the model
-// on save, so declining to hydrate does not preserve the theme link -- it
-// deletes the shading and the cell comes back white. Keeping the cached colour
-// costs the theme *linkage*: the cell stops following a later theme change.
-// That is a real loss and it is in the CHANGELOG, but it is strictly less loss
-// than discarding a colour the source spelled out.
-//
-// The rule is the same one the no-colour cases below follow: hydrate a
-// concrete colour when the source gives one, skip when it does not.
-func TestReconstructTableCellShading_ThemedFillKeepsItsCachedColour(t *testing.T) {
+// A themeFill with no w:fill alongside it still hydrates nothing -- see
+// the "theme fill only" case below -- because then there is no cached
+// colour to keep or link to attach it to.
+func TestReconstructTableCellShading_ThemedFillKeepsItsCachedColourAndTheLink(t *testing.T) {
 	tableXML := `<w:tbl>
 <w:tblGrid><w:gridCol/></w:tblGrid>
-<w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:fill="FF0000" w:themeFill="accent1"/></w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:fill="FF0000" w:themeFill="accent1" w:themeFillTint="80"/></w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>`
 
-	table, _ := reconstructTableFromXML(t, tableXML)
+	table, doc := reconstructTableFromXML(t, tableXML)
 	row, err := table.Row(0)
 	if err != nil {
 		t.Fatalf("Row(0): %v", err)
@@ -2338,6 +2334,74 @@ func TestReconstructTableCellShading_ThemedFillKeepsItsCachedColour(t *testing.T
 	want := domain.Color{R: 0xFF, G: 0x00, B: 0x00}
 	if got := cell.Shading(); got != want {
 		t.Errorf("Cell(0).Shading() = %+v, want %+v (the cached w:fill, not the untouched default)", got, want)
+	}
+
+	themed, ok := cell.(interface {
+		ThemeFill() (string, string, string)
+	})
+	if !ok {
+		t.Fatal("cell does not expose ThemeFill")
+	}
+	if fill, tint, shade := themed.ThemeFill(); fill != "accent1" || tint != "80" || shade != "" {
+		t.Errorf("ThemeFill() = (%q, %q, %q), want (\"accent1\", \"80\", \"\")", fill, tint, shade)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `w:themeFill="accent1"`) {
+		t.Errorf("resaved document.xml lost the theme link:\n%s", written)
+	}
+	if !strings.Contains(written, `w:themeFillTint="80"`) {
+		t.Errorf("resaved document.xml lost the theme tint:\n%s", written)
+	}
+	if !strings.Contains(written, `w:fill="FF0000"`) {
+		t.Errorf("resaved document.xml lost the cached fallback colour:\n%s", written)
+	}
+}
+
+// TestReconstructTableCellShading_SolidThemeColourNormalizesToThemeFill pins
+// the same normalization the plain-colour case already has (see
+// TestReconstructTableCellShading_ColourSourceDependsOnThePattern): a
+// w:val="solid" shading's visible colour is w:color, so its theme link is
+// w:themeColor -- but the domain caches only one colour and one link
+// regardless of pattern, and the writer always re-emits as clear+w:fill.
+// clear+w:themeFill and solid+w:themeColor resolve to the same visible
+// colour (clear draws no pattern, so w:fill is fully visible; solid's
+// foreground covers the background completely), so collapsing a source
+// w:themeColor onto the cell's single w:themeFill slot is exact, not lossy.
+func TestReconstructTableCellShading_SolidThemeColourNormalizesToThemeFill(t *testing.T) {
+	tableXML := `<w:tbl>
+<w:tblGrid><w:gridCol/></w:tblGrid>
+<w:tr><w:tc><w:tcPr><w:shd w:val="solid" w:color="0000FF" w:themeColor="accent2" w:themeShade="40"/></w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr>
+</w:tbl>`
+
+	table, doc := reconstructTableFromXML(t, tableXML)
+	row, _ := table.Row(0)
+	cell, _ := row.Cell(0)
+
+	themed, ok := cell.(interface {
+		ThemeFill() (string, string, string)
+	})
+	if !ok {
+		t.Fatal("cell does not expose ThemeFill")
+	}
+	if fill, tint, shade := themed.ThemeFill(); fill != "accent2" || tint != "" || shade != "40" {
+		t.Errorf("ThemeFill() = (%q, %q, %q), want (\"accent2\", \"\", \"40\")", fill, tint, shade)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `w:themeFill="accent2"`) {
+		t.Errorf("resaved document.xml did not normalize w:themeColor onto w:themeFill:\n%s", written)
+	}
+	if !strings.Contains(written, `w:themeFillShade="40"`) {
+		t.Errorf("resaved document.xml lost the theme shade:\n%s", written)
 	}
 }
 
