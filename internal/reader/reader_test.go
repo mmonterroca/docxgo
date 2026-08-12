@@ -409,10 +409,18 @@ func TestReconstructMidBodySectionBreak_AgainstHandAuthoredPackage(t *testing.T)
 // text, followed by an empty section-break carrier.
 //
 // Confirmed via the same repro run against master before this PR's changes:
-// the doubling already happens today, unconditionally, for every embedded
-// sectPr regardless of whether its paragraph has content -- this PR's
-// bareSectionBreakSectPr check only *removes* the double-count for the
-// no-content case, it does not add a new one for the with-content case.
+// this exact shape -- an embedded sectPr with an explicit w:type -- already
+// doubled the paragraph today, since master's own extractSectionBreakType
+// check succeeds whenever w:type is present. This PR's bareSectionBreakSectPr
+// check only *removes* the double-count for the no-content case, it does not
+// add a new one for this with-content, explicit-w:type case.
+//
+// This is NOT true of the with-content, *absent*-w:type shape -- the actual
+// shape of the real #102 fixture -- which behaves differently on master (no
+// tripling, but the section boundary is silently dropped instead); see
+// TestReconstructSectionBreakWithContent_NoExplicitType_AgainstHandAuthoredPackage
+// below and the CHANGELOG's Known limitations entry for that distinction.
+//
 // Fixing this properly means teaching the writer to fold a SectionBreak
 // block's sectPr into the immediately preceding content paragraph instead
 // of always minting a new one -- a writer-wide behavior change (it would
@@ -483,6 +491,84 @@ func TestReconstructSectionBreakWithContent_AgainstHandAuthoredPackage(t *testin
 	// section level) plus a synthetic empty section-break carrier, plus the
 	// second content paragraph. See the doc comment above: not a regression
 	// from this PR, not fixed by it either.
+	if got := len(paragraphOpenTagRE.FindAllString(written, -1)); got != 3 {
+		t.Errorf("resaved document.xml contains %d <w:p> elements, want 3 (known limitation: content+sectPr paragraphs still split in two -- see test doc comment)", got)
+	}
+	if got := strings.Count(written, "<w:sectPr"); got != 2 {
+		t.Errorf("resaved document.xml contains %d <w:sectPr> elements, want 2", got)
+	}
+}
+
+// TestReconstructSectionBreakWithContent_NoExplicitType_AgainstHandAuthoredPackage
+// is the same pinned limitation as the test above, but with the embedded
+// sectPr's optional <w:type> omitted entirely -- the exact shape of the real
+// #102 fixture (Word commonly emits sectPr without w:type, relying on its
+// schema default of "nextPage"). The test above alone left that specific
+// shape unverified: extractSectionBreakType defaults to
+// domain.SectionBreakTypeNextPage whether w:type is present-and-"nextPage" or
+// absent, so the two shapes are handled identically -- confirmed here rather
+// than assumed.
+func TestReconstructSectionBreakWithContent_NoExplicitType_AgainstHandAuthoredPackage(t *testing.T) {
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr><w:r><w:t>First section</w:t></w:r></w:p>
+<w:p><w:r><w:t>Second section</w:t></w:r></w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	if got := len(doc.Sections()); got != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2 (an embedded sectPr with no w:type must still default to nextPage and start a new section)", got)
+	}
+
+	paras := doc.Paragraphs()
+	if len(paras) != 2 {
+		t.Fatalf("len(Paragraphs()) = %d, want 2", len(paras))
+	}
+	if got := paras[0].Runs()[0].Text(); got != "First section" {
+		t.Errorf("Paragraphs()[0].Runs()[0].Text() = %q, want %q", got, "First section")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+
+	// Same pinned known limitation as the w:type="nextPage" variant above:
+	// still 3 <w:p> elements, not a difference introduced by omitting w:type.
 	if got := len(paragraphOpenTagRE.FindAllString(written, -1)); got != 3 {
 		t.Errorf("resaved document.xml contains %d <w:p> elements, want 3 (known limitation: content+sectPr paragraphs still split in two -- see test doc comment)", got)
 	}
