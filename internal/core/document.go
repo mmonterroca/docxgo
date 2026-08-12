@@ -60,8 +60,10 @@ type document struct {
 	// Preserved parts for round-trip operations (read-modify-write).
 	// When set, these parts are written verbatim to preserve original content.
 	preservedStylesPart   []byte            // Original styles.xml
-	preservedHeaders      map[string][]byte // Original headers (e.g., "header1.xml" -> bytes)
-	preservedFooters      map[string][]byte // Original footers (e.g., "footer1.xml" -> bytes)
+	preservedHeaders      map[string][]byte // Original headers (e.g., "word/header1.xml" -> bytes)
+	preservedFooters      map[string][]byte // Original footers (e.g., "word/footer1.xml" -> bytes)
+	preservedHeaderRels   map[string][]byte // Original word/_rels/headerN.xml.rels, keyed by archive path
+	preservedFooterRels   map[string][]byte // Original word/_rels/footerN.xml.rels, keyed by archive path
 	preservedDocRels      []byte            // Original word/_rels/document.xml.rels
 	preservedContentTypes []byte            // Original [Content_Types].xml
 	preservedAdditional   map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
@@ -495,6 +497,8 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 		writerPreserved = &writer.PreservedParts{
 			Headers:          corePreserved.Headers,
 			Footers:          corePreserved.Footers,
+			HeaderRels:       corePreserved.HeaderRels,
+			FooterRels:       corePreserved.FooterRels,
 			DocRels:          docRels,
 			ContentTypes:     corePreserved.ContentTypes,
 			Additional:       corePreserved.Additional,
@@ -744,6 +748,8 @@ func (d *document) PreservedStylesPartInfo() []byte {
 type PreservedParts struct {
 	Headers          map[string][]byte
 	Footers          map[string][]byte
+	HeaderRels       map[string][]byte // word/_rels/headerN.xml.rels, keyed by archive path
+	FooterRels       map[string][]byte // word/_rels/footerN.xml.rels, keyed by archive path
 	DocRels          []byte
 	ContentTypes     []byte
 	Additional       map[string][]byte
@@ -778,6 +784,26 @@ func (d *document) SetPreservedParts(parts *PreservedParts) {
 			copied := make([]byte, len(v))
 			copy(copied, v)
 			d.preservedFooters[k] = copied
+		}
+	}
+
+	// Copy header relationships
+	if len(parts.HeaderRels) > 0 {
+		d.preservedHeaderRels = make(map[string][]byte, len(parts.HeaderRels))
+		for k, v := range parts.HeaderRels {
+			copied := make([]byte, len(v))
+			copy(copied, v)
+			d.preservedHeaderRels[k] = copied
+		}
+	}
+
+	// Copy footer relationships
+	if len(parts.FooterRels) > 0 {
+		d.preservedFooterRels = make(map[string][]byte, len(parts.FooterRels))
+		for k, v := range parts.FooterRels {
+			copied := make([]byte, len(v))
+			copy(copied, v)
+			d.preservedFooterRels[k] = copied
 		}
 	}
 
@@ -852,6 +878,7 @@ func (d *document) GetPreservedParts() *PreservedParts {
 
 	// Only return if we have any preserved parts
 	if len(d.preservedHeaders) == 0 && len(d.preservedFooters) == 0 &&
+		len(d.preservedHeaderRels) == 0 && len(d.preservedFooterRels) == 0 &&
 		len(d.preservedDocRels) == 0 && len(d.preservedContentTypes) == 0 &&
 		len(d.preservedAdditional) == 0 && len(d.preservedThemes) == 0 &&
 		len(d.preservedFontTable) == 0 && len(d.preservedSettings) == 0 &&
@@ -863,6 +890,8 @@ func (d *document) GetPreservedParts() *PreservedParts {
 	return &PreservedParts{
 		Headers:          d.preservedHeaders,
 		Footers:          d.preservedFooters,
+		HeaderRels:       d.preservedHeaderRels,
+		FooterRels:       d.preservedFooterRels,
 		DocRels:          d.preservedDocRels,
 		ContentTypes:     d.preservedContentTypes,
 		Additional:       d.preservedAdditional,

@@ -135,6 +135,8 @@ func loadFromZip(zr *zip.Reader) (*Package, error) {
 		normalizedPaths:      normalized,
 		Headers:              make(map[string][]byte),
 		Footers:              make(map[string][]byte),
+		HeaderRels:           make(map[string][]byte),
+		FooterRels:           make(map[string][]byte),
 		Media:                make(map[string]*MediaPart),
 		AdditionalParts:      make(map[string][]byte),
 		ThemeParts:           make(map[string][]byte),
@@ -230,6 +232,19 @@ func (p *Package) extractKnownParts() {
 	p.CustomProperties = extract(constants.PathCustomProps)
 
 	for key, original := range p.normalizedPaths {
+		// Header/footer .rels parts (e.g. "word/_rels/header1.xml.rels") must
+		// be checked before the plain header/footer prefixes below: they live
+		// under "word/_rels/", not "word/header"/"word/footer", so they never
+		// collide with those, but must still be claimed here rather than
+		// falling through to AdditionalParts as an opaque, unrelated blob.
+		if strings.HasPrefix(key, normalizePartName(constants.PathHeaderRelsPrefix)) {
+			p.HeaderRels[original] = p.RawParts[original]
+			continue
+		}
+		if strings.HasPrefix(key, normalizePartName(constants.PathFooterRelsPrefix)) {
+			p.FooterRels[original] = p.RawParts[original]
+			continue
+		}
 		if strings.HasPrefix(key, normalizePartName(constants.PathHeaderPrefix)) {
 			p.Headers[original] = p.RawParts[original]
 			continue
@@ -287,6 +302,10 @@ func (p *Package) isKnownPart(normalized string) bool {
 	case normalized == normalizePartName(constants.PathAppProps):
 		return true
 	case normalized == normalizePartName(constants.PathCustomProps):
+		return true
+	case strings.HasPrefix(normalized, normalizePartName(constants.PathHeaderRelsPrefix)):
+		return true
+	case strings.HasPrefix(normalized, normalizePartName(constants.PathFooterRelsPrefix)):
 		return true
 	case strings.HasPrefix(normalized, normalizePartName(constants.PathHeaderPrefix)):
 		return true

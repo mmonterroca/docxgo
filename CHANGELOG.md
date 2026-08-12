@@ -2,6 +2,7 @@
 
 ### Added
 
+- **Header/footer relationship parts (`word/_rels/headerN.xml.rels`, `word/_rels/footerN.xml.rels`) are now preserved through their own dedicated path instead of the opaque, unrelated-parts bucket.** Previously these files survived a round-trip only incidentally, as part of `PreservedParts.Additional` — indistinguishable from any other unrecognized part in the package. They're now read into `Package.HeaderRels`/`FooterRels`, threaded through `core.PreservedParts.HeaderRels`/`FooterRels`, and written back verbatim on an untouched resave. No behavior change yet (headers/footers still don't mint their own relationships); this is the plumbing PR 2c (per-part relationships) builds on.
 - **`domain.Run.SetCaps` / `Caps`** — set whether a run displays in all capitals (`w:caps`). This is a display-only override, the same distinction as Word's own "All Caps" character formatting versus actually typing in capitals: it does not change `run.Text()` or the run's stored `<w:t>` content, only how it renders.
   - `SetCaps(caps bool) error` / `Caps() bool` — same shape as the existing `SetBold`/`Bold`, `SetItalic`/`Italic`, `SetStrike`/`Strike`.
   - Written as `w:caps` in the run's own `w:rPr`.

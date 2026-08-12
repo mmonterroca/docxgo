@@ -42,8 +42,10 @@ type NumberingPart struct {
 // PreservedParts holds all parts that should be written verbatim from the original document.
 // This enables complete round-trip fidelity when reading and saving documents.
 type PreservedParts struct {
-	Headers          map[string][]byte // Original headers (e.g., "header1.xml" -> bytes)
-	Footers          map[string][]byte // Original footers (e.g., "footer1.xml" -> bytes)
+	Headers          map[string][]byte // Original headers, keyed by archive path (e.g. "word/header1.xml")
+	Footers          map[string][]byte // Original footers, keyed by archive path (e.g. "word/footer1.xml")
+	HeaderRels       map[string][]byte // Original word/_rels/headerN.xml.rels, keyed by archive path
+	FooterRels       map[string][]byte // Original word/_rels/footerN.xml.rels, keyed by archive path
 	DocRels          []byte            // Original word/_rels/document.xml.rels
 	ContentTypes     []byte            // Original [Content_Types].xml
 	Additional       map[string][]byte // Additional parts (comments, footnotes, customXml, etc.)
@@ -213,6 +215,24 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 		for name, footer := range footers {
 			if err := zw.writeXML(fmt.Sprintf("word/%s", name), footer); err != nil {
 				return fmt.Errorf("write footer %s: %w", name, err)
+			}
+		}
+	}
+
+	// Write preserved header/footer relationship parts (word/_rels/headerN.xml.rels,
+	// word/_rels/footerN.xml.rels). Kept separate from the header/footer content
+	// above and from Additional (below) so each can be reasoned about on its own.
+	if roundTrip && len(preserved.HeaderRels) > 0 {
+		for name, data := range preserved.HeaderRels {
+			if err := zw.writeRaw(name, data); err != nil {
+				return fmt.Errorf("write preserved header rels %s: %w", name, err)
+			}
+		}
+	}
+	if roundTrip && len(preserved.FooterRels) > 0 {
+		for name, data := range preserved.FooterRels {
+			if err := zw.writeRaw(name, data); err != nil {
+				return fmt.Errorf("write preserved footer rels %s: %w", name, err)
 			}
 		}
 	}

@@ -502,6 +502,69 @@ func buildCollidingRelationshipDocx(t *testing.T, pngBytes []byte) []byte {
 	return buf.Bytes()
 }
 
+// TestOpenDocument_PreservesHeaderRelsBytesOnUntouchedResave is a regression
+// for the round-trip property that PR 2 (per-header/footer relationships,
+// tracked as a follow-up to #101/#102) is about to put at risk: a header's
+// own word/_rels/header1.xml.rels currently survives a save only
+// incidentally, as an opaque entry in PreservedParts.Additional (it doesn't
+// match the "word/header"/"word/footer" prefix isKnownPart uses to route
+// content into PreservedParts.Headers/Footers, so it fell through to the
+// generic bucket). Nothing previously asserted this as a property in its own
+// right -- TestOpenDocument_CollidingRelationshipIDsAcrossParts, which uses
+// the same fixture, only calls Validate() after a round-trip, which cannot
+// catch either of the two ways this could silently break once headers start
+// being regenerated instead of always preserved verbatim: (1) the rels part
+// going missing or changing bytes, or (2) a duplicate zip entry under the
+// same name (archive/zip does not dedupe; a corrupt/ambiguous package that
+// most tools still open, silently preferring one of the two copies).
+func TestOpenDocument_PreservesHeaderRelsBytesOnUntouchedResave(t *testing.T) {
+	pngBytes := encodeTestPNG(t)
+	docxBytes := buildCollidingRelationshipDocx(t, pngBytes)
+
+	doc, err := OpenDocumentFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	resaved := buf.Bytes()
+
+	origRels := zipPart(t, docxBytes, "word/_rels/header1.xml.rels")
+	resavedRels := zipPart(t, resaved, "word/_rels/header1.xml.rels")
+	if !bytes.Equal(origRels, resavedRels) {
+		t.Errorf("word/_rels/header1.xml.rels changed on an untouched resave:\noriginal: %s\nresaved:  %s", origRels, resavedRels)
+	}
+
+	if got := countZipEntries(t, resaved, "word/_rels/header1.xml.rels"); got != 1 {
+		t.Errorf("resaved package contains %d entries named word/_rels/header1.xml.rels, want exactly 1", got)
+	}
+
+	origCT := zipPart(t, docxBytes, "[Content_Types].xml")
+	resavedCT := zipPart(t, resaved, "[Content_Types].xml")
+	if !bytes.Equal(origCT, resavedCT) {
+		t.Errorf("[Content_Types].xml changed on an untouched resave:\noriginal: %s\nresaved:  %s", origCT, resavedCT)
+	}
+}
+
+// countZipEntries returns how many entries in a .docx archive are named exactly name.
+func countZipEntries(t *testing.T, docxBytes []byte, name string) int {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(docxBytes), int64(len(docxBytes)))
+	if err != nil {
+		t.Fatalf("zip.NewReader: %v", err)
+	}
+	count := 0
+	for _, f := range zr.File {
+		if f.Name == name {
+			count++
+		}
+	}
+	return count
+}
+
 // TestOpenDocument_AddHyperlink_PreservesForeignRelationshipIDs pins a fix
 // found in this PR's own review: NewDocument() -- used internally to build
 // the domain.Document that ReconstructDocument hydrates into -- used to
