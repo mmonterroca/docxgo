@@ -214,6 +214,144 @@ func TestDocument_HeaderFooterSerialization(t *testing.T) {
 	}
 }
 
+// zipPartText reads a named part's content as a string from a resaved DOCX
+// package, failing the test if the part is missing or unreadable.
+func zipPartText(t *testing.T, docBytes []byte, name string) string {
+	t.Helper()
+
+	zipReader, err := zip.NewReader(bytes.NewReader(docBytes), int64(len(docBytes)))
+	if err != nil {
+		t.Fatalf("not a valid ZIP: %v", err)
+	}
+	for _, f := range zipReader.File {
+		if f.Name != name {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("failed to open %s: %v", name, err)
+		}
+		defer rc.Close()
+		content, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatalf("failed to read %s: %v", name, err)
+		}
+		return string(content)
+	}
+	t.Fatalf("%s not found in DOCX package", name)
+	return ""
+}
+
+// TestDocument_HeaderFooterTableSerialization pins the actual serialized
+// XML for a header/footer containing an interleaved paragraph/table/
+// paragraph sequence — unlike TestDocument_HeaderFooterSerialization above,
+// which only asserts the part exists. Every failure mode in the storage
+// (docxHeader/docxFooter.AddTable/Blocks) and serializer
+// (serializeHeaderFooterContent) layers is invisible to that test, since it
+// never adds a table or inspects the header/footer XML content at all.
+func TestDocument_HeaderFooterTableSerialization(t *testing.T) {
+	doc := NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection failed: %v", err)
+	}
+
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header failed: %v", err)
+	}
+	addTextParagraph(t, header, "Before Table")
+	headerTable, err := header.AddTable(1, 2)
+	if err != nil {
+		t.Fatalf("Header.AddTable failed: %v", err)
+	}
+	setCellText(t, headerTable, 0, 0, "H-Cell")
+	addTextParagraph(t, header, "After Table")
+
+	footer, err := section.Footer(domain.FooterDefault)
+	if err != nil {
+		t.Fatalf("Footer failed: %v", err)
+	}
+	footerTable, err := footer.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("Footer.AddTable failed: %v", err)
+	}
+	setCellText(t, footerTable, 0, 0, "F-Cell")
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	headerXML := zipPartText(t, buf.Bytes(), "word/header1.xml")
+	if !strings.Contains(headerXML, "<w:tbl") {
+		t.Error("header1.xml missing <w:tbl>")
+	}
+	if !strings.Contains(headerXML, "H-Cell") {
+		t.Error("header1.xml missing cell text \"H-Cell\"")
+	}
+	beforeIdx := strings.Index(headerXML, "Before Table")
+	tblIdx := strings.Index(headerXML, "<w:tbl")
+	afterIdx := strings.Index(headerXML, "After Table")
+	if beforeIdx < 0 || tblIdx < 0 || afterIdx < 0 {
+		t.Fatalf("header1.xml missing expected content: %s", headerXML)
+	}
+	if !(beforeIdx < tblIdx && tblIdx < afterIdx) {
+		t.Errorf("header1.xml out of order: want \"Before Table\" < <w:tbl> < \"After Table\", got offsets %d, %d, %d", beforeIdx, tblIdx, afterIdx)
+	}
+	// A trailing <w:p> must follow the table so Word doesn't coalesce it with
+	// whatever comes next; "After Table"'s own paragraph satisfies that here.
+
+	footerXML := zipPartText(t, buf.Bytes(), "word/footer1.xml")
+	if !strings.Contains(footerXML, "<w:tbl") {
+		t.Error("footer1.xml missing <w:tbl>")
+	}
+	if !strings.Contains(footerXML, "F-Cell") {
+		t.Error("footer1.xml missing cell text \"F-Cell\"")
+	}
+	// The table is the last block in the footer, so serializeHeaderFooterContent
+	// must have appended a trailing empty paragraph after it.
+	tblCloseIdx := strings.LastIndex(footerXML, "</w:tbl>")
+	trailingPIdx := strings.Index(footerXML[tblCloseIdx:], "<w:p")
+	if tblCloseIdx < 0 || trailingPIdx < 0 {
+		t.Errorf("footer1.xml missing trailing <w:p> after </w:tbl>: %s", footerXML)
+	}
+}
+
+// addTextParagraph adds a paragraph with a single run of text to a
+// domain.Header or domain.Footer.
+func addTextParagraph(t *testing.T, target interface {
+	AddParagraph() (domain.Paragraph, error)
+}, text string) {
+	t.Helper()
+	para, err := target.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph failed: %v", err)
+	}
+	run, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun failed: %v", err)
+	}
+	if err := run.SetText(text); err != nil {
+		t.Fatalf("SetText failed: %v", err)
+	}
+}
+
+// setCellText adds a paragraph with a single run of text to the table cell
+// at [row, col].
+func setCellText(t *testing.T, table domain.Table, row, col int, text string) {
+	t.Helper()
+	r, err := table.Row(row)
+	if err != nil {
+		t.Fatalf("Table.Row(%d) failed: %v", row, err)
+	}
+	c, err := r.Cell(col)
+	if err != nil {
+		t.Fatalf("Row.Cell(%d) failed: %v", col, err)
+	}
+	addTextParagraph(t, c, text)
+}
+
 func TestDocument_SaveAs(t *testing.T) {
 	doc := NewDocument()
 

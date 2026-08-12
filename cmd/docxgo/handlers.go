@@ -1463,10 +1463,14 @@ func (s *server) handleTemplateInspect(req *Request) Response {
 			"run":       p.Location.RunIndex,
 		}
 		// TableIndex/RowIndex/CellIndex are only meaningful for table-cell
-		// placeholders; for a top-level paragraph, header, or footer they're
-		// left at their zero value, so gate on the location type rather than
-		// on TableIndex >= 0 (which is always true).
-		if p.Location.Type == template.LocationTableCell {
+		// placeholders; for a top-level paragraph, or a plain header/footer
+		// paragraph, they're left at their zero value. Gate on
+		// Location.InTableCell rather than Location.Type == LocationTableCell:
+		// a header/footer table-cell match keeps Type == LocationHeader/
+		// LocationFooter (see walkHeaderFooterTables), so checking Type alone
+		// would silently drop table/row/cell coordinates for every
+		// placeholder found inside a header or footer table.
+		if p.Location.InTableCell {
 			loc["table"] = p.Location.TableIndex
 			loc["row"] = p.Location.RowIndex
 			loc["cell"] = p.Location.CellIndex
@@ -2026,8 +2030,15 @@ func applyImage(para domain.Paragraph, img *imageDef) error {
 	return err
 }
 
-// applyTable adds a table to the document.
-func applyTable(doc domain.Document, item tableItem) error {
+// tableTarget is the subset of domain.Document/domain.Header/domain.Footer
+// that applyTable needs to add a table, letting it target the document body
+// or a header/footer part from the same code path.
+type tableTarget interface {
+	AddTable(rows, cols int) (domain.Table, error)
+}
+
+// applyTable adds a table to target (the document body, or a header/footer).
+func applyTable(target tableTarget, item tableItem) error {
 	if len(item.Rows) == 0 {
 		return nil
 	}
@@ -2042,7 +2053,7 @@ func applyTable(doc domain.Document, item tableItem) error {
 		return nil
 	}
 
-	table, err := doc.AddTable(len(item.Rows), cols)
+	table, err := target.AddTable(len(item.Rows), cols)
 	if err != nil {
 		return fmt.Errorf("failed to add table: %w", err)
 	}
@@ -2109,13 +2120,37 @@ func applyTable(doc domain.Document, item tableItem) error {
 	return nil
 }
 
+// sectionRemover is implemented by the concrete document type in
+// internal/core, exposing the undo half of AddSectionWithBreak for
+// applySection's rollback-on-error path below.
+type sectionRemover interface {
+	RemoveLastSection(domain.Section) bool
+}
+
 // applySection adds a new section to the document.
-func applySection(doc domain.Document, item sectionItem) error {
+//
+// AddSectionWithBreak attaches the new section to doc immediately, before
+// any of this function's own validation (page size, margins, headers,
+// footers, ...) runs. doc is not a scratch value here -- it's the same
+// document instance the CLI/RPC server keeps in its document store across
+// calls, keyed by documentId -- so a validation failure partway through must
+// undo the attach, or the store is left holding a permanently
+// half-configured extra section that every later operation on that
+// documentId (including a plain section.list or document.save) would see,
+// despite this call having reported failure. See sectionRemover.
+func applySection(doc domain.Document, item sectionItem) (err error) {
 	bt := parseSectionBreakType(item.BreakType)
 	sec, err := doc.AddSectionWithBreak(bt)
 	if err != nil {
 		return fmt.Errorf("failed to add section: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			if remover, ok := doc.(sectionRemover); ok {
+				remover.RemoveLastSection(sec)
+			}
+		}
+	}()
 
 	if item.PageSize != nil {
 		if err := sec.SetPageSize(parsePageSize(item.PageSize)); err != nil {
@@ -2148,18 +2183,8 @@ func applySection(doc domain.Document, item sectionItem) error {
 		if err != nil {
 			return fmt.Errorf("failed to get header %q: %w", hType, err)
 		}
-		for _, paraRaw := range content {
-			var pItem paragraphItem
-			if err := json.Unmarshal(paraRaw, &pItem); err != nil {
-				return fmt.Errorf("invalid header paragraph: %w", err)
-			}
-			para, err := header.AddParagraph()
-			if err != nil {
-				return fmt.Errorf("failed to add header paragraph: %w", err)
-			}
-			if err := applyParagraph(para, pItem); err != nil {
-				return fmt.Errorf("failed to apply header paragraph: %w", err)
-			}
+		if err := applyHeaderFooterContent(header, content); err != nil {
+			return fmt.Errorf("failed to apply header content: %w", err)
 		}
 	}
 
@@ -2168,21 +2193,60 @@ func applySection(doc domain.Document, item sectionItem) error {
 		if err != nil {
 			return fmt.Errorf("failed to get footer %q: %w", fType, err)
 		}
-		for _, paraRaw := range content {
-			var pItem paragraphItem
-			if err := json.Unmarshal(paraRaw, &pItem); err != nil {
-				return fmt.Errorf("invalid footer paragraph: %w", err)
-			}
-			para, err := footer.AddParagraph()
-			if err != nil {
-				return fmt.Errorf("failed to add footer paragraph: %w", err)
-			}
-			if err := applyParagraph(para, pItem); err != nil {
-				return fmt.Errorf("failed to apply footer paragraph: %w", err)
-			}
+		if err := applyHeaderFooterContent(footer, content); err != nil {
+			return fmt.Errorf("failed to apply footer content: %w", err)
 		}
 	}
 
+	return nil
+}
+
+// headerFooterTarget is the subset of domain.Header/domain.Footer that
+// applyHeaderFooterContent needs to add paragraphs and tables.
+type headerFooterTarget interface {
+	AddParagraph() (domain.Paragraph, error)
+	tableTarget
+}
+
+// applyHeaderFooterContent applies a header's or footer's content items to
+// target, mirroring applyContentItem's discriminated dispatch on the body
+// path: each item's "type" field decides whether it's decoded as a
+// paragraph or a table, instead of always decoding to a (possibly empty)
+// paragraph the way this used to.
+func applyHeaderFooterContent(target headerFooterTarget, content []json.RawMessage) error {
+	for _, raw := range content {
+		var item contentItem
+		if err := json.Unmarshal(raw, &item); err != nil {
+			return fmt.Errorf("invalid content item: %w", err)
+		}
+
+		switch item.Type {
+		case "table":
+			var tItem tableItem
+			if err := json.Unmarshal(raw, &tItem); err != nil {
+				return fmt.Errorf("invalid table: %w", err)
+			}
+			if err := applyTable(target, tItem); err != nil {
+				return err
+			}
+		case "", "paragraph":
+			// An absent "type" defaults to paragraph, matching every request
+			// sent before this method distinguished item types at all.
+			var pItem paragraphItem
+			if err := json.Unmarshal(raw, &pItem); err != nil {
+				return fmt.Errorf("invalid paragraph: %w", err)
+			}
+			para, err := target.AddParagraph()
+			if err != nil {
+				return fmt.Errorf("failed to add paragraph: %w", err)
+			}
+			if err := applyParagraph(para, pItem); err != nil {
+				return fmt.Errorf("failed to apply paragraph: %w", err)
+			}
+		default:
+			return fmt.Errorf("unknown header/footer content type: %s", item.Type)
+		}
+	}
 	return nil
 }
 

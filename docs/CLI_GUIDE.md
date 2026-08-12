@@ -657,7 +657,7 @@ Some matches are reported in `skipped` instead of being replaced:
 - A match spanning **several** runs is also skipped when any run between its ends carries a line/page break or an image, because collapsing those runs would leave that content stranded in the middle of the replacement. A match that fits inside a *single* run carrying a break or image is replaced normally, and the break or image is preserved.
 - On a document opened with `document.open`, every match inside a **header or footer** is skipped whenever the document has any preserved header or footer part. Header/footer XML from an opened document is written back byte-for-byte on save (see `document.save`), so an in-memory replacement there would never reach the saved file — reporting it as `replaced` would be a false success. This is a document-wide check, not a per-header/footer one: if any header or footer was preserved, all header/footer matches are skipped, even in a section whose own header/footer wasn't touched.
 
-This does not reach into tables nested inside other tables, or into tables placed inside a header or footer — the same traversal limits as `template.render`/`template.inspect`, which share the underlying paragraph walk.
+This reaches top-level tables placed inside a header or footer, but not a table nested inside another table (body or header/footer) — the same traversal limits as `template.render`/`template.inspect`, which share the underlying paragraph walk.
 
 **Params:**
 
@@ -1347,6 +1347,8 @@ Or with base64 data:
 **Break types:** `nextPage` (default), `continuous`, `evenPage`, `oddPage`
 
 **Header/footer keys:** `default`, `first`, `even`
+
+**Header/footer content:** each key's array accepts the same discriminated content items as the top-level document `content` array — `{"type": "paragraph", ...}` (as above) or `{"type": "table", ...}` (see [Table](#table), above). A table item follows a header/footer around like any other block: it does not need a paragraph before or after it.
 
 ---
 

@@ -140,8 +140,25 @@ type Header interface {
 	// AddParagraph adds a paragraph to the header.
 	AddParagraph() (Paragraph, error)
 
-	// Paragraphs returns all paragraphs in the header.
+	// Paragraphs returns all top-level paragraphs in the header, in insertion
+	// order. A paragraph inside a table cell is not included here — use
+	// Blocks to reach it, the same way Document.Paragraphs excludes cell
+	// paragraphs.
 	Paragraphs() []Paragraph
+
+	// AddTable adds a table with the given number of rows and columns to the
+	// header.
+	AddTable(rows, cols int) (Table, error)
+
+	// Tables returns all top-level tables in the header, in insertion order.
+	Tables() []Table
+
+	// Blocks returns every top-level element in the header — paragraphs and
+	// tables — in insertion order. This is the authoritative ordering view;
+	// Paragraphs and Tables are convenience filters over the same content.
+	// A Block's SectionBreak field is never set for a header, since w:hdr
+	// has no section properties of its own.
+	Blocks() []Block
 }
 
 // Footer represents a page footer.
@@ -149,8 +166,25 @@ type Footer interface {
 	// AddParagraph adds a paragraph to the footer.
 	AddParagraph() (Paragraph, error)
 
-	// Paragraphs returns all paragraphs in the footer.
+	// Paragraphs returns all top-level paragraphs in the footer, in insertion
+	// order. A paragraph inside a table cell is not included here — use
+	// Blocks to reach it, the same way Document.Paragraphs excludes cell
+	// paragraphs.
 	Paragraphs() []Paragraph
+
+	// AddTable adds a table with the given number of rows and columns to the
+	// footer.
+	AddTable(rows, cols int) (Table, error)
+
+	// Tables returns all top-level tables in the footer, in insertion order.
+	Tables() []Table
+
+	// Blocks returns every top-level element in the footer — paragraphs and
+	// tables — in insertion order. This is the authoritative ordering view;
+	// Paragraphs and Tables are convenience filters over the same content.
+	// A Block's SectionBreak field is never set for a footer, since w:ftr
+	// has no section properties of its own.
+	Blocks() []Block
 }
 
 // Style represents a paragraph or character style.

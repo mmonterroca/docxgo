@@ -1210,6 +1210,15 @@ func (s *DocumentSerializer) SerializeDocument(doc domain.Document) *xml.Documen
 
 // SerializeSectionParts converts headers and footers into their own XML parts.
 // The returned maps are keyed by the part filename (e.g., "header1.xml").
+// headerFooterPart is the subset of docxHeader/docxFooter that
+// SerializeSectionParts needs: the block content to serialize, and the
+// relationship metadata that decides whether (and where) to serialize it.
+type headerFooterPart interface {
+	Blocks() []domain.Block
+	RelationshipID() string
+	TargetPath() string
+}
+
 func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[string]*xml.Header, map[string]*xml.Footer) {
 	headers := make(map[string]*xml.Header)
 	footers := make(map[string]*xml.Footer)
@@ -1225,11 +1234,7 @@ func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[str
 		}
 
 		for _, header := range secWithMaps.HeadersAll() {
-			headerMeta, ok := header.(interface {
-				Paragraphs() []domain.Paragraph
-				RelationshipID() string
-				TargetPath() string
-			})
+			headerMeta, ok := header.(headerFooterPart)
 			if !ok {
 				continue
 			}
@@ -1243,18 +1248,12 @@ func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[str
 			}
 
 			xmlHeader := xml.NewHeader()
-			for _, para := range headerMeta.Paragraphs() {
-				xmlHeader.AddParagraph(s.paraSerializer.Serialize(para))
-			}
+			xmlHeader.Content = s.serializeHeaderFooterContent(headerMeta.Blocks())
 			headers[target] = xmlHeader
 		}
 
 		for _, footer := range secWithMaps.FootersAll() {
-			footerMeta, ok := footer.(interface {
-				Paragraphs() []domain.Paragraph
-				RelationshipID() string
-				TargetPath() string
-			})
+			footerMeta, ok := footer.(headerFooterPart)
 			if !ok {
 				continue
 			}
@@ -1268,9 +1267,7 @@ func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[str
 			}
 
 			xmlFooter := xml.NewFooter()
-			for _, para := range footerMeta.Paragraphs() {
-				xmlFooter.AddParagraph(s.paraSerializer.Serialize(para))
-			}
+			xmlFooter.Content = s.serializeHeaderFooterContent(footerMeta.Blocks())
 			footers[target] = xmlFooter
 		}
 	}
@@ -1283,6 +1280,38 @@ func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[str
 	}
 
 	return headers, footers
+}
+
+// serializeHeaderFooterContent converts a header's or footer's top-level
+// blocks to XML content in insertion order, mirroring SerializeBody minus
+// the SectionBreak arm (w:hdr/w:ftr have no section properties of their
+// own). Two adjacent w:tbl with no intervening w:p are coalesced by Word
+// into a single table using the first table's grid, so a separator
+// paragraph is inserted between consecutive tables and after a trailing
+// table — the same policy serializeCell already applies to nested tables.
+func (s *DocumentSerializer) serializeHeaderFooterContent(blocks []domain.Block) []interface{} {
+	content := make([]interface{}, 0, len(blocks)+1)
+	prevWasTable := false
+
+	for _, block := range blocks {
+		switch {
+		case block.Paragraph != nil:
+			content = append(content, s.paraSerializer.Serialize(block.Paragraph))
+			prevWasTable = false
+		case block.Table != nil:
+			if prevWasTable {
+				content = append(content, emptyParagraph())
+			}
+			content = append(content, s.tableSerializer.Serialize(block.Table))
+			prevWasTable = true
+		}
+	}
+
+	if prevWasTable {
+		content = append(content, emptyParagraph())
+	}
+
+	return content
 }
 
 // SerializeCoreProperties converts metadata to core properties.

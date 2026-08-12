@@ -177,6 +177,58 @@ func TestHeader_Marshal(t *testing.T) {
 	}
 }
 
+// TestHeader_MarshalWithTable pins Header.Content's mixed-content ordering
+// (*Paragraph and *Table interleaved, marshaled in slice order) now that
+// Header no longer has a paragraph-only Paragraphs field.
+func TestHeader_MarshalWithTable(t *testing.T) {
+	header := NewHeader()
+
+	para := &Paragraph{
+		Elements: []interface{}{
+			&Run{Text: &Text{Space: "preserve", Content: "Header Text"}},
+		},
+	}
+	header.AddParagraph(para)
+
+	table := &Table{
+		Rows: []*TableRow{
+			{
+				Cells: []*TableCell{
+					{Content: []interface{}{
+						&Paragraph{Elements: []interface{}{
+							&Run{Text: &Text{Space: "preserve", Content: "Cell Text"}},
+						}},
+					}},
+				},
+			},
+		},
+	}
+	header.AddTable(table)
+
+	data, err := xml.Marshal(header)
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+
+	xmlStr := string(data)
+
+	if !strings.Contains(xmlStr, `<w:hdr`) {
+		t.Error("Should contain hdr element")
+	}
+	if !strings.Contains(xmlStr, `<w:tbl`) {
+		t.Error("Should contain tbl element")
+	}
+	if !strings.Contains(xmlStr, "Cell Text") {
+		t.Error("Should contain cell text")
+	}
+
+	pIdx := strings.Index(xmlStr, "<w:p")
+	tblIdx := strings.Index(xmlStr, "<w:tbl")
+	if pIdx < 0 || tblIdx < 0 || pIdx > tblIdx {
+		t.Errorf("expected <w:p> before <w:tbl> in %s", xmlStr)
+	}
+}
+
 func TestFooter_Marshal(t *testing.T) {
 	footer := NewFooter()
 

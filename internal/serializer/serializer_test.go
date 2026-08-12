@@ -8,6 +8,7 @@ package serializer_test
 
 import (
 	stdxml "encoding/xml"
+	"io"
 	"testing"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -1326,4 +1327,103 @@ func TestParagraphSerializer_WrappedParagraphDegradesGracefully(t *testing.T) {
 	if xmlPara.Properties != nil && xmlPara.Properties.Spacing != nil {
 		t.Errorf("expected no direct w:spacing through a wrapped domain.Paragraph (degraded behavior), got %+v", xmlPara.Properties.Spacing)
 	}
+}
+
+// TestSerializeSectionParts_HeaderTable pins SerializeSectionParts' output
+// for a header and a footer that each contain a paragraph/table/paragraph
+// sequence. It's the only place that exercises the headerFooterPart
+// interface assertion for both header AND footer at once — a missing method
+// on either docxHeader or docxFooter would make that assertion fail
+// silently (SerializeSectionParts just `continue`s past it), dropping the
+// part from the output map with no build error. Asserting the map here
+// turns that into a loud test failure instead.
+func TestSerializeSectionParts_HeaderTable(t *testing.T) {
+	doc := core.NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection() error = %v", err)
+	}
+
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header() error = %v", err)
+	}
+	if _, err := header.AddParagraph(); err != nil {
+		t.Fatalf("header.AddParagraph() error = %v", err)
+	}
+	if _, err := header.AddTable(1, 1); err != nil {
+		t.Fatalf("header.AddTable() error = %v", err)
+	}
+	if _, err := header.AddParagraph(); err != nil {
+		t.Fatalf("header.AddParagraph() [2] error = %v", err)
+	}
+
+	footer, err := section.Footer(domain.FooterDefault)
+	if err != nil {
+		t.Fatalf("Footer() error = %v", err)
+	}
+	if _, err := footer.AddParagraph(); err != nil {
+		t.Fatalf("footer.AddParagraph() error = %v", err)
+	}
+	if _, err := footer.AddTable(1, 1); err != nil {
+		t.Fatalf("footer.AddTable() error = %v", err)
+	}
+	if _, err := footer.AddParagraph(); err != nil {
+		t.Fatalf("footer.AddParagraph() [2] error = %v", err)
+	}
+
+	// Relationship IDs/target paths for headers and footers are only
+	// assigned as a side effect of WriteTo (prepareHeaderFooterRelationships)
+	// -- SerializeSectionParts skips any part without one, by design (it
+	// mirrors what a document that never attached the part to a section
+	// looks like). Write to a discarded buffer to trigger that assignment,
+	// then inspect the same in-memory doc.
+	if _, err := doc.WriteTo(io.Discard); err != nil {
+		t.Fatalf("WriteTo() error = %v", err)
+	}
+
+	ser := serializer.NewDocumentSerializer()
+	headers, footers := ser.SerializeSectionParts(doc)
+
+	xmlHeader, ok := headers["header1.xml"]
+	if !ok {
+		t.Fatalf("headers map missing \"header1.xml\"; got keys %v", mapKeys(headers))
+	}
+	if len(xmlHeader.Content) != 3 {
+		t.Fatalf("len(header Content) = %d, want 3", len(xmlHeader.Content))
+	}
+	if _, ok := xmlHeader.Content[0].(*xmlstructs.Paragraph); !ok {
+		t.Errorf("header Content[0] = %T, want *xmlstructs.Paragraph", xmlHeader.Content[0])
+	}
+	if _, ok := xmlHeader.Content[1].(*xmlstructs.Table); !ok {
+		t.Errorf("header Content[1] = %T, want *xmlstructs.Table", xmlHeader.Content[1])
+	}
+	if _, ok := xmlHeader.Content[2].(*xmlstructs.Paragraph); !ok {
+		t.Errorf("header Content[2] = %T, want *xmlstructs.Paragraph", xmlHeader.Content[2])
+	}
+
+	xmlFooter, ok := footers["footer1.xml"]
+	if !ok {
+		t.Fatalf("footers map missing \"footer1.xml\"; got keys %v", mapKeys(footers))
+	}
+	if len(xmlFooter.Content) != 3 {
+		t.Fatalf("len(footer Content) = %d, want 3", len(xmlFooter.Content))
+	}
+	if _, ok := xmlFooter.Content[0].(*xmlstructs.Paragraph); !ok {
+		t.Errorf("footer Content[0] = %T, want *xmlstructs.Paragraph", xmlFooter.Content[0])
+	}
+	if _, ok := xmlFooter.Content[1].(*xmlstructs.Table); !ok {
+		t.Errorf("footer Content[1] = %T, want *xmlstructs.Table", xmlFooter.Content[1])
+	}
+	if _, ok := xmlFooter.Content[2].(*xmlstructs.Paragraph); !ok {
+		t.Errorf("footer Content[2] = %T, want *xmlstructs.Paragraph", xmlFooter.Content[2])
+	}
+}
+
+func mapKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
