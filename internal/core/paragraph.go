@@ -65,10 +65,6 @@ type paragraph struct {
 	bookmarkID         string // ID for bookmark (if this paragraph needs one for TOC)
 	bookmarkName       string // Name for bookmark (e.g., "_Toc123456")
 	mediaManager       *manager.MediaManager
-	// inHeaderFooter is true for a paragraph that lives in a header or footer
-	// part. AddHyperlink refuses to run on such a paragraph -- see its doc
-	// comment for why.
-	inHeaderFooter bool
 }
 
 // NewParagraph creates a new Paragraph.
@@ -86,27 +82,6 @@ func NewParagraph(id string, idGen IDGenerator, relManager *manager.Relationship
 		idGen:         idGen,
 		relManager:    relManager,
 		mediaManager:  mediaManager,
-	}
-}
-
-// markHeaderFooterParagraph flags a paragraph as living inside a header or
-// footer part, so AddHyperlink can refuse to run on it. p is always a
-// *paragraph in practice -- NewParagraph is the only constructor -- so a
-// failed type assertion is silently ignored rather than panicking.
-func markHeaderFooterParagraph(p domain.Paragraph) {
-	if concrete, ok := p.(*paragraph); ok {
-		concrete.inHeaderFooter = true
-	}
-}
-
-// markHeaderFooterTable flags a table as living inside a header or footer
-// part, so its cells' paragraphs inherit the same AddHyperlink restriction as
-// markHeaderFooterParagraph. t is always a *table in practice -- NewTable is
-// the only constructor -- so a failed type assertion is silently ignored
-// rather than panicking.
-func markHeaderFooterTable(t domain.Table) {
-	if concrete, ok := t.(*table); ok {
-		concrete.inHeaderFooter = true
 	}
 }
 
@@ -130,18 +105,20 @@ func (p *paragraph) AddField(_ domain.FieldType) (domain.Field, error) {
 // The link is written as a real OOXML <w:hyperlink> element: for an external
 // URL, via a relationship in this part's .rels (r:id); for an internal link
 // (a url starting with "#"), via a bookmark anchor (w:anchor) with no
-// relationship at all. Do not call this on a header or footer paragraph:
-// docxgo does not yet emit a per-part relationships file
-// (word/_rels/headerN.xml.rels / footerN.xml.rels), so an external hyperlink
-// relationship minted there would reference a part that doesn't exist.
+// relationship at all.
+//
+// This works on a header or footer paragraph too. The relationship is minted
+// into that part's own manager and written to word/_rels/headerN.xml.rels --
+// see newPartRelationshipManager in section.go. One caveat applies there, and
+// it is not specific to hyperlinks: on a document opened via OpenDocument
+// whose headers were preserved for round-trip fidelity, WriteTo writes those
+// parts verbatim, so no in-memory header edit reaches the saved file --
+// SetText included. Document.HasPreservedHeadersOrFooters reports that case,
+// and pkg/template's ReplaceText/MergeTemplate already use it to skip such
+// paragraphs rather than silently doing nothing.
 func (p *paragraph) AddHyperlink(url, displayText string) (domain.Run, error) {
 	if url == "" {
 		return nil, errors.InvalidArgument("Paragraph.AddHyperlink", "url", url, "URL cannot be empty")
-	}
-
-	if p.inHeaderFooter {
-		return nil, errors.Unsupported("Paragraph.AddHyperlink",
-			"hyperlinks in a header or footer paragraph (no word/_rels/headerN.xml.rels support yet)")
 	}
 
 	text := displayText

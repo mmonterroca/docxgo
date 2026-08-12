@@ -7,6 +7,15 @@
 package core_test
 
 import (
+	"archive/zip"
+	"bytes"
+	"image"
+	"image/color"
+	"image/png"
+	"io"
+	"os"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -700,12 +709,20 @@ func TestParagraph_AddHyperlink_InternalAnchor(t *testing.T) {
 	}
 }
 
-// TestParagraph_AddHyperlink_HeaderFooterRejected pins the issue #101 guard:
-// docxgo does not yet write a per-part relationships file
-// (word/_rels/headerN.xml.rels), so a hyperlink relationship minted on a
-// header/footer paragraph would reference a part that doesn't exist and
-// produce a document Word offers to repair. AddHyperlink refuses instead.
-func TestParagraph_AddHyperlink_HeaderFooterRejected(t *testing.T) {
+// TestParagraph_AddHyperlink_HeaderFooterUsesPartRels is the inverse of the
+// guard that used to live here: a hyperlink on a header/footer paragraph is
+// now supported, because the relationship is minted into that part's own
+// manager and written to word/_rels/headerN.xml.rels.
+//
+// The assertion that matters is not merely that AddHyperlink succeeds -- it is
+// *where* the relationship lands. A header cannot resolve an r:id declared in
+// word/_rels/document.xml.rels, so a hyperlink whose relationship went there
+// would still produce a package Word offers to repair, while looking fine to a
+// test that only checked the error return.
+func TestParagraph_AddHyperlink_HeaderFooterUsesPartRels(t *testing.T) {
+	const headerURL = "https://example.com/header"
+	const footerURL = "https://example.com/footer"
+
 	doc := core.NewDocument()
 	section, err := doc.DefaultSection()
 	if err != nil {
@@ -720,8 +737,8 @@ func TestParagraph_AddHyperlink_HeaderFooterRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("header.AddParagraph() error = %v", err)
 	}
-	if _, err := headerPara.AddHyperlink("https://example.com", "text"); err == nil {
-		t.Error("header paragraph AddHyperlink() error = nil, want an error")
+	if _, err := headerPara.AddHyperlink(headerURL, "header link"); err != nil {
+		t.Fatalf("header paragraph AddHyperlink() error = %v, want nil", err)
 	}
 
 	footer, err := section.Footer(domain.FooterDefault)
@@ -732,23 +749,261 @@ func TestParagraph_AddHyperlink_HeaderFooterRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("footer.AddParagraph() error = %v", err)
 	}
-	if _, err := footerPara.AddHyperlink("https://example.com", "text"); err == nil {
-		t.Error("footer paragraph AddHyperlink() error = nil, want an error")
+	if _, err := footerPara.AddHyperlink(footerURL, "footer link"); err != nil {
+		t.Fatalf("footer paragraph AddHyperlink() error = %v, want nil", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo() error = %v", err)
+	}
+	saved := buf.Bytes()
+
+	headerRels := zipPartText(t, saved, "word/_rels/header1.xml.rels")
+	if !strings.Contains(headerRels, headerURL) {
+		t.Errorf("word/_rels/header1.xml.rels is missing the hyperlink target %q:\n%s", headerURL, headerRels)
+	}
+
+	footerRels := zipPartText(t, saved, "word/_rels/footer1.xml.rels")
+	if !strings.Contains(footerRels, footerURL) {
+		t.Errorf("word/_rels/footer1.xml.rels is missing the hyperlink target %q:\n%s", footerURL, footerRels)
+	}
+
+	// Each part's rels must hold ONLY its own relationships. Asserting just
+	// "the header's link is in the header's rels" would still pass if every
+	// part shared one manager and each rels part listed everything -- which
+	// is a real mis-scoping, not a harmless one: it puts targets in a part
+	// that never references them and makes relationship IDs collide across
+	// parts as soon as two parts each mint their own.
+	if strings.Contains(headerRels, footerURL) {
+		t.Errorf("word/_rels/header1.xml.rels contains the FOOTER's target %q -- the two parts are sharing a relationship manager:\n%s", footerURL, headerRels)
+	}
+	if strings.Contains(footerRels, headerURL) {
+		t.Errorf("word/_rels/footer1.xml.rels contains the HEADER's target %q -- the two parts are sharing a relationship manager:\n%s", headerURL, footerRels)
+	}
+
+	// The whole point: neither relationship may leak into the document part.
+	docRels := zipPartText(t, saved, "word/_rels/document.xml.rels")
+	if strings.Contains(docRels, headerURL) {
+		t.Errorf("header hyperlink leaked into word/_rels/document.xml.rels, which header1.xml cannot resolve:\n%s", docRels)
+	}
+	if strings.Contains(docRels, footerURL) {
+		t.Errorf("footer hyperlink leaked into word/_rels/document.xml.rels, which footer1.xml cannot resolve:\n%s", docRels)
+	}
+
+	// The r:id the header part references must be one its own rels declares.
+	headerXML := zipPartText(t, saved, "word/header1.xml")
+	relID := hyperlinkRelIDFrom(t, headerXML)
+	if !strings.Contains(headerRels, `Id="`+relID+`"`) {
+		t.Errorf("header1.xml references r:id=%q but word/_rels/header1.xml.rels does not declare it:\n%s", relID, headerRels)
 	}
 }
 
-// TestHeaderTableCell_AddHyperlinkRejected extends the guard pinned by
-// TestParagraph_AddHyperlink_HeaderFooterRejected to paragraphs inside a
-// header/footer table's cells, including a table nested one level deeper.
-// Without markHeaderFooterTable propagating the flag down through
-// tableCell.AddParagraph/AddTable, a cell paragraph in a header table would
-// let AddHyperlink succeed, minting a relationship in
-// word/_rels/document.xml.rels that header1.xml can never resolve.
+// TestHeader_ImageProducesValidPart is the regression for the corruption bug
+// that shipped unnoticed for as long as headers have existed: an image added
+// to a header produced a package Word offers to repair, silently. Nothing
+// covered it -- the only header-image test in the repo before this one
+// (pkg/template's TestConsolidateRuns_PreservesImageInHeader) never calls
+// WriteTo, so it could not see either half of the problem.
 //
-// AddHyperlink checks p.inHeaderFooter before it does anything else (see
-// paragraph.go), so an error return here is sufficient proof no relationship
-// was minted -- there's no code path between the check and the mint.
-func TestHeaderTableCell_AddHyperlinkRejected(t *testing.T) {
+// Both halves are asserted here because either one alone breaks the file:
+//
+//  1. <w:hdr> must declare xmlns:wp. Every <w:drawing> wrapper element is
+//     wp:-prefixed, so without the declaration the part is an undeclared-prefix
+//     error. w:document has always declared it; w:hdr/w:ftr did not.
+//  2. The image relationship must live in word/_rels/header1.xml.rels. Minted
+//     into word/_rels/document.xml.rels -- as it was -- the header's r:embed
+//     resolves to nothing.
+//
+// The image is placed in a header table cell rather than a plain paragraph on
+// purpose: that is the path #109 opened up, and it exercises the longest
+// relationship-manager chain.
+func TestHeader_ImageProducesValidPart(t *testing.T) {
+	imgPath := createTestPNGFile(t)
+
+	doc := core.NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection() error = %v", err)
+	}
+	header, err := section.Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header() error = %v", err)
+	}
+
+	// Plain header paragraph.
+	headerPara, err := header.AddParagraph()
+	if err != nil {
+		t.Fatalf("header.AddParagraph() error = %v", err)
+	}
+	if _, err := headerPara.AddImage(imgPath); err != nil {
+		t.Fatalf("header paragraph AddImage() error = %v", err)
+	}
+
+	// Header table cell -- the path #109 made reachable.
+	headerTable, err := header.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("header.AddTable() error = %v", err)
+	}
+	row, err := headerTable.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0) error = %v", err)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0) error = %v", err)
+	}
+	cellPara, err := cell.AddParagraph()
+	if err != nil {
+		t.Fatalf("cell.AddParagraph() error = %v", err)
+	}
+	if _, err := cellPara.AddImage(imgPath); err != nil {
+		t.Fatalf("header table cell AddImage() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo() error = %v", err)
+	}
+	saved := buf.Bytes()
+
+	headerXML := zipPartText(t, saved, "word/header1.xml")
+
+	// Half 1: the namespace.
+	if !strings.Contains(headerXML, `xmlns:wp="`) {
+		t.Errorf("word/header1.xml does not declare xmlns:wp, so its wp:-prefixed drawing elements are an undeclared-prefix error:\n%s", headerXML)
+	}
+	if !strings.Contains(headerXML, "<wp:") {
+		t.Fatalf("word/header1.xml contains no wp:-prefixed drawing element, so this test is not exercising the bug:\n%s", headerXML)
+	}
+
+	// Half 2: every r:embed the header references must be declared in the
+	// header's own rels part, not the document's.
+	headerRels := zipPartText(t, saved, "word/_rels/header1.xml.rels")
+	embedIDs := embedRelIDsFrom(t, headerXML)
+	if len(embedIDs) != 2 {
+		t.Fatalf("found %d r:embed references in word/header1.xml, want 2 (paragraph image + table cell image):\n%s", len(embedIDs), headerXML)
+	}
+	for _, id := range embedIDs {
+		if !strings.Contains(headerRels, `Id="`+id+`"`) {
+			t.Errorf("header1.xml references r:embed=%q but word/_rels/header1.xml.rels does not declare it:\n%s", id, headerRels)
+		}
+	}
+	// Match the Type attribute specifically -- a bare "/image" also matches
+	// each relationship's "media/imageN.png" target and double-counts.
+	if got := strings.Count(headerRels, `/relationships/image"`); got != 2 {
+		t.Errorf("word/_rels/header1.xml.rels declares %d image relationships, want 2:\n%s", got, headerRels)
+	}
+
+	// Per-part relationship numbering: the header's own manager starts at
+	// rId1 rather than continuing the document's sequence.
+	if !strings.Contains(headerRels, `Id="rId1"`) {
+		t.Errorf("word/_rels/header1.xml.rels does not start numbering at rId1, so the part is sharing the document's relationship counter:\n%s", headerRels)
+	}
+
+	// And the images must not also be declared document-side.
+	docRels := zipPartText(t, saved, "word/_rels/document.xml.rels")
+	if strings.Contains(docRels, `/relationships/image"`) {
+		t.Errorf("the header's images leaked into word/_rels/document.xml.rels:\n%s", docRels)
+	}
+}
+
+// embedRelIDsFrom returns every a:blip r:embed value in a part, in order.
+func embedRelIDsFrom(t *testing.T, partXML string) []string {
+	t.Helper()
+
+	var ids []string
+	for _, m := range embedRelIDRE.FindAllStringSubmatch(partXML, -1) {
+		ids = append(ids, m[1])
+	}
+	return ids
+}
+
+var embedRelIDRE = regexp.MustCompile(`r:embed="([^"]+)"`)
+
+// createTestPNGFile writes a tiny valid PNG to a temp file and returns its path.
+func createTestPNGFile(t *testing.T) string {
+	t.Helper()
+
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			img.Set(x, y, color.RGBA{R: uint8(20 * x), G: uint8(20 * y), B: 200, A: 255})
+		}
+	}
+
+	file, err := os.CreateTemp(t.TempDir(), "img-*.png")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	defer file.Close()
+
+	if err := png.Encode(file, img); err != nil {
+		t.Fatalf("png.Encode: %v", err)
+	}
+	return file.Name()
+}
+
+// hyperlinkRelIDFrom extracts the r:id of the first <w:hyperlink> element in a
+// header/footer/document part.
+func hyperlinkRelIDFrom(t *testing.T, partXML string) string {
+	t.Helper()
+
+	match := hyperlinkRelIDRE.FindStringSubmatch(partXML)
+	if match == nil {
+		t.Fatalf("no <w:hyperlink r:id=...> element found in part:\n%s", partXML)
+	}
+	return match[1]
+}
+
+var hyperlinkRelIDRE = regexp.MustCompile(`<w:hyperlink[^>]*r:id="([^"]+)"`)
+
+// zipPartText reads a named part out of a saved .docx package as a string,
+// failing the test if it is missing. io_test.go has an identical helper, but
+// that file is in package core (internal tests) while this one is in
+// package core_test, so it is not reachable from here.
+func zipPartText(t *testing.T, docBytes []byte, name string) string {
+	t.Helper()
+
+	zipReader, err := zip.NewReader(bytes.NewReader(docBytes), int64(len(docBytes)))
+	if err != nil {
+		t.Fatalf("not a valid ZIP: %v", err)
+	}
+	for _, f := range zipReader.File {
+		if f.Name != name {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("failed to open %s: %v", name, err)
+		}
+		defer rc.Close()
+		content, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatalf("failed to read %s: %v", name, err)
+		}
+		return string(content)
+	}
+	t.Fatalf("%s not found in the saved package", name)
+	return ""
+}
+
+// TestHeaderTableCell_AddHyperlinkUsesPartRels is the table-cell counterpart
+// to TestParagraph_AddHyperlink_HeaderFooterUsesPartRels, covering the deeper
+// path #109 opened up: a paragraph inside a header/footer table's cell, and
+// inside a table nested one level further down.
+//
+// This is the path most likely to regress. The relationship manager reaches a
+// nested cell paragraph through a long chain -- docxHeader -> NewTable ->
+// NewTableRow -> NewTableCell -> AddParagraph -> NewRun, and again for the
+// nested table -- so any link in it that reaches for the document's manager
+// instead of the header's puts the relationship in a part the header cannot
+// resolve.
+func TestHeaderTableCell_AddHyperlinkUsesPartRels(t *testing.T) {
+	const cellURL = "https://example.com/header-cell"
+	const nestedURL = "https://example.com/header-nested-cell"
+	const footerCellURL = "https://example.com/footer-cell"
+
 	doc := core.NewDocument()
 	section, err := doc.DefaultSection()
 	if err != nil {
@@ -775,8 +1030,8 @@ func TestHeaderTableCell_AddHyperlinkRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("headerCell.AddParagraph() error = %v", err)
 	}
-	if _, err := headerCellPara.AddHyperlink("https://example.com", "text"); err == nil {
-		t.Error("header table cell paragraph AddHyperlink() error = nil, want an error")
+	if _, err := headerCellPara.AddHyperlink(cellURL, "cell link"); err != nil {
+		t.Fatalf("header table cell paragraph AddHyperlink() error = %v, want nil", err)
 	}
 
 	// One level deeper: a table nested inside the header table's cell.
@@ -796,8 +1051,8 @@ func TestHeaderTableCell_AddHyperlinkRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nestedCell.AddParagraph() error = %v", err)
 	}
-	if _, err := nestedCellPara.AddHyperlink("https://example.com", "text"); err == nil {
-		t.Error("nested header table cell paragraph AddHyperlink() error = nil, want an error")
+	if _, err := nestedCellPara.AddHyperlink(nestedURL, "nested link"); err != nil {
+		t.Fatalf("nested header table cell paragraph AddHyperlink() error = %v, want nil", err)
 	}
 
 	footer, err := section.Footer(domain.FooterDefault)
@@ -820,8 +1075,43 @@ func TestHeaderTableCell_AddHyperlinkRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("footerCell.AddParagraph() error = %v", err)
 	}
-	if _, err := footerCellPara.AddHyperlink("https://example.com", "text"); err == nil {
-		t.Error("footer table cell paragraph AddHyperlink() error = nil, want an error")
+	if _, err := footerCellPara.AddHyperlink(footerCellURL, "footer cell link"); err != nil {
+		t.Fatalf("footer table cell paragraph AddHyperlink() error = %v, want nil", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo() error = %v", err)
+	}
+	saved := buf.Bytes()
+
+	headerRels := zipPartText(t, saved, "word/_rels/header1.xml.rels")
+	for _, url := range []string{cellURL, nestedURL} {
+		if !strings.Contains(headerRels, url) {
+			t.Errorf("word/_rels/header1.xml.rels is missing %q:\n%s", url, headerRels)
+		}
+	}
+
+	footerRels := zipPartText(t, saved, "word/_rels/footer1.xml.rels")
+	if !strings.Contains(footerRels, footerCellURL) {
+		t.Errorf("word/_rels/footer1.xml.rels is missing %q:\n%s", footerCellURL, footerRels)
+	}
+	// Cross-contamination: see the same check in
+	// TestParagraph_AddHyperlink_HeaderFooterUsesPartRels for why.
+	if strings.Contains(headerRels, footerCellURL) {
+		t.Errorf("word/_rels/header1.xml.rels contains the FOOTER's target %q -- the parts are sharing a relationship manager:\n%s", footerCellURL, headerRels)
+	}
+	for _, url := range []string{cellURL, nestedURL} {
+		if strings.Contains(footerRels, url) {
+			t.Errorf("word/_rels/footer1.xml.rels contains the HEADER's target %q -- the parts are sharing a relationship manager:\n%s", url, footerRels)
+		}
+	}
+
+	docRels := zipPartText(t, saved, "word/_rels/document.xml.rels")
+	for _, url := range []string{cellURL, nestedURL, footerCellURL} {
+		if strings.Contains(docRels, url) {
+			t.Errorf("%q leaked into word/_rels/document.xml.rels, which the header/footer part cannot resolve:\n%s", url, docRels)
+		}
 	}
 }
 

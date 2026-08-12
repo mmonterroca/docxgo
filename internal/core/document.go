@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -130,7 +131,7 @@ func newBareDocument() *document {
 // ensureActiveSection guarantees the document has a current section and returns it.
 func (d *document) ensureActiveSection() (*docxSection, error) {
 	if len(d.sections) == 0 {
-		section := NewSection(d.relManager, d.idGen, d.mediaManager)
+		section := NewSection(d.idGen, d.mediaManager)
 		coreSection, ok := section.(*docxSection)
 		if !ok {
 			return nil, errors.InvalidState("Document.ensureActiveSection", "unexpected section implementation type")
@@ -210,7 +211,7 @@ func (d *document) AddSectionWithBreak(breakType domain.SectionBreakType) (domai
 		},
 	})
 
-	newSection := NewSection(d.relManager, d.idGen, d.mediaManager)
+	newSection := NewSection(d.idGen, d.mediaManager)
 	coreSection, ok := newSection.(*docxSection)
 	if !ok {
 		return nil, errors.InvalidState("Document.AddSectionWithBreak", "unexpected section implementation type")
@@ -389,6 +390,79 @@ func (d *document) prepareHeaderFooterRelationships() {
 	}
 }
 
+// partRelsPathFor maps a header/footer target name to the archive path of that
+// part's own relationships file: "header1.xml" -> "word/_rels/header1.xml.rels".
+//
+// Header and footer target paths are stored bare (just the file name) all the
+// way through core and the serializer -- see prepareHeaderFooterRelationships,
+// which assigns them, and zip.go, which prepends "word/" when writing the part
+// itself. PreservedParts.HeaderRels, by contrast, is keyed by the full archive
+// path, so this normalizes to that shape and the two can be compared directly.
+//
+// path.Base defends against a target that already carries a directory (an
+// opened document's target comes from the source file's own rels, so it is not
+// guaranteed to be bare) -- without it the result would nest a second "word/".
+func partRelsPathFor(target string) string {
+	return "word/_rels/" + path.Base(target) + ".rels"
+}
+
+// collectPartRelationships gathers the relationships each header and footer
+// owns, keyed by the archive path of that part's .rels file.
+//
+// A relationship referenced from word/header1.xml has to be declared in
+// word/_rels/header1.xml.rels: the header is its own OPC part and cannot
+// resolve an r:id that only exists in word/_rels/document.xml.rels. Each
+// header/footer therefore carries its own RelationshipManager (see
+// newPartRelationshipManager) and this is where those get handed to the writer.
+//
+// Parts with no relationships of their own are skipped rather than emitting an
+// empty <Relationships/> part, which would be valid but pointless.
+//
+// Note this deliberately does NOT include the w:headerReference relationship
+// that points *at* the header -- that one is genuinely document-level and is
+// minted into d.relManager by prepareHeaderFooterRelationships.
+func (d *document) collectPartRelationships() map[string]*xmlstructs.Relationships {
+	if d == nil {
+		return nil
+	}
+
+	out := make(map[string]*xmlstructs.Relationships)
+
+	for _, sec := range d.sections {
+		coreSection, ok := sec.(*docxSection)
+		if !ok {
+			continue
+		}
+
+		coreSection.mu.RLock()
+
+		for _, header := range coreSection.headers {
+			if header == nil || header.relationMgr == nil || header.relationMgr.Count() == 0 {
+				continue
+			}
+			if target := header.TargetPath(); target != "" {
+				out[partRelsPathFor(target)] = header.relationMgr.ToXML()
+			}
+		}
+
+		for _, footer := range coreSection.footers {
+			if footer == nil || footer.relationMgr == nil || footer.relationMgr.Count() == 0 {
+				continue
+			}
+			if target := footer.TargetPath(); target != "" {
+				out[partRelsPathFor(target)] = footer.relationMgr.ToXML()
+			}
+		}
+
+		coreSection.mu.RUnlock()
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 // ensureDefaultRelationships guarantees that the DOCX package contains the
 // required relationships for styles, fonts, and theme assets. Without these
 // entries Word falls back to implicit defaults and style assignments appear as
@@ -484,6 +558,11 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	xmlDoc := ser.SerializeDocument(d)
 	headers, footers := ser.SerializeSectionParts(d)
 
+	// Relationships owned by individual header/footer parts (an image or
+	// hyperlink placed in one). Collected after prepareHeaderFooterRelationships
+	// above, which is what assigns each part its target name.
+	partRels := d.collectPartRelationships()
+
 	// Create ZIP writer
 	zipWriter := writer.NewZipWriter(w)
 	zipWriter.SetLanguage(d.language)
@@ -547,7 +626,7 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	}
 
 	// Use preserved styles and parts if available (from reading an existing document)
-	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers, numberingPart, d.preservedStylesPart, writerPreserved); err != nil {
+	if err := zipWriter.WriteDocument(xmlDoc, rels, coreProps, appProps, styles, mediaFiles, headers, footers, partRels, numberingPart, d.preservedStylesPart, writerPreserved); err != nil {
 		return 0, errors.WrapWithCode(err, errors.ErrCodeIO, "Document.WriteTo")
 	}
 

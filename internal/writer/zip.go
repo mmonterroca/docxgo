@@ -75,7 +75,13 @@ func (zw *ZipWriter) SetLanguage(lang *domain.Language) {
 // WriteDocument writes a complete .docx document structure.
 // If preservedStyles is provided (non-nil), it will be written verbatim instead of serializing styles.
 // If preserved is provided, those parts will be written verbatim for complete round-trip fidelity.
-func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Relationships, coreProps *xmlstructs.CoreProperties, appProps *xmlstructs.AppProperties, styles *xmlstructs.Styles, media []*manager.MediaFile, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, numbering *NumberingPart, preservedStyles []byte, preserved *PreservedParts) error {
+//
+// partRels holds the relationships owned by individual header/footer parts,
+// keyed by the archive path of the .rels file itself (e.g.
+// "word/_rels/header1.xml.rels"). It is the generated counterpart to
+// PreservedParts.HeaderRels/FooterRels; an entry is written only when no
+// preserved part already claims that name.
+func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Relationships, coreProps *xmlstructs.CoreProperties, appProps *xmlstructs.AppProperties, styles *xmlstructs.Styles, media []*manager.MediaFile, headers map[string]*xmlstructs.Header, footers map[string]*xmlstructs.Footer, partRels map[string]*xmlstructs.Relationships, numbering *NumberingPart, preservedStyles []byte, preserved *PreservedParts) error {
 	numberingPart := sanitizeNumberingPart(numbering)
 
 	// Determine if we're in round-trip mode (have preserved parts)
@@ -234,6 +240,30 @@ func (zw *ZipWriter) WriteDocument(doc *xmlstructs.Document, rels *xmlstructs.Re
 			if err := zw.writeRaw(name, data); err != nil {
 				return fmt.Errorf("write preserved footer rels %s: %w", name, err)
 			}
+		}
+	}
+
+	// Write generated header/footer relationship parts, for relationships a
+	// header or footer owns itself (an image or hyperlink placed in it). These
+	// cannot go in word/_rels/document.xml.rels: a header is its own OPC part
+	// and cannot resolve an r:id declared there.
+	//
+	// A name already written from the preserved maps above is skipped rather
+	// than written twice -- writeRaw is a bare zip.Create and archive/zip
+	// accepts duplicate entry names silently, leaving Word to pick one
+	// unpredictably. Today the two sets cannot actually overlap (a generated
+	// header is only produced when no preserved header exists), but the guard
+	// is here so that stops being load-bearing once headers regenerate on
+	// opened documents.
+	for name, partRel := range partRels {
+		if partRel == nil {
+			continue
+		}
+		if roundTrip && (hasPart(preserved.HeaderRels, name) || hasPart(preserved.FooterRels, name)) {
+			continue
+		}
+		if err := zw.writeXML(name, partRel); err != nil {
+			return fmt.Errorf("write part rels %s: %w", name, err)
 		}
 	}
 
@@ -660,6 +690,14 @@ func (zw *ZipWriter) writeXML(path string, v interface{}) error {
 	}
 
 	return nil
+}
+
+// hasPart reports whether parts already claims the given archive path. Used to
+// keep a generated part from being written under a name a preserved part
+// already occupies, which archive/zip would accept as a duplicate entry.
+func hasPart(parts map[string][]byte, name string) bool {
+	_, ok := parts[name]
+	return ok
 }
 
 // writeRaw writes raw bytes to the ZIP.
