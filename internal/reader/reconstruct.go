@@ -160,7 +160,7 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 	}
 
 	if sectPr := findChild(body, "sectPr"); sectPr != nil {
-		if err := ctx.applySectionProperties(sectPr); err != nil {
+		if err := ctx.applySectionProperties(sectPr, false); err != nil {
 			return nil, errors.Wrap(err, opReconstructDocument)
 		}
 	}
@@ -169,12 +169,65 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 }
 
 func hydrateParagraph(doc domain.Document, elem *Element, ctx *reconstructContext) error {
+	// A paragraph whose only content is a mid-body section break -- pPr's
+	// sole child is sectPr, no runs/hyperlinks/fields/anything else -- exists
+	// in the source purely to carry that sectPr (ECMA-376 17.6.17: a sectPr
+	// in a paragraph's pPr means "this paragraph ends a section"; Word always
+	// puts one on its own dedicated, otherwise-empty paragraph). The writer
+	// already synthesizes a paragraph like this for every SectionBreak block
+	// (see DocumentSerializer.SerializeBody). Hydrating this source paragraph
+	// as an ordinary domain.Paragraph *in addition to* the section break
+	// would double it on the next write: the original (now content-less)
+	// paragraph, immediately followed by the writer's own synthetic one.
+	if sectPr, ok := bareSectionBreakSectPr(elem); ok {
+		return ctx.applySectionProperties(sectPr, true)
+	}
+
 	para, err := doc.AddParagraph()
 	if err != nil {
 		return errors.Wrap(err, opHydrateParagraph)
 	}
 
 	return populateParagraph(para, elem, ctx)
+}
+
+// bareSectionBreakSectPr returns the sectPr and true if elem is a paragraph
+// that exists solely to carry a mid-body section break: no children besides
+// pPr, and pPr has no children besides sectPr.
+func bareSectionBreakSectPr(elem *Element) (*Element, bool) {
+	if elem == nil {
+		return nil, false
+	}
+
+	var props *Element
+	for _, child := range elem.Children {
+		if child == nil {
+			continue
+		}
+		if child.Name.Local != "pPr" {
+			return nil, false
+		}
+		props = child
+	}
+	if props == nil {
+		return nil, false
+	}
+
+	var sectPr *Element
+	for _, child := range props.Children {
+		if child == nil {
+			continue
+		}
+		if child.Name.Local != "sectPr" {
+			return nil, false
+		}
+		sectPr = child
+	}
+
+	if sectPr == nil {
+		return nil, false
+	}
+	return sectPr, true
 }
 
 func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructContext) error {
@@ -216,7 +269,7 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 	if ctx != nil {
 		if props := findChild(elem, "pPr"); props != nil {
 			if sectPr := findChild(props, "sectPr"); sectPr != nil {
-				if err := ctx.applySectionProperties(sectPr); err != nil {
+				if err := ctx.applySectionProperties(sectPr, true); err != nil {
 					return err
 				}
 			}
@@ -556,6 +609,14 @@ func applyRunProperties(run domain.Run, props *Element) error {
 	if italicElem := findChild(props, "i"); italicElem != nil {
 		if val, ok := parseOnOff(italicElem); ok {
 			if err := run.SetItalic(val); err != nil {
+				return errors.Wrap(err, opApplyRunProperties)
+			}
+		}
+	}
+
+	if capsElem := findChild(props, "caps"); capsElem != nil {
+		if val, ok := parseOnOff(capsElem); ok {
+			if err := run.SetCaps(val); err != nil {
 				return errors.Wrap(err, opApplyRunProperties)
 			}
 		}
@@ -1462,7 +1523,17 @@ func (ctx *reconstructContext) ensureCurrentSection() (domain.Section, error) {
 	return sec, nil
 }
 
-func (ctx *reconstructContext) applySectionProperties(sectPr *Element) error {
+// applySectionProperties applies a <w:sectPr>'s layout, headers, and footers
+// to the current section.
+//
+// embedded distinguishes the two places a <w:sectPr> can appear: as a
+// paragraph's own pPr child, versus as the body's own last child. Per OOXML
+// (ECMA-376 §17.6.17), a sectPr embedded in a paragraph's pPr always means
+// "this paragraph ends a section" -- a new section always follows, even when
+// the optional w:type child is absent (its schema default is "nextPage", not
+// "no break"). The body-level sectPr describes the document's own last
+// section and never starts another one, since nothing follows it.
+func (ctx *reconstructContext) applySectionProperties(sectPr *Element, embedded bool) error {
 	if ctx == nil || sectPr == nil || ctx.suppressSectionHydration > 0 {
 		return nil
 	}
@@ -1485,10 +1556,11 @@ func (ctx *reconstructContext) applySectionProperties(sectPr *Element) error {
 		return err
 	}
 
-	if breakType, ok := extractSectionBreakType(sectPr); ok {
+	if embedded {
 		if ctx.doc == nil {
 			return nil
 		}
+		breakType, _ := extractSectionBreakType(sectPr)
 		newSection, err := ctx.doc.AddSectionWithBreak(breakType)
 		if err != nil {
 			return errors.Wrap(err, opApplySectionProperties)
@@ -2056,6 +2128,10 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 		return errors.Wrap(err, opHydrateTable)
 	}
 
+	if err := applyTableStyle(table, elem); err != nil {
+		return errors.Wrap(err, opHydrateTable)
+	}
+
 	for i, cells := range rowCells {
 		row, err := table.Row(i)
 		if err != nil {
@@ -2082,6 +2158,31 @@ func hydrateTable(doc domain.Document, elem *Element, ctx *reconstructContext) e
 	}
 
 	return nil
+}
+
+// applyTableStyle hydrates a table's <w:tblPr>/<w:tblStyle> reference (e.g.
+// "TableGrid") into the domain model. A table style commonly carries visible
+// properties -- borders, shading, banding -- defined once in styles.xml and
+// referenced by name rather than repeated on every table; dropping the
+// reference orphans that rendering even though the style definition itself
+// survives untouched in styles.xml.
+func applyTableStyle(table domain.Table, elem *Element) error {
+	if table == nil || elem == nil {
+		return nil
+	}
+	tblPr := findChild(elem, "tblPr")
+	if tblPr == nil {
+		return nil
+	}
+	styleElem := findChild(tblPr, "tblStyle")
+	if styleElem == nil {
+		return nil
+	}
+	val, ok := getAttr(styleElem, "val")
+	if !ok || val == "" {
+		return nil
+	}
+	return table.SetStyle(domain.TableStyle{Name: val})
 }
 
 func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructContext) error {
