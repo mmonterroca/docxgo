@@ -20,13 +20,12 @@ import (
 // By default, placeholders use {{key}} syntax. Unmatched placeholders are left
 // as-is unless StrictMode is enabled in options.
 //
-// On a document opened via OpenDocument/OpenDocumentFromBytes/
-// OpenDocumentFromReader whose headers or footers were preserved for
-// round-trip fidelity, header and footer placeholders are never written:
-// WriteTo writes those parts verbatim, so an in-memory replacement there
-// would never reach the saved file. Their keys are reported through
-// missingKeys instead (and so trigger StrictMode's error), since silently
-// succeeding while discarding the write on save would be worse.
+// Header and footer placeholders are filled like any other, including on a
+// document opened via OpenDocument/OpenDocumentFromBytes/
+// OpenDocumentFromReader. They used to be reported through missingKeys
+// instead, because WriteTo wrote every preserved header back verbatim and the
+// replacement could never reach the saved file. See ReplaceText's doc comment
+// for what changed and what a regenerated header costs.
 func MergeTemplate(doc domain.Document, data MergeData, opts ...MergeOptions) error {
 	opt := DefaultMergeOptions()
 	if len(opts) > 0 {
@@ -34,16 +33,9 @@ func MergeTemplate(doc domain.Document, data MergeData, opts ...MergeOptions) er
 	}
 
 	pattern := BuildPattern(opt)
-	skipHeaderFooter := hasPreservedHeadersOrFooters(doc)
 	var missingKeys []string
 
-	err := walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
-		if skipHeaderFooter && (ctx.locationType == LocationHeader || ctx.locationType == LocationFooter) {
-			for _, ph := range scanParagraph(para, pattern, ctx) {
-				missingKeys = append(missingKeys, ph.Name)
-			}
-			return nil
-		}
+	err := walkParagraphs(doc, func(para domain.Paragraph, _ paragraphContext) error {
 		if err := ConsolidateRuns(para); err != nil {
 			return err
 		}

@@ -41,44 +41,33 @@ type ReplaceResult struct {
 // middle of the replacement. A match confined to a single run carrying a
 // break or an image is replaced, and the break or image is preserved.
 //
-// On a document opened via OpenDocument/OpenDocumentFromBytes/
-// OpenDocumentFromReader whose headers or footers were preserved for
-// round-trip fidelity, every header and footer match is skipped too: WriteTo
-// writes those parts verbatim, so an in-memory edit there would never reach
-// the saved file. This check is document-wide, not per-header/footer — if
-// any header or footer part was preserved, all header/footer paragraphs are
-// skipped, even ones belonging to a different section.
+// Header and footer matches are replaced like any other, including on a
+// document opened via OpenDocument/OpenDocumentFromBytes/
+// OpenDocumentFromReader. They used to be skipped wholesale on such a
+// document, because WriteTo wrote every preserved header back verbatim and an
+// in-memory edit there could never reach the saved file. WriteTo now
+// regenerates a header or footer the caller actually edited, so the skip would
+// be discarding replacements that do land.
+//
+// The cost of that is worth stating plainly: a regenerated header is rebuilt
+// from what docxgo can model, so anything the reader does not understand —
+// a content control, a field, a nested table — is dropped from *that part*.
+// Headers this call does not touch are unaffected and still round-trip
+// byte-for-byte. Use Document.HasPreservedHeadersOrFooters to detect the
+// round-tripped case if that trade is not one you want to make.
 func ReplaceText(doc domain.Document, find, replace string) (ReplaceResult, error) {
 	if find == "" {
 		return ReplaceResult{}, fmt.Errorf("template: find text must not be empty")
 	}
 
-	skipHeaderFooter := hasPreservedHeadersOrFooters(doc)
-
 	var result ReplaceResult
-	err := walkParagraphs(doc, func(para domain.Paragraph, ctx paragraphContext) error {
-		if skipHeaderFooter && (ctx.locationType == LocationHeader || ctx.locationType == LocationFooter) {
-			result.Skipped += strings.Count(para.Text(), find)
-			return nil
-		}
+	err := walkParagraphs(doc, func(para domain.Paragraph, _ paragraphContext) error {
 		replaced, skipped, err := replaceInParagraph(para, find, replace)
 		result.Replaced += replaced
 		result.Skipped += skipped
 		return err
 	})
 	return result, err
-}
-
-// hasPreservedHeadersOrFooters reports whether doc carries preserved
-// header/footer bytes from a round-trip read. domain.Document does not
-// expose this on its own — the check goes through the same type-assertion
-// idiom walkParagraphs already uses for HeadersAll/FootersAll.
-func hasPreservedHeadersOrFooters(doc domain.Document) bool {
-	type preservedHeaderFooterChecker interface {
-		HasPreservedHeadersOrFooters() bool
-	}
-	checker, ok := doc.(preservedHeaderFooterChecker)
-	return ok && checker.HasPreservedHeadersOrFooters()
 }
 
 // runSpan maps a run to its byte-offset range [start, end) within the

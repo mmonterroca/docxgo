@@ -459,15 +459,21 @@ func TestReplaceText_DeletionMatchesStdlibSemantics(t *testing.T) {
 	}
 }
 
-// TestReplaceText_SkipsPreservedHeaderAndFooter is an end-to-end regression
-// test for the case where ReplaceText reported a header/footer match as
-// Replaced even though WriteTo writes preserved headers/footers verbatim,
-// silently discarding the edit. It builds a document with "FOO" in the body,
-// a header, and a footer, saves it, reopens it (which preserves the header
-// and footer bytes for round-trip), replaces "FOO" with "BAR", saves again,
-// and inspects the raw zip entries: the body must change and the header/
-// footer must not.
-func TestReplaceText_SkipsPreservedHeaderAndFooter(t *testing.T) {
+// TestReplaceText_ReachesPreservedHeaderAndFooter is the end-to-end proof
+// that an edit to a round-tripped header now survives the save. It builds a
+// document with "FOO" in the body, a header, and a footer, saves it, reopens
+// it (which preserves the header and footer bytes for round-trip), replaces
+// "FOO" with "BAR", saves again, and inspects the raw zip entries: all three
+// parts must change.
+//
+// This inverts TestReplaceText_SkipsPreservedHeaderAndFooter, which pinned
+// the old behaviour -- ReplaceText skipped every header/footer match on a
+// round-tripped document, because WriteTo wrote those parts back verbatim and
+// the edit could never reach the file. WriteTo now regenerates a part the
+// caller actually edited, so skipping would discard replacements that do
+// land. See TestOpenDocument_UntouchedHeaderStaysByteIdentical for the other
+// half of the contract: a part nobody touched is still written verbatim.
+func TestReplaceText_ReachesPreservedHeaderAndFooter(t *testing.T) {
 	doc := core.NewDocument()
 	bodyPara, _ := doc.AddParagraph()
 	bodyRun, _ := bodyPara.AddRun()
@@ -507,11 +513,11 @@ func TestReplaceText_SkipsPreservedHeaderAndFooter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReplaceText: %v", err)
 	}
-	if result.Replaced != 1 {
-		t.Errorf("replaced = %d, want 1 (body only)", result.Replaced)
+	if result.Replaced != 3 {
+		t.Errorf("replaced = %d, want 3 (body + header + footer)", result.Replaced)
 	}
-	if result.Skipped != 2 {
-		t.Errorf("skipped = %d, want 2 (header + footer)", result.Skipped)
+	if result.Skipped != 0 {
+		t.Errorf("skipped = %d, want 0", result.Skipped)
 	}
 
 	var buf bytes.Buffer
@@ -529,18 +535,18 @@ func TestReplaceText_SkipsPreservedHeaderAndFooter(t *testing.T) {
 	}
 
 	headerXML := string(extractZipPart(t, savedBytes, "word/header1.xml"))
-	if !strings.Contains(headerXML, "FOO in header") {
-		t.Errorf("header1.xml: expected untouched FOO, got %s", headerXML)
+	if !strings.Contains(headerXML, "BAR in header") {
+		t.Errorf("header1.xml: expected the replacement to reach the saved header, got %s", headerXML)
 	}
-	if strings.Contains(headerXML, "BAR") {
-		t.Errorf("header1.xml: unexpected BAR — header should be preserved verbatim, got %s", headerXML)
+	if strings.Contains(headerXML, "FOO") {
+		t.Errorf("header1.xml: unexpected leftover FOO, got %s", headerXML)
 	}
 
 	footerXML := string(extractZipPart(t, savedBytes, "word/footer1.xml"))
-	if !strings.Contains(footerXML, "FOO in footer") {
-		t.Errorf("footer1.xml: expected untouched FOO, got %s", footerXML)
+	if !strings.Contains(footerXML, "BAR in footer") {
+		t.Errorf("footer1.xml: expected the replacement to reach the saved footer, got %s", footerXML)
 	}
-	if strings.Contains(footerXML, "BAR") {
-		t.Errorf("footer1.xml: unexpected BAR — footer should be preserved verbatim, got %s", footerXML)
+	if strings.Contains(footerXML, "FOO") {
+		t.Errorf("footer1.xml: unexpected leftover FOO, got %s", footerXML)
 	}
 }

@@ -161,14 +161,16 @@ func TestMergeTemplate_MissingKey_Strict(t *testing.T) {
 	}
 }
 
-// TestMergeTemplate_SkipsPreservedHeaderAndFooter is an end-to-end regression
-// test for the case where MergeTemplate silently replaced placeholder text
-// in a header/footer whose bytes WriteTo then writes verbatim, discarding
-// the edit on save. On a document whose headers/footers were preserved from
-// a round-trip open, a header/footer placeholder must be left untouched (so
-// re-running the merge later still finds it) and, in strict mode, reported
-// as missing rather than silently dropped.
-func TestMergeTemplate_SkipsPreservedHeaderAndFooter(t *testing.T) {
+// TestMergeTemplate_ReachesPreservedHeader is the end-to-end proof that a
+// merge into a round-tripped header now survives the save, and that the
+// placeholder is therefore no longer reported as missing.
+//
+// This inverts TestMergeTemplate_SkipsPreservedHeaderAndFooter, which pinned
+// the old behaviour: a header placeholder was left untouched and reported
+// through missingKeys (so strict mode failed), because WriteTo wrote the
+// preserved header back verbatim and the merge could never reach the file.
+// See ReplaceText's doc comment for what changed.
+func TestMergeTemplate_ReachesPreservedHeader(t *testing.T) {
 	doc := core.NewDocument()
 	bodyPara, _ := doc.AddParagraph()
 	bodyRun, _ := bodyPara.AddRun()
@@ -197,12 +199,8 @@ func TestMergeTemplate_SkipsPreservedHeaderAndFooter(t *testing.T) {
 	}
 
 	opts := MergeOptions{OpenDelimiter: "{{", CloseDelimiter: "}}", StrictMode: true}
-	err = MergeTemplate(opened, MergeData{"name": "Alice"}, opts)
-	if err == nil {
-		t.Fatal("expected strict-mode error for the header placeholder that cannot be persisted")
-	}
-	if !strings.Contains(err.Error(), "name") {
-		t.Errorf("expected error to mention 'name', got: %v", err)
+	if err := MergeTemplate(opened, MergeData{"name": "Alice"}, opts); err != nil {
+		t.Fatalf("MergeTemplate: %v (the header placeholder is filled now, not reported missing)", err)
 	}
 
 	var buf bytes.Buffer
@@ -217,11 +215,11 @@ func TestMergeTemplate_SkipsPreservedHeaderAndFooter(t *testing.T) {
 	}
 
 	headerXML := string(extractZipPart(t, savedBytes, "word/header1.xml"))
-	if !strings.Contains(headerXML, "Header: {{name}}") {
-		t.Errorf("header1.xml: expected untouched placeholder, got %s", headerXML)
+	if !strings.Contains(headerXML, "Header: Alice") {
+		t.Errorf("header1.xml: expected the merged value to reach the saved header, got %s", headerXML)
 	}
-	if strings.Contains(headerXML, "Alice") {
-		t.Errorf("header1.xml: unexpected merged value — header should be preserved verbatim, got %s", headerXML)
+	if strings.Contains(headerXML, "{{name}}") {
+		t.Errorf("header1.xml: unexpected leftover placeholder, got %s", headerXML)
 	}
 }
 

@@ -1315,6 +1315,23 @@ func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[str
 	headers := make(map[string]*xml.Header)
 	footers := make(map[string]*xml.Footer)
 
+	// Each header and footer numbers its drawings from 1, independently of
+	// the body and of every other part. A header is its own OPC part with its
+	// own drawing tree, so that is the natural scope for wp:docPr ids -- but
+	// it is load-bearing for round-trip fidelity, not just tidiness.
+	//
+	// WriteTo serializes the body before the parts and shares one counter
+	// with them, so without this an untouched header's ids depend on how many
+	// images the *body* happens to hold. Regeneration is decided by comparing
+	// a part against a snapshot taken at hydration, so a header whose ids
+	// shift because the caller added a body image reads as edited and gets
+	// rebuilt, losing whatever the reader could not model from it. Mirroring
+	// the body pass inside the snapshot would not be enough: the body can
+	// legitimately change between opening the document and saving it, and
+	// that must not dirty a header nobody touched.
+	restore := s.drawingCounter
+	defer func() { s.drawingCounter = restore }()
+
 	sections := doc.Sections()
 	for _, section := range sections {
 		secWithMaps, ok := section.(interface {
@@ -1339,6 +1356,7 @@ func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[str
 				continue
 			}
 
+			s.drawingCounter = 0
 			xmlHeader := xml.NewHeader()
 			xmlHeader.Content = s.serializeHeaderFooterContent(headerMeta.Blocks())
 			headers[target] = xmlHeader
@@ -1358,6 +1376,7 @@ func (s *DocumentSerializer) SerializeSectionParts(doc domain.Document) (map[str
 				continue
 			}
 
+			s.drawingCounter = 0
 			xmlFooter := xml.NewFooter()
 			xmlFooter.Content = s.serializeHeaderFooterContent(footerMeta.Blocks())
 			footers[target] = xmlFooter
