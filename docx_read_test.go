@@ -1024,6 +1024,48 @@ func TestOpenDocument_AddHyperlink_RegeneratesRelsWithoutLosingOriginal(t *testi
 	})
 }
 
+// TestOpenDocument_PreservesRunCaps is the end-to-end regression for one of
+// the three losses reported in issue #102: opening a real, Word-authored
+// document whose title uses "All Caps" character formatting (<w:caps>, a
+// display override -- the stored text is genuinely mixed-case) and resaving
+// it dropped the formatting, so the title would render in its literal
+// mixed-case text instead of forced uppercase.
+//
+// testdata/word/issue-102-input.docx is the reporter's own attachment. Only
+// the w:caps loss is asserted here; the section-break and table-style losses
+// reported in the same issue are fixed separately.
+func TestOpenDocument_PreservesRunCaps(t *testing.T) {
+	doc, err := OpenDocument(filepath.Join("internal", "reader", "testdata", "word", "issue-102-input.docx"))
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+
+	var titleRun domain.Run
+	for _, para := range doc.Paragraphs() {
+		for _, run := range para.Runs() {
+			if strings.Contains(run.Text(), "TiTlE") {
+				titleRun = run
+			}
+		}
+	}
+	if titleRun == nil {
+		t.Fatal("did not find the title run (looked for text containing \"TiTlE\")")
+	}
+	if !titleRun.Caps() {
+		t.Error("title run Caps() = false, want true")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	if !strings.Contains(written, "<w:caps") {
+		t.Errorf("resaved document.xml lost the title's w:caps:\n%s", written)
+	}
+}
+
 // TestOpenDocument_PreservesTableStyle is the end-to-end regression for one
 // of the three losses reported in issue #102: opening a real, Word-authored
 // document whose table borders come from a named table style (<w:tblStyle>,

@@ -225,6 +225,79 @@ func TestConsolidateRuns_DifferentLanguage(t *testing.T) {
 	}
 }
 
+func TestConsolidateRuns_DifferentCaps(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("hello ")
+
+	r2, _ := para.AddRun()
+	r2.SetText("SHOUTED")
+	if err := r2.SetCaps(true); err != nil {
+		t.Fatalf("SetCaps: %v", err)
+	}
+
+	r3, _ := para.AddRun()
+	r3.SetText(" world")
+
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
+
+	// r2's Caps override must keep it from merging with its neighbors -- a
+	// merge would either lose the all-caps display on r2's text or wrongly
+	// apply it to "hello "/" world" too, since the merge keeps only the
+	// leader's formatting (see ConsolidateRuns).
+	runs := para.Runs()
+	if len(runs) != 3 {
+		t.Fatalf("expected 3 runs (no merge across a Caps boundary), got %d", len(runs))
+	}
+	if runs[0].Text() != "hello " || runs[0].Caps() {
+		t.Errorf("run[0]: expected Caps=false 'hello ', got %q caps=%v", runs[0].Text(), runs[0].Caps())
+	}
+	if runs[1].Text() != "SHOUTED" || !runs[1].Caps() {
+		t.Errorf("run[1]: expected Caps=true 'SHOUTED', got %q caps=%v", runs[1].Text(), runs[1].Caps())
+	}
+	if runs[2].Text() != " world" || runs[2].Caps() {
+		t.Errorf("run[2]: expected Caps=false ' world', got %q caps=%v", runs[2].Text(), runs[2].Caps())
+	}
+}
+
+func TestConsolidateRuns_ExplicitFalseCapsNotMergedWithUnset(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	r1, _ := para.AddRun()
+	r1.SetText("hello ")
+
+	r2, _ := para.AddRun()
+	r2.SetText("world")
+	if err := r2.SetCaps(false); err != nil {
+		t.Fatalf("SetCaps: %v", err)
+	}
+
+	if err := ConsolidateRuns(para); err != nil {
+		t.Fatalf("ConsolidateRuns: %v", err)
+	}
+
+	// r1 and r2 both report Caps() == false, but r2's is an explicit override
+	// (must resave as <w:caps w:val="false"/> to cancel a style's All Caps)
+	// while r1's is merely never-set. Merging them would keep only r1's
+	// (never-set) state on the combined run, silently discarding r2's
+	// override -- see capsSetOf in format.go.
+	runs := para.Runs()
+	if len(runs) != 2 {
+		t.Fatalf("expected 2 runs (no merge across an explicit-vs-unset Caps boundary), got %d", len(runs))
+	}
+	if runs[0].Text() != "hello " {
+		t.Errorf("run[0]: expected 'hello ', got %q", runs[0].Text())
+	}
+	if runs[1].Text() != "world" {
+		t.Errorf("run[1]: expected 'world', got %q", runs[1].Text())
+	}
+}
+
 func TestConsolidateRuns_SplitPlaceholder(t *testing.T) {
 	doc := core.NewDocument()
 	para, _ := doc.AddParagraph()
