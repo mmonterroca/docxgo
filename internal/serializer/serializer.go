@@ -91,9 +91,13 @@ func (s *RunSerializer) serializeProperties(run domain.Run) *xml.RunProperties {
 		props.Italic = &xml.BoolValue{Val: boolPtr(true)}
 	}
 
-	// Caps
+	// Caps -- emit an explicit false too, when the source (or caller) set one,
+	// since that's the only way to override a run/paragraph style's own All
+	// Caps. See capsSetter.
 	if run.Caps() {
 		props.Caps = &xml.BoolValue{Val: boolPtr(true)}
+	} else if r, ok := run.(capsSetter); ok && r.CapsSet() {
+		props.Caps = &xml.BoolValue{Val: boolPtr(false)}
 	}
 
 	// Strike
@@ -1039,6 +1043,15 @@ func boolPtr(b bool) *bool {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+// capsSetter exposes whether a run's SetCaps was ever called, letting the
+// serializer emit an explicit <w:caps w:val="false"/> instead of treating a
+// false Caps() as "unset" -- the only way to override a style's own All
+// Caps. Implemented by the concrete run type in internal/core; degrades to
+// "never explicitly set" for any other domain.Run implementation.
+type capsSetter interface {
+	CapsSet() bool
 }
 
 // spacingSetter exposes whether a paragraph's spacing setters were ever

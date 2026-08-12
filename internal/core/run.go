@@ -29,6 +29,7 @@ type run struct {
 	underline  domain.UnderlineStyle
 	strike     bool
 	caps       bool
+	capsSet    bool
 	highlight  domain.HighlightColor
 	language   *domain.Language
 	fields     []domain.Field     // Fields embedded in this run
@@ -168,7 +169,16 @@ func (r *run) Caps() bool {
 // SetCaps sets whether the text is displayed in all capitals.
 func (r *run) SetCaps(caps bool) error {
 	r.caps = caps
+	r.capsSet = true
 	return nil
+}
+
+// CapsSet reports whether SetCaps was ever called, letting the serializer
+// distinguish an explicit false (which must override a style's own All Caps
+// by emitting <w:caps w:val="false"/>) from the default, never-set false
+// (which correctly emits nothing). See capsSetter in internal/serializer.
+func (r *run) CapsSet() bool {
+	return r.capsSet
 }
 
 // Highlight returns the highlight color.

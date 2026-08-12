@@ -1183,6 +1183,74 @@ func TestReconstructRunCaps_AgainstHandAuthoredPackage(t *testing.T) {
 	}
 }
 
+// TestReconstructRunCapsExplicitFalse_AgainstHandAuthoredPackage covers the
+// other half of w:caps fidelity: a run that explicitly cancels All Caps with
+// <w:caps w:val="false"/>, distinct from a run that simply never mentions
+// w:caps at all. Both hydrate to Runs()[0].Caps() == false, but only the
+// explicit one must round-trip back to an explicit w:val="false" -- omitting
+// it entirely would be indistinguishable from "never set" on resave, and if
+// a run/paragraph style further up sets All Caps, that omission would let
+// the style's All Caps silently apply to text the source explicitly
+// exempted from it.
+func TestReconstructRunCapsExplicitFalse_AgainstHandAuthoredPackage(t *testing.T) {
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p><w:r><w:rPr><w:caps w:val="false"/></w:rPr><w:t>not shouted</w:t></w:r></w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	paras := doc.Paragraphs()
+	if len(paras) != 1 || len(paras[0].Runs()) != 1 {
+		t.Fatalf("unexpected shape: %d paragraphs", len(paras))
+	}
+	run := paras[0].Runs()[0]
+	if run.Caps() {
+		t.Error("Runs()[0].Caps() = true, want false")
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `<w:caps w:val="false"`) {
+		t.Errorf("resaved document.xml lost the run's explicit w:caps w:val=\"false\" override:\n%s", written)
+	}
+}
+
 func TestReconstructDocumentTable(t *testing.T) {
 	doc := core.NewDocument()
 	table, err := doc.AddTable(1, 2)
