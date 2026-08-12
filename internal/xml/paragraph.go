@@ -110,8 +110,11 @@ type DecimalNumber struct {
 // Can use either r:id (external link via relationship) or w:anchor (internal bookmark link).
 type Hyperlink struct {
 	XMLName xml.Name `xml:"w:hyperlink"`
-	ID      string   `xml:"r:id,attr,omitempty"`      // External hyperlink via relationship
-	Anchor  string   `xml:"w:anchor,attr,omitempty"`  // Internal bookmark anchor (e.g., _Toc123456)
-	History string   `xml:"w:history,attr,omitempty"` // "1" to add to history
-	Runs    []*Run   `xml:"w:r"`
+	ID      string   `xml:"r:id,attr,omitempty"`     // External hyperlink via relationship
+	Anchor  string   `xml:"w:anchor,attr,omitempty"` // Internal bookmark anchor (e.g., _Toc123456)
+	// History is a pointer, not a bare string, because "0" is a real value
+	// distinct from "attribute absent" -- a source document that explicitly
+	// turns history off must round-trip that, not just fall back to omitted.
+	History *string `xml:"w:history,attr,omitempty"`
+	Runs    []*Run  `xml:"w:r"`
 }

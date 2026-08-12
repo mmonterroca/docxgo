@@ -307,7 +307,46 @@ func (s *ParagraphSerializer) Serialize(para domain.Paragraph) *xml.Paragraph {
 		}
 	}
 
+	xmlPara.Elements = mergeConsecutiveHyperlinks(xmlPara.Elements)
+
 	return xmlPara
+}
+
+// mergeConsecutiveHyperlinks combines adjacent *xml.Hyperlink elements that
+// target the same place into one element with their runs concatenated. A
+// hyperlink spanning several domain runs with different formatting expands
+// to one <w:hyperlink> per run above; this folds those back into the single
+// element Word itself always writes for one link.
+//
+// Only truly adjacent elements are merged -- xml.Hyperlink has no field for
+// anything but Runs, so a bookmark or other element between two hyperlinks
+// would be reordered by a non-adjacent merge. And the key is the full
+// (ID, Anchor, History) triple, not "both are hyperlinks": two different
+// links sitting next to each other in the same paragraph must stay separate.
+func mergeConsecutiveHyperlinks(elements []interface{}) []interface{} {
+	merged := make([]interface{}, 0, len(elements))
+	for _, el := range elements {
+		link, ok := el.(*xml.Hyperlink)
+		if ok && len(merged) > 0 {
+			if prev, ok := merged[len(merged)-1].(*xml.Hyperlink); ok && sameHyperlinkTarget(prev, link) {
+				prev.Runs = append(prev.Runs, link.Runs...)
+				continue
+			}
+		}
+		merged = append(merged, el)
+	}
+	return merged
+}
+
+func sameHyperlinkTarget(a, b *xml.Hyperlink) bool {
+	return a.ID == b.ID && a.Anchor == b.Anchor && stringPtrEqual(a.History, b.History)
+}
+
+func stringPtrEqual(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 func (s *ParagraphSerializer) expandRunWithNewlines(run domain.Run, text string) []interface{} {
@@ -432,11 +471,21 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 					if xmlRun.Properties == nil {
 						xmlRun.Properties = &xml.RunProperties{}
 					}
-					xmlRun.Properties.Style = &xml.RunStyle{Val: "Hyperlink"}
+					// Only Hyperlink char style has any chance of already being
+					// set here -- domain.Run has no rStyle representation of its
+					// own today, so this guard is forward cover, not an active fix.
+					if xmlRun.Properties.Style == nil {
+						xmlRun.Properties.Style = &xml.RunStyle{Val: "Hyperlink"}
+					}
+
+					history := stringPtr("1")
+					if hv, ok := accessor.GetProperty("history"); ok {
+						history = stringPtr(hv)
+					}
 
 					hyperlink := &xml.Hyperlink{
 						Anchor:  anchor,
-						History: "1",
+						History: history,
 						Runs:    []*xml.Run{xmlRun},
 					}
 					elements = append(elements, hyperlink)
@@ -472,11 +521,19 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 					if xmlRun.Properties == nil {
 						xmlRun.Properties = &xml.RunProperties{}
 					}
-					xmlRun.Properties.Style = &xml.RunStyle{Val: "Hyperlink"}
+					if xmlRun.Properties.Style == nil {
+						xmlRun.Properties.Style = &xml.RunStyle{Val: "Hyperlink"}
+					}
+
+					var history *string
+					if hv, ok := accessor.GetProperty("history"); ok {
+						history = stringPtr(hv)
+					}
 
 					hyperlink := &xml.Hyperlink{
-						ID:   relID,
-						Runs: []*xml.Run{xmlRun},
+						ID:      relID,
+						History: history,
+						Runs:    []*xml.Run{xmlRun},
 					}
 					elements = append(elements, hyperlink)
 					textConsumedByHyperlink = true
@@ -1135,6 +1192,10 @@ func boolPtr(b bool) *bool {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
 
 // capsSetter exposes whether a run's SetCaps was ever called, letting the

@@ -252,6 +252,17 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 
 	state := newFieldState(ctx)
 
+	// Bookmarks are hydrated only when their w:bookmarkStart and
+	// w:bookmarkEnd both fall in this same paragraph -- core.paragraph holds
+	// one scalar (id, name) pair, so it cannot represent a bookmark spanning
+	// several paragraphs or one hanging directly off w:body (where Word's own
+	// _GoBack usually sits). Those are dropped, same as before this existed.
+	// pendingBookmarks collects every start seen so far in this paragraph;
+	// bookmarkHydrated fires on the first end that closes one of them, so a
+	// paragraph with several (possibly nested) bookmarks keeps exactly one.
+	pendingBookmarks := make(map[string]string)
+	bookmarkHydrated := false
+
 	for _, child := range elem.Children {
 		if child == nil {
 			continue
@@ -269,6 +280,32 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 		case "fldSimple":
 			if err := hydrateSimpleField(para, child, ctx, state); err != nil {
 				return err
+			}
+		case "bookmarkStart":
+			if id, ok := getAttr(child, "id"); ok && id != "" {
+				name, _ := getAttr(child, "name")
+				pendingBookmarks[id] = name
+			}
+		case "bookmarkEnd":
+			if bookmarkHydrated {
+				continue
+			}
+			id, ok := getAttr(child, "id")
+			if !ok {
+				continue
+			}
+			name, started := pendingBookmarks[id]
+			if !started {
+				continue
+			}
+			if hydrator, ok := para.(interface{ HydrateBookmark(string, string) }); ok {
+				hydrator.HydrateBookmark(id, name)
+				bookmarkHydrated = true
+				if ctx != nil {
+					if tracker, ok := ctx.doc.(interface{ ObserveHydratedBookmarkID(string) }); ok {
+						tracker.ObserveHydratedBookmarkID(id)
+					}
+				}
 			}
 		}
 	}
@@ -771,6 +808,10 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 		}
 	}
 
+	// w:history is ST_OnOff: "0" is a real, distinct value from the
+	// attribute being absent, so track presence rather than defaulting.
+	history, hasHistory := getAttr(elem, "history")
+
 	for _, child := range elem.Children {
 		if child == nil || child.Name.Local != "r" {
 			continue
@@ -794,6 +835,9 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 				// so the serializer can reuse it instead of generating new IDs
 				if originalRelID != "" && !strings.HasPrefix(url, "#") {
 					accessor.SetProperty("relationshipID", originalRelID)
+				}
+				if hasHistory {
+					accessor.SetProperty("history", history)
 				}
 			}
 			extraFields = []domain.Field{field}

@@ -200,8 +200,8 @@ func TestReconstructHyperlink_AgainstHandAuthoredPackage(t *testing.T) {
 		t.Fatalf("WriteTo: %v", err)
 	}
 	written := documentXML(t, buf.Bytes())
-	if got := strings.Count(written, "<w:hyperlink"); got != 2 {
-		t.Errorf("resaved document.xml contains %d <w:hyperlink> elements, want 2 (one per run, since reading flattens the source's single element)", got)
+	if got := strings.Count(written, "<w:hyperlink"); got != 1 {
+		t.Errorf("resaved document.xml contains %d <w:hyperlink> elements, want 1 (reading flattens the source's single element into runs, and serializing merges consecutive same-target hyperlink runs back into one element)", got)
 	}
 
 	// Regression for a defect found while planning #101's follow-ups: this
@@ -215,6 +215,244 @@ func TestReconstructHyperlink_AgainstHandAuthoredPackage(t *testing.T) {
 		if got := strings.Count(written, wantText); got != 1 {
 			t.Errorf("resaved document.xml contains %q %d times, want 1 (duplicated trailing run)", wantText, got)
 		}
+	}
+
+	if !strings.Contains(written, `w:history="1"`) {
+		t.Errorf("resaved document.xml lost w:history=\"1\" from the source:\n%s", written)
+	}
+}
+
+// TestReconstructHyperlink_ExplicitHistoryFalseRoundTrips pins the reason
+// xml.Hyperlink.History is a *string rather than a bare string: w:history is
+// ST_OnOff, so an explicit "0" is a real value distinct from the attribute
+// being absent, and a bare string with omitempty could not tell them apart.
+func TestReconstructHyperlink_ExplicitHistoryFalseRoundTrips(t *testing.T) {
+	const url = "https://example.com/no-history"
+
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	docRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId2" Type="` + constants.RelTypeHyperlink + `" Target="` + url + `" TargetMode="External"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p>
+<w:hyperlink r:id="rId2" w:history="0">
+<w:r><w:t>No history</w:t></w:r>
+</w:hyperlink>
+</w:p>
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml":          contentTypesXML,
+		"_rels/.rels":                  rootRelsXML,
+		"word/document.xml":            mainDocumentXML,
+		"word/_rels/document.xml.rels": docRelsXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+
+	if !strings.Contains(written, `w:history="0"`) {
+		t.Errorf("resaved document.xml did not preserve explicit w:history=\"0\":\n%s", written)
+	}
+	if strings.Contains(written, `w:history="1"`) {
+		t.Errorf("resaved document.xml turned an explicit w:history=\"0\" into \"1\":\n%s", written)
+	}
+}
+
+// buildBookmarkPackage assembles a minimal single-part .docx around the
+// given word/document.xml body, for the bookmark hydration tests below.
+func buildBookmarkPackage(t *testing.T, bodyXML string) []byte {
+	t.Helper()
+
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `">
+<w:body>
+` + bodyXML + `
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	return buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+}
+
+func reconstructFromBookmarkBody(t *testing.T, bodyXML string) domain.Document {
+	t.Helper()
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackage(t, bodyXML))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	return doc
+}
+
+type bookmarkedParagraph interface {
+	BookmarkID() string
+	BookmarkName() string
+}
+
+// TestReconstructBookmark_SameParagraphHydrates covers populateParagraph's
+// bookmarkStart/bookmarkEnd handling: a bookmark whose start and end both
+// fall in one paragraph is the only shape core.paragraph's single (id, name)
+// pair can represent, and it must survive a read-then-write round trip.
+func TestReconstructBookmark_SameParagraphHydrates(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p>
+<w:bookmarkStart w:id="3" w:name="MyBookmark"/>
+<w:r><w:t>Hello</w:t></w:r>
+<w:bookmarkEnd w:id="3"/>
+</w:p>`)
+
+	paras := doc.Paragraphs()
+	if len(paras) != 1 {
+		t.Fatalf("len(Paragraphs()) = %d, want 1", len(paras))
+	}
+	bp, ok := paras[0].(bookmarkedParagraph)
+	if !ok {
+		t.Fatal("paragraph does not expose BookmarkID/BookmarkName")
+	}
+	if bp.BookmarkID() != "3" || bp.BookmarkName() != "MyBookmark" {
+		t.Errorf("BookmarkID/BookmarkName = %q/%q, want \"3\"/\"MyBookmark\"", bp.BookmarkID(), bp.BookmarkName())
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `<w:bookmarkStart w:id="3" w:name="MyBookmark"`) {
+		t.Errorf("resaved document.xml lost the bookmark start:\n%s", written)
+	}
+	if !strings.Contains(written, `<w:bookmarkEnd w:id="3"`) {
+		t.Errorf("resaved document.xml lost the bookmark end:\n%s", written)
+	}
+}
+
+// TestReconstructBookmark_SpanningParagraphsIsDropped pins the documented
+// limit of the single-paragraph model: a bookmark whose end falls in a
+// different paragraph than its start has nowhere to live and is discarded,
+// which is the pre-existing behavior this feature must not regress.
+func TestReconstructBookmark_SpanningParagraphsIsDropped(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:bookmarkStart w:id="1" w:name="Spans"/><w:r><w:t>A</w:t></w:r></w:p>
+<w:p><w:r><w:t>B</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>`)
+
+	for i, para := range doc.Paragraphs() {
+		bp, ok := para.(bookmarkedParagraph)
+		if !ok {
+			t.Fatalf("paragraph %d does not expose BookmarkID/BookmarkName", i)
+		}
+		if bp.BookmarkID() != "" {
+			t.Errorf("Paragraphs()[%d].BookmarkID() = %q, want \"\" (bookmark spans paragraphs, must be dropped)", i, bp.BookmarkID())
+		}
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if strings.Contains(written, "Spans") {
+		t.Errorf("resaved document.xml still references the dropped bookmark's name:\n%s", written)
+	}
+}
+
+// TestGenerateHeadingBookmarks_DoesNotClobberHydratedBookmark is the direct
+// regression test for the bug generateHeadingBookmarks had before this
+// change: it ran on every WriteTo, including a pure round trip, and
+// unconditionally overwrote any bookmark on a Heading-styled paragraph.
+func TestGenerateHeadingBookmarks_DoesNotClobberHydratedBookmark(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p>
+<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
+<w:bookmarkStart w:id="7" w:name="_Ref123"/>
+<w:r><w:t>Title</w:t></w:r>
+<w:bookmarkEnd w:id="7"/>
+</w:p>`)
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+
+	if !strings.Contains(written, `w:id="7" w:name="_Ref123"`) {
+		t.Errorf("resaved document.xml lost the hydrated heading bookmark:\n%s", written)
+	}
+	if strings.Contains(written, `_Toc`) {
+		t.Errorf("resaved document.xml assigned a generated _Toc bookmark to a paragraph that already had a hydrated one:\n%s", written)
+	}
+}
+
+// TestGenerateHeadingBookmarks_StartsAboveHighestHydratedID covers the
+// allocator: a Heading-styled paragraph with no bookmark of its own still
+// gets one generated, but its numeric w:id must start above every bookmark
+// ID already hydrated from the source, anywhere in the document -- not
+// always at 0, or it could collide with one the file already had.
+func TestGenerateHeadingBookmarks_StartsAboveHighestHydratedID(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:bookmarkStart w:id="5" w:name="SomeAnchor"/><w:r><w:t>Anchor</w:t></w:r><w:bookmarkEnd w:id="5"/></w:p>
+<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Chapter One</w:t></w:r></w:p>`)
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+
+	if !strings.Contains(written, `<w:bookmarkStart w:id="6" w:name="_Toc6"`) {
+		t.Errorf("resaved document.xml did not start the generated heading bookmark at id 6 (above the hydrated id 5):\n%s", written)
 	}
 }
 

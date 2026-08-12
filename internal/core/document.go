@@ -27,6 +27,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -79,6 +80,13 @@ type document struct {
 	preservedWebSettings  []byte            // Original webSettings.xml
 	preservedCustomProps  []byte            // Original docProps/custom.xml
 	preservedRootRels     []byte            // Original _rels/.rels
+
+	// maxHydratedBookmarkID is the highest numeric w:id seen among bookmarks
+	// hydrated from a source document, or -1 if none were. It seeds
+	// generateHeadingBookmarks's own counter so an auto-generated heading
+	// bookmark never collides with one the source already had, wherever in
+	// the document it sits. See ObserveHydratedBookmarkID.
+	maxHydratedBookmarkID int
 }
 
 // NewDocument creates a new Document.
@@ -121,15 +129,16 @@ func newBareDocument() *document {
 	idGen := manager.NewIDGenerator()
 	relManager := manager.NewRelationshipManager(idGen)
 	return &document{
-		paragraphs:   make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
-		tables:       make([]domain.Table, 0, constants.DefaultTableCapacity),
-		sections:     make([]domain.Section, 0, 1),
-		blocks:       make([]domain.Block, 0, constants.DefaultParagraphCapacity),
-		metadata:     &domain.Metadata{},
-		idGen:        idGen,
-		relManager:   relManager,
-		mediaManager: manager.NewMediaManager(idGen),
-		styleManager: manager.NewStyleManager(),
+		paragraphs:            make([]domain.Paragraph, 0, constants.DefaultParagraphCapacity),
+		tables:                make([]domain.Table, 0, constants.DefaultTableCapacity),
+		sections:              make([]domain.Section, 0, 1),
+		blocks:                make([]domain.Block, 0, constants.DefaultParagraphCapacity),
+		metadata:              &domain.Metadata{},
+		idGen:                 idGen,
+		relManager:            relManager,
+		mediaManager:          manager.NewMediaManager(idGen),
+		styleManager:          manager.NewStyleManager(),
+		maxHydratedBookmarkID: -1,
 	}
 }
 
@@ -323,12 +332,26 @@ func (d *document) Blocks() []domain.Block {
 // generateHeadingBookmarks generates bookmarks for all headings in the document.
 // This is required for Table of Contents (TOC) fields to work properly.
 // Bookmarks are named _Toc{sequential_number} and only applied to paragraphs with Heading styles.
+//
+// Runs on every WriteTo, including a pure read-modify-write round trip, so it
+// must not touch a paragraph whose bookmark was hydrated from the source
+// document (BookmarkHydrated) -- overwriting it here would both destroy a
+// real bookmark (a REF field's target, an internal hyperlink anchor, Word's
+// own _Ref.../_GoBack) and renumber it out from under anything that names it
+// by ID. A paragraph the caller styled Heading between two WriteTo calls, or
+// whose bookmark was set through the public SetBookmark rather than
+// hydration, is unaffected and still gets renumbered freely -- generation is
+// the status quo everywhere except a hydrated source bookmark.
 func (d *document) generateHeadingBookmarks() {
-	bookmarkCounter := 0
+	bookmarkCounter := d.maxHydratedBookmarkID + 1
 
 	for _, para := range d.paragraphs {
 		// Type assert to access internal paragraph methods
 		if p, ok := para.(*paragraph); ok {
+			if p.BookmarkHydrated() {
+				continue
+			}
+
 			styleName := p.StyleName()
 
 			// Check if this paragraph has a Heading style
@@ -976,6 +999,25 @@ func (d *document) RegisterExistingRelationship(id, relType, target, targetMode 
 		return errors.InvalidState("Document.RegisterExistingRelationship", "relationship manager not initialized")
 	}
 	return d.relManager.RegisterExisting(id, relType, target, targetMode)
+}
+
+// ObserveHydratedBookmarkID records a bookmark ID read from the source
+// document, so generateHeadingBookmarks can start its own numbering above
+// every ID the file already uses instead of always at 0. w:id is
+// ST_DecimalNumber; a non-numeric id (schema-invalid, but reader helpers
+// don't reject malformed source content) is ignored rather than erroring,
+// since this only needs to bound a decimal counter, not validate the source.
+func (d *document) ObserveHydratedBookmarkID(id string) {
+	if d == nil {
+		return
+	}
+	n, err := strconv.Atoi(id)
+	if err != nil {
+		return
+	}
+	if n > d.maxHydratedBookmarkID {
+		d.maxHydratedBookmarkID = n
+	}
 }
 
 func (d *document) SetNumberingPart(data []byte, target string) {
