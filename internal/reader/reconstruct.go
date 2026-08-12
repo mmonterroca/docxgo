@@ -2525,7 +2525,7 @@ func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 	// background entirely, so w:color is. Reading w:fill for both turns a
 	// solid red-on-blue cell blue.
 	val, _ := getAttr(shdElem, "val")
-	source := "fill"
+	var source string
 	switch {
 	case val == "" || strings.EqualFold(val, "clear"):
 		source = "fill"
