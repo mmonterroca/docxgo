@@ -12,10 +12,18 @@ import "github.com/mmonterroca/docxgo/v2/domain"
 type paragraphContext struct {
 	locationType LocationType
 	paraIdx      int
-	// Table cell context
-	tableIdx int
-	rowIdx   int
-	cellIdx  int
+	// Table cell context. inTableCell is the discriminator: tableIdx/rowIdx/
+	// cellIdx are only meaningful when it's true. LocationType alone can't
+	// serve that role for a header/footer paragraph -- unlike the body,
+	// where LocationTableCell vs LocationParagraph already says it -- because
+	// walkHeaderFooterTables deliberately reuses LocationHeader/LocationFooter
+	// for header/footer table cells too (see its doc comment), so a plain
+	// header paragraph and a header table's cell (0, 0, 0) are otherwise
+	// indistinguishable by Type and zero-valued indices alone.
+	inTableCell bool
+	tableIdx    int
+	rowIdx      int
+	cellIdx     int
 	// Header/footer context
 	sectionIdx int
 	headerType domain.HeaderType
@@ -44,6 +52,7 @@ func walkParagraphs(doc domain.Document, fn func(para domain.Paragraph, ctx para
 					ctx := paragraphContext{
 						locationType: LocationTableCell,
 						paraIdx:      pi,
+						inTableCell:  true,
 						tableIdx:     ti,
 						rowIdx:       ri,
 						cellIdx:      ci,
@@ -130,6 +139,7 @@ func walkHeaderFooterTables(tables []domain.Table, loc LocationType, sectionIdx 
 					ctx := paragraphContext{
 						locationType: loc,
 						paraIdx:      pi,
+						inTableCell:  true,
 						tableIdx:     ti,
 						rowIdx:       ri,
 						cellIdx:      ci,

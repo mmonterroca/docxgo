@@ -59,10 +59,18 @@ type Location struct {
 	// EndOffset is the byte offset after the placeholder end within the run
 	// at EndRunIndex.
 	EndOffset int
-	// TableIndex, RowIndex, CellIndex are set when Type == LocationTableCell,
-	// and also when the match is inside a table cell within a header or
-	// footer (Type == LocationHeader/LocationFooter) — in that case they're
-	// set alongside SectionIndex/HeaderType/FooterType below.
+	// InTableCell reports whether TableIndex/RowIndex/CellIndex below are
+	// meaningful. Always true when Type == LocationTableCell. For
+	// Type == LocationHeader/LocationFooter it varies: a header/footer table
+	// cell match sets it true (alongside SectionIndex/HeaderType/FooterType),
+	// but a plain header/footer paragraph match does not — Type alone can't
+	// tell the two apart there, since walkHeaderFooterTables deliberately
+	// reuses LocationHeader/LocationFooter for table cells too (see its doc
+	// comment), and TableIndex/RowIndex/CellIndex all zero-value to 0, the
+	// same as a real table/row/cell 0.
+	InTableCell bool
+	// TableIndex, RowIndex, CellIndex are only meaningful when InTableCell
+	// is true; otherwise they're left at their zero value.
 	TableIndex int
 	RowIndex   int
 	CellIndex  int
@@ -155,6 +163,7 @@ func scanParagraph(para domain.Paragraph, pattern *regexp.Regexp, ctx paragraphC
 				EndRunIndex:    endRun,
 				StartOffset:    startOffset,
 				EndOffset:      endOffset,
+				InTableCell:    ctx.inTableCell,
 				TableIndex:     ctx.tableIdx,
 				RowIndex:       ctx.rowIdx,
 				CellIndex:      ctx.cellIdx,

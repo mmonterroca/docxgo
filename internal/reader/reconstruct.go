@@ -1669,6 +1669,13 @@ type partBlockContainer interface {
 	AddTable(rows, cols int) (domain.Table, error)
 }
 
+// tableRollbacker is implemented by the concrete header/footer types in
+// internal/core, exposing the undo half of AddTable for hydrateTable's
+// best-effort error path -- see the "tbl" case in hydratePartBlocks.
+type tableRollbacker interface {
+	RemoveLastTable()
+}
+
 // hydratePartBlocks copies the paragraph and table children of a
 // header/footer part tree into container, resolving relationship IDs
 // against that part's own relationships (per-part scoping) with section
@@ -1701,7 +1708,17 @@ func (ctx *reconstructContext) hydratePartBlocks(container partBlockContainer, t
 				case "tbl":
 					// Best-effort: skip a table docxgo can't hydrate rather
 					// than failing the whole document (see doc comment above).
-					_ = hydrateTable(container, child, ctx)
+					// hydrateTable's own AddTable call already attached the
+					// table to container before any row/cell hydration ran,
+					// so a failure partway through must be rolled back too --
+					// otherwise a table that only *partly* failed would stay
+					// visible in Tables()/Blocks() instead of being skipped
+					// as this comment promises. See tableRollbacker.
+					if err := hydrateTable(container, child, ctx); err != nil {
+						if remover, ok := container.(tableRollbacker); ok {
+							remover.RemoveLastTable()
+						}
+					}
 				}
 			}
 			return nil

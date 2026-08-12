@@ -2416,6 +2416,55 @@ func TestHandleSectionAdd(t *testing.T) {
 	}
 }
 
+// TestHandleSectionAdd_RollsBackOnHeaderContentError pins that a rejected
+// section.add leaves the document's Sections() exactly as it was before the
+// call. applySection's AddSectionWithBreak attaches the new section to the
+// shared, store-persisted document immediately, before header/footer content
+// is validated -- an unknown content item type later in the same request
+// must not leave that half-configured section behind for every subsequent
+// operation on this documentId to see.
+func TestHandleSectionAdd_RollsBackOnHeaderContentError(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"output": "buffer",
+	}))
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	docBefore, ok := s.getDoc(docID)
+	if !ok {
+		t.Fatal("document not found after create")
+	}
+	before := len(docBefore.Sections())
+
+	resp := s.dispatch(makeRequest(2, "section.add", map[string]interface{}{
+		"documentId": docID,
+		"breakType":  "nextPage",
+		"headers": map[string]interface{}{
+			"default": []interface{}{
+				map[string]interface{}{
+					"type": "paragraph",
+					"runs": []interface{}{map[string]interface{}{"text": "ok"}},
+				},
+				map[string]interface{}{
+					"type": "not-a-real-type",
+				},
+			},
+		},
+	}))
+	if resp.Error == nil {
+		t.Fatal("expected error for unknown header content type")
+	}
+
+	docAfter, ok := s.getDoc(docID)
+	if !ok {
+		t.Fatal("document not found after rejected section.add")
+	}
+	if got := len(docAfter.Sections()); got != before {
+		t.Errorf("Sections() = %d after a rejected section.add, want %d (unchanged) -- the half-added section must be rolled back", got, before)
+	}
+}
+
 func TestHandleSectionAdd_NotFound(t *testing.T) {
 	s := newServer()
 	resp := s.dispatch(makeRequest(1, "section.add", map[string]interface{}{
@@ -2812,6 +2861,77 @@ func TestHandleTemplateInspect(t *testing.T) {
 			if _, ok := d[k]; ok {
 				t.Errorf("paragraph placeholder %v should not have %q key, got %v", d["name"], k, d[k])
 			}
+		}
+	}
+}
+
+// TestHandleTemplateInspect_HeaderTableCell pins that a placeholder inside a
+// header table cell reports its table/row/cell coordinates in template.inspect,
+// not just "location": "header". The domain walk (walkHeaderFooterTables)
+// deliberately keeps Type == LocationHeader for a header table cell match --
+// see its doc comment -- so the RPC handler must gate on
+// Location.InTableCell, not Location.Type == LocationTableCell, or these
+// coordinates silently disappear for every header/footer table placeholder.
+func TestHandleTemplateInspect_HeaderTableCell(t *testing.T) {
+	s := newServer()
+
+	createResp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"content": []map[string]interface{}{
+			{
+				"type":      "section",
+				"breakType": "nextPage",
+				"headers": map[string]interface{}{
+					"default": []interface{}{
+						map[string]interface{}{
+							"type": "table",
+							"rows": []interface{}{
+								map[string]interface{}{"cells": []interface{}{
+									map[string]interface{}{"paragraphs": []interface{}{
+										map[string]interface{}{"runs": []interface{}{
+											map[string]interface{}{"text": "{{companyName}}"},
+										}},
+									}},
+								}},
+							},
+						},
+					},
+				},
+			},
+		},
+		"output": "buffer",
+	}))
+	if createResp.Error != nil {
+		t.Fatalf("create failed: %+v", createResp.Error)
+	}
+	docID := createResp.Result.(map[string]interface{})["documentId"].(string)
+
+	inspResp := s.dispatch(makeRequest(2, "template.inspect", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if inspResp.Error != nil {
+		t.Fatalf("template.inspect failed: %+v", inspResp.Error)
+	}
+	result := inspResp.Result.(map[string]interface{})
+
+	resultJSON, _ := json.Marshal(result)
+	var parsed struct {
+		Details []map[string]interface{} `json:"details"`
+	}
+	json.Unmarshal(resultJSON, &parsed)
+
+	if len(parsed.Details) != 1 {
+		t.Fatalf("expected 1 placeholder occurrence, got %d: %+v", len(parsed.Details), parsed.Details)
+	}
+	d := parsed.Details[0]
+	if d["name"] != "companyName" {
+		t.Fatalf("expected placeholder %q, got %v", "companyName", d["name"])
+	}
+	if d["location"] != "header" {
+		t.Errorf("expected location %q, got %v", "header", d["location"])
+	}
+	for _, k := range []string{"table", "row", "cell"} {
+		if _, ok := d[k]; !ok {
+			t.Errorf("header table-cell placeholder missing %q key: %+v", k, d)
 		}
 	}
 }

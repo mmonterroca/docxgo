@@ -274,6 +274,33 @@ func (h *docxHeader) AddTable(rows, cols int) (domain.Table, error) {
 	return tbl, nil
 }
 
+// RemoveLastTable drops the most recently added table from both tables and
+// blocks, but only if it is still the very last block -- i.e. nothing else
+// was added to the header since. It exists for the reader's best-effort
+// header/footer hydration (see hydrateTable in internal/reader): AddTable
+// attaches a table to the header immediately, before its rows/cells are
+// populated, so a hydration failure partway through a table (e.g. an
+// unparseable gridSpan) must undo that attach -- otherwise the header is
+// left holding a table whose later rows or cells were silently never
+// populated, even though the caller tolerated the error and got no failure
+// back from OpenDocument. Safe under hydration's synchronous, single-caller
+// use: hydrateTable returns immediately on error, before anything else can
+// be added to the container.
+func (h *docxHeader) RemoveLastTable() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if len(h.tables) == 0 || len(h.blocks) == 0 {
+		return
+	}
+	last := h.tables[len(h.tables)-1]
+	if h.blocks[len(h.blocks)-1].Table != last {
+		return
+	}
+	h.tables = h.tables[:len(h.tables)-1]
+	h.blocks = h.blocks[:len(h.blocks)-1]
+}
+
 // Tables returns all top-level tables in the header.
 func (h *docxHeader) Tables() []domain.Table {
 	h.mu.RLock()
@@ -382,6 +409,22 @@ func (f *docxFooter) AddTable(rows, cols int) (domain.Table, error) {
 	f.tables = append(f.tables, tbl)
 	f.blocks = append(f.blocks, domain.Block{Table: tbl})
 	return tbl, nil
+}
+
+// RemoveLastTable is docxHeader.RemoveLastTable's footer twin -- see there.
+func (f *docxFooter) RemoveLastTable() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if len(f.tables) == 0 || len(f.blocks) == 0 {
+		return
+	}
+	last := f.tables[len(f.tables)-1]
+	if f.blocks[len(f.blocks)-1].Table != last {
+		return
+	}
+	f.tables = f.tables[:len(f.tables)-1]
+	f.blocks = f.blocks[:len(f.blocks)-1]
 }
 
 // Tables returns all top-level tables in the footer.

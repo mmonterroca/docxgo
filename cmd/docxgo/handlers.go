@@ -1463,10 +1463,14 @@ func (s *server) handleTemplateInspect(req *Request) Response {
 			"run":       p.Location.RunIndex,
 		}
 		// TableIndex/RowIndex/CellIndex are only meaningful for table-cell
-		// placeholders; for a top-level paragraph, header, or footer they're
-		// left at their zero value, so gate on the location type rather than
-		// on TableIndex >= 0 (which is always true).
-		if p.Location.Type == template.LocationTableCell {
+		// placeholders; for a top-level paragraph, or a plain header/footer
+		// paragraph, they're left at their zero value. Gate on
+		// Location.InTableCell rather than Location.Type == LocationTableCell:
+		// a header/footer table-cell match keeps Type == LocationHeader/
+		// LocationFooter (see walkHeaderFooterTables), so checking Type alone
+		// would silently drop table/row/cell coordinates for every
+		// placeholder found inside a header or footer table.
+		if p.Location.InTableCell {
 			loc["table"] = p.Location.TableIndex
 			loc["row"] = p.Location.RowIndex
 			loc["cell"] = p.Location.CellIndex
@@ -2116,13 +2120,37 @@ func applyTable(target tableTarget, item tableItem) error {
 	return nil
 }
 
+// sectionRemover is implemented by the concrete document type in
+// internal/core, exposing the undo half of AddSectionWithBreak for
+// applySection's rollback-on-error path below.
+type sectionRemover interface {
+	RemoveLastSection(domain.Section) bool
+}
+
 // applySection adds a new section to the document.
-func applySection(doc domain.Document, item sectionItem) error {
+//
+// AddSectionWithBreak attaches the new section to doc immediately, before
+// any of this function's own validation (page size, margins, headers,
+// footers, ...) runs. doc is not a scratch value here -- it's the same
+// document instance the CLI/RPC server keeps in its document store across
+// calls, keyed by documentId -- so a validation failure partway through must
+// undo the attach, or the store is left holding a permanently
+// half-configured extra section that every later operation on that
+// documentId (including a plain section.list or document.save) would see,
+// despite this call having reported failure. See sectionRemover.
+func applySection(doc domain.Document, item sectionItem) (err error) {
 	bt := parseSectionBreakType(item.BreakType)
 	sec, err := doc.AddSectionWithBreak(bt)
 	if err != nil {
 		return fmt.Errorf("failed to add section: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			if remover, ok := doc.(sectionRemover); ok {
+				remover.RemoveLastSection(sec)
+			}
+		}
+	}()
 
 	if item.PageSize != nil {
 		if err := sec.SetPageSize(parsePageSize(item.PageSize)); err != nil {

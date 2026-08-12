@@ -455,6 +455,100 @@ func TestReconstructDocument_HeaderTableOversizedIsTolerated(t *testing.T) {
 	}
 }
 
+// TestReconstructDocument_HeaderTableWithBrokenCellIsNotPartiallyAdded pins
+// that a header table which fails partway through hydration (a cell with an
+// unparseable gridSpan) is skipped entirely -- not left in header.Tables()
+// half-populated. AddTable attaches the table to the header before any row
+// or cell is hydrated, so a failure on, say, the second row must roll that
+// attach back too; otherwise the "best-effort skip" hydratePartBlocks
+// documents would actually leave a corrupt, partially-hydrated table
+// visible to callers instead of skipping it.
+func TestReconstructDocument_HeaderTableWithBrokenCellIsNotPartiallyAdded(t *testing.T) {
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+<w:p><w:r><w:t>Body</w:t></w:r></w:p>
+<w:sectPr>
+<w:headerReference w:type="default" r:id="rId7"/>
+<w:pgSz w:w="12240" w:h="15840"/>
+</w:sectPr>
+</w:body>
+</w:document>`
+
+	docRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId7" Type="` + constants.RelTypeHeader + `" Target="header1.xml"/>
+</Relationships>`
+
+	// Row 1 hydrates fine. Row 2's second cell has a gridSpan that isn't a
+	// number at all -- strconv.Atoi fails inside hydrateTableCell, after
+	// AddTable already attached a 2x2 table to the header.
+	headerXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:p><w:r><w:t>Before Table</w:t></w:r></w:p>
+<w:tbl>
+<w:tr><w:tc><w:p><w:r><w:t>R1C1</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>R1C2</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:tc><w:p><w:r><w:t>R2C1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:gridSpan w:val="broken"/></w:tcPr><w:p><w:r><w:t>R2C2</w:t></w:r></w:p></w:tc></w:tr>
+</w:tbl>
+</w:hdr>`
+
+	docxBytes := buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml":          contentTypesXML,
+		"_rels/.rels":                  rootRelsXML,
+		"word/document.xml":            mainDocumentXML,
+		"word/_rels/document.xml.rels": docRelsXML,
+		"word/header1.xml":             headerXML,
+	})
+
+	pkg, err := LoadPackageFromBytes(docxBytes)
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v (a header table with a broken cell must not fail the whole document)", err)
+	}
+
+	sections := doc.Sections()
+	if len(sections) == 0 {
+		t.Fatal("no sections")
+	}
+	header, err := sections[0].Header(domain.HeaderDefault)
+	if err != nil {
+		t.Fatalf("Header(): %v", err)
+	}
+
+	if got := len(header.Tables()); got != 0 {
+		t.Errorf("len(header.Tables()) = %d, want 0 (the table must be skipped entirely, not left half-hydrated)", got)
+	}
+	for i, block := range header.Blocks() {
+		if block.Table != nil {
+			t.Errorf("Blocks()[%d] is a table; want it entirely absent alongside Tables()", i)
+		}
+	}
+	// The paragraph before the skipped table must still have hydrated.
+	if got := len(header.Paragraphs()); got != 1 {
+		t.Errorf("len(header.Paragraphs()) = %d, want 1", got)
+	}
+}
+
 func TestLoadPackageFromBytes(t *testing.T) {
 	doc := core.NewDocument()
 	para, err := doc.AddParagraph()

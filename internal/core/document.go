@@ -220,6 +220,41 @@ func (d *document) AddSectionWithBreak(breakType domain.SectionBreakType) (domai
 	return newSection, nil
 }
 
+// RemoveLastSection undoes the most recent AddSectionWithBreak call, but
+// only if it is still the very last thing added -- i.e. section is still
+// d.activeSection and nothing else was appended to d.blocks since. It exists
+// for callers (namely the CLI/RPC document.section.add handler) that build a
+// section up across several steps (page size, margins, headers, footers,
+// ...) against a document that's already shared with other in-flight state:
+// AddSectionWithBreak attaches the new section immediately, so if a later
+// step in that sequence fails, the caller needs a way to undo the whole
+// section rather than leaving a half-configured one permanently in
+// Sections(). Reports whether it actually removed anything, so a caller that
+// can't be sure the section is still last-added can check before assuming
+// the document is back to its prior state.
+func (d *document) RemoveLastSection(section domain.Section) bool {
+	if len(d.sections) == 0 || d.sections[len(d.sections)-1] != section {
+		return false
+	}
+	if len(d.blocks) == 0 {
+		return false
+	}
+	lastBlock := d.blocks[len(d.blocks)-1]
+	if lastBlock.SectionBreak == nil || lastBlock.SectionBreak.Section == nil {
+		return false
+	}
+
+	prevSection, ok := lastBlock.SectionBreak.Section.(*docxSection)
+	if !ok {
+		return false
+	}
+
+	d.sections = d.sections[:len(d.sections)-1]
+	d.blocks = d.blocks[:len(d.blocks)-1]
+	d.activeSection = prevSection
+	return true
+}
+
 // AddPageBreak adds a page break to the document.
 func (d *document) AddPageBreak() error {
 	// Create a new paragraph
