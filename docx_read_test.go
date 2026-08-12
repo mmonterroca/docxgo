@@ -1253,6 +1253,57 @@ func TestOpenDocument_PreservesMidBodySectionBreak(t *testing.T) {
 	}
 }
 
+// TestOpenDocument_PreservesTableCellWidths is the end-to-end regression for
+// what was left of issue #102 after the table style, the mid-body section
+// break and w:caps were fixed: the reporter's table lays its two columns out
+// with explicit widths (918 and 1111 twips, in both <w:tcW> and <w:tblGrid>),
+// and resaving collapsed every one of them to auto -- the table came back
+// evenly split at whatever width Word chose.
+//
+// testdata/word/issue-102-input.docx is the reporter's own attachment.
+func TestOpenDocument_PreservesTableCellWidths(t *testing.T) {
+	doc, err := OpenDocument(filepath.Join("internal", "reader", "testdata", "word", "issue-102-input.docx"))
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+
+	tables := doc.Tables()
+	if len(tables) != 1 {
+		t.Fatalf("len(Tables()) = %d, want 1", len(tables))
+	}
+
+	row, err := tables[0].Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	for col, want := range []int{918, 1111} {
+		cell, err := row.Cell(col)
+		if err != nil {
+			t.Fatalf("Cell(%d): %v", col, err)
+		}
+		if got := cell.Width(); got != want {
+			t.Errorf("Row(0).Cell(%d).Width() = %d, want %d", col, got, want)
+		}
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	for _, want := range []string{
+		`<w:tcW w:type="dxa" w:w="918">`,
+		`<w:tcW w:type="dxa" w:w="1111">`,
+		`<w:gridCol w:w="918">`,
+		`<w:gridCol w:w="1111">`,
+	} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document.xml lost %s:\n%s", want, written)
+		}
+	}
+}
+
 // zipPart returns the named entry from a .docx archive.
 func zipPart(t *testing.T, docxBytes []byte, name string) []byte {
 	t.Helper()

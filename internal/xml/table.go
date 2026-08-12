@@ -17,13 +17,18 @@ type Table struct {
 }
 
 // TableProperties represents w:tblPr element.
+//
+// Field order is the CT_TblPrBase sequence (tblStyle, tblW, jc, tblBorders,
+// tblLook) and is load-bearing: this package has no custom MarshalXML, so
+// struct order is document order, and CT_TblPrBase is an xsd:sequence -- a
+// misordered child is a schema error, not a cosmetic difference.
 type TableProperties struct {
 	XMLName xml.Name           `xml:"w:tblPr"`
 	Style   *TableStyle        `xml:"w:tblStyle,omitempty"`
 	Width   *TableWidth        `xml:"w:tblW,omitempty"`
+	Jc      *Justification     `xml:"w:jc,omitempty"`
 	Borders *TableLevelBorders `xml:"w:tblBorders,omitempty"`
 	Look    *TableLook         `xml:"w:tblLook,omitempty"`
-	Jc      *Justification     `xml:"w:jc,omitempty"`
 }
 
 // TableStyle represents w:tblStyle element.
@@ -87,14 +92,17 @@ type TableCell struct {
 }
 
 // TableCellProperties represents w:tcPr element.
+//
+// Field order is the CT_TcPrBase sequence (tcW, gridSpan, vMerge, tcBorders,
+// shd, vAlign). See TableProperties for why the order matters.
 type TableCellProperties struct {
 	XMLName  xml.Name       `xml:"w:tcPr"`
 	Width    *TableWidth    `xml:"w:tcW,omitempty"`
 	GridSpan *GridSpan      `xml:"w:gridSpan,omitempty"`
 	VMerge   *VMerge        `xml:"w:vMerge,omitempty"`
-	VAlign   *VerticalAlign `xml:"w:vAlign,omitempty"`
 	Borders  *TableBorders  `xml:"w:tcBorders,omitempty"`
 	Shading  *Shading       `xml:"w:shd,omitempty"`
+	VAlign   *VerticalAlign `xml:"w:vAlign,omitempty"`
 }
 
 // GridSpan represents w:gridSpan element for horizontal cell merging.

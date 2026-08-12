@@ -2079,3 +2079,300 @@ func TestApplyParagraphIndentation_AllowsFirstLineAndHangingBothPresent(t *testi
 		t.Fatalf("expected Hanging=720, got %d", indent.Hanging)
 	}
 }
+
+// buildTableBodyDocx wraps a <w:tbl> fragment in a minimal, hand-authored
+// OOXML package -- raw bytes, not routed through docxgo's writer, so a reader
+// gap cannot be masked by a matching writer gap. See buildRawZipPackage.
+func buildTableBodyDocx(t *testing.T, tableXML string) []byte {
+	t.Helper()
+
+	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+
+	rootRelsXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + constants.NamespacePackageRels + `">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:r="` + constants.NamespaceRelationships + `">
+<w:body>
+` + tableXML + `
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+</w:body>
+</w:document>`
+
+	return buildRawZipPackage(t, map[string]string{
+		"[Content_Types].xml": contentTypesXML,
+		"_rels/.rels":         rootRelsXML,
+		"word/document.xml":   mainDocumentXML,
+	})
+}
+
+// reconstructTableFromXML reads a hand-authored <w:tbl> back into the domain
+// model and returns both the table and the document, so a caller can assert
+// on the hydrated state and then resave to check what survives the writer.
+func reconstructTableFromXML(t *testing.T, tableXML string) (domain.Table, domain.Document) {
+	t.Helper()
+
+	pkg, err := LoadPackageFromBytes(buildTableBodyDocx(t, tableXML))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	tables := doc.Tables()
+	if len(tables) != 1 {
+		t.Fatalf("len(Tables()) = %d, want 1", len(tables))
+	}
+	return tables[0], doc
+}
+
+// TestReconstructTableProperties_AgainstHandAuthoredPackage covers the table,
+// row and cell properties that the reader dropped on the floor: before this,
+// hydration read <w:tblStyle> and the merge attributes and nothing else, so a
+// table whose layout was drawn by hand -- explicit widths, an explicit height,
+// hand-drawn borders, cell shading -- came back as an unstyled auto-width grid
+// even though the domain model and the serializer had supported all of it for
+// releases. Row properties were the starkest case: <w:trPr> was never read at
+// all.
+func TestReconstructTableProperties_AgainstHandAuthoredPackage(t *testing.T) {
+	tableXML := `<w:tbl>
+<w:tblPr>
+<w:tblStyle w:val="TableGrid"/>
+<w:tblW w:w="5000" w:type="dxa"/>
+<w:jc w:val="center"/>
+<w:tblBorders>
+<w:top w:val="single" w:sz="8" w:color="FF0000"/>
+<w:left w:val="dashed" w:sz="4" w:color="00FF00"/>
+<w:bottom w:val="double" w:sz="12" w:color="0000FF"/>
+<w:right w:val="dotted" w:sz="6" w:color="123456"/>
+<w:insideH w:val="single" w:sz="2" w:color="654321"/>
+<w:insideV w:val="thick" w:sz="18" w:color="ABCDEF"/>
+</w:tblBorders>
+</w:tblPr>
+<w:tblGrid><w:gridCol w:w="918"/><w:gridCol w:w="1111"/></w:tblGrid>
+<w:tr>
+<w:trPr><w:trHeight w:val="567"/></w:trPr>
+<w:tc>
+<w:tcPr>
+<w:tcW w:w="918" w:type="dxa"/>
+<w:tcBorders><w:top w:val="single" w:sz="4" w:color="112233"/></w:tcBorders>
+<w:shd w:val="clear" w:color="auto" w:fill="DDEEFF"/>
+<w:vAlign w:val="center"/>
+</w:tcPr>
+<w:p><w:r><w:t>A</w:t></w:r></w:p>
+</w:tc>
+<w:tc>
+<w:tcPr><w:tcW w:w="1111" w:type="dxa"/></w:tcPr>
+<w:p><w:r><w:t>B</w:t></w:r></w:p>
+</w:tc>
+</w:tr>
+</w:tbl>`
+
+	table, doc := reconstructTableFromXML(t, tableXML)
+
+	if got := table.Width(); got.Type != domain.WidthDXA || got.Value != 5000 {
+		t.Errorf("Width() = %+v, want {WidthDXA 5000}", got)
+	}
+	if got := table.Alignment(); got != domain.AlignmentCenter {
+		t.Errorf("Alignment() = %v, want AlignmentCenter", got)
+	}
+
+	borders := table.Borders()
+	if borders.Top.Style != domain.BorderSingle || borders.Top.Width != 8 ||
+		borders.Top.Color != (domain.Color{R: 0xFF}) {
+		t.Errorf("Borders().Top = %+v, want single/8/FF0000", borders.Top)
+	}
+	if borders.Left.Style != domain.BorderDashed {
+		t.Errorf("Borders().Left.Style = %v, want BorderDashed", borders.Left.Style)
+	}
+	if borders.Bottom.Style != domain.BorderDouble {
+		t.Errorf("Borders().Bottom.Style = %v, want BorderDouble", borders.Bottom.Style)
+	}
+	if borders.Right.Style != domain.BorderDotted {
+		t.Errorf("Borders().Right.Style = %v, want BorderDotted", borders.Right.Style)
+	}
+	if borders.InsideH.Style != domain.BorderSingle {
+		t.Errorf("Borders().InsideH.Style = %v, want BorderSingle", borders.InsideH.Style)
+	}
+	if borders.InsideV.Style != domain.BorderThick || borders.InsideV.Width != 18 {
+		t.Errorf("Borders().InsideV = %+v, want thick/18", borders.InsideV)
+	}
+
+	row, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	if got := row.Height(); got != 567 {
+		t.Errorf("Row(0).Height() = %d, want 567", got)
+	}
+
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	if got := cell.Width(); got != 918 {
+		t.Errorf("Cell(0).Width() = %d, want 918", got)
+	}
+	if got := cell.VerticalAlignment(); got != domain.VerticalAlignCenter {
+		t.Errorf("Cell(0).VerticalAlignment() = %v, want VerticalAlignCenter", got)
+	}
+	if got := cell.Shading(); got != (domain.Color{R: 0xDD, G: 0xEE, B: 0xFF}) {
+		t.Errorf("Cell(0).Shading() = %+v, want DDEEFF", got)
+	}
+	if got := cell.Borders().Top; got.Style != domain.BorderSingle || got.Width != 4 {
+		t.Errorf("Cell(0).Borders().Top = %+v, want single/4", got)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+
+	for _, want := range []string{
+		`<w:tblW w:type="dxa" w:w="5000">`,
+		`<w:jc w:val="center">`,
+		`<w:tblBorders>`,
+		`<w:insideV w:val="thick" w:sz="18" w:color="ABCDEF">`,
+		`<w:trHeight w:val="567" w:hRule="atLeast">`,
+		`<w:tcW w:type="dxa" w:w="918">`,
+		`<w:shd w:val="clear" w:fill="DDEEFF">`,
+		`<w:vAlign w:val="center">`,
+		// The grid columns come from the row's cell widths, so they have to
+		// match the source's <w:gridCol> values rather than being omitted.
+		`<w:gridCol w:w="918">`,
+		`<w:gridCol w:w="1111">`,
+	} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document.xml is missing %s:\n%s", want, written)
+		}
+	}
+}
+
+// TestReconstructTableCellWidth_NonDxaIsNotHydrated pins a deliberate
+// omission. domain.TableCell.SetWidth takes a bare twip count with no type,
+// and the serializer writes w:type="dxa" for any positive width, so hydrating
+// a percentage width would rewrite "half the table" as a fixed 2500 twips --
+// wrong, not merely lossy. Leaving it alone degrades the cell to auto width,
+// which still lays out sensibly.
+func TestReconstructTableCellWidth_NonDxaIsNotHydrated(t *testing.T) {
+	tableXML := `<w:tbl>
+<w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr>
+<w:tblGrid><w:gridCol/></w:tblGrid>
+<w:tr><w:tc>
+<w:tcPr><w:tcW w:w="2500" w:type="pct"/></w:tcPr>
+<w:p><w:r><w:t>A</w:t></w:r></w:p>
+</w:tc></w:tr>
+</w:tbl>`
+
+	table, doc := reconstructTableFromXML(t, tableXML)
+
+	row, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	if got := cell.Width(); got != 0 {
+		t.Errorf("Cell(0).Width() = %d, want 0 (a pct width must not be hydrated as twips)", got)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if strings.Contains(written, `<w:tcW w:type="dxa" w:w="2500">`) {
+		t.Errorf("resaved document.xml turned a 50%% width into 2500 twips:\n%s", written)
+	}
+}
+
+// TestReconstructTableCellShading_OnlySolidFillsAreHydrated pins the other
+// deliberate omission: domain.TableCell.SetShading holds a single colour, so a
+// pattern fill or w:fill="auto" has nothing to map onto, and picking a colour
+// would paint a background the source never had.
+func TestReconstructTableCellShading_OnlySolidFillsAreHydrated(t *testing.T) {
+	cases := []struct {
+		name string
+		shd  string
+	}{
+		{"pattern fill", `<w:shd w:val="pct25" w:color="auto" w:fill="DDEEFF"/>`},
+		{"auto fill", `<w:shd w:val="clear" w:color="auto" w:fill="auto"/>`},
+		{"theme fill only", `<w:shd w:val="clear" w:color="auto" w:themeFill="accent1"/>`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tableXML := `<w:tbl>
+<w:tblGrid><w:gridCol/></w:tblGrid>
+<w:tr><w:tc><w:tcPr>` + tc.shd + `</w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr>
+</w:tbl>`
+
+			table, _ := reconstructTableFromXML(t, tableXML)
+			row, err := table.Row(0)
+			if err != nil {
+				t.Fatalf("Row(0): %v", err)
+			}
+			cell, err := row.Cell(0)
+			if err != nil {
+				t.Fatalf("Cell(0): %v", err)
+			}
+			if got := cell.Shading(); got != domain.ColorWhite {
+				t.Errorf("Cell(0).Shading() = %+v, want the untouched default (%+v)", got, domain.ColorWhite)
+			}
+		})
+	}
+}
+
+// TestReconstructTableGrid_MergedFirstRowDoesNotInventColumnWidths covers the
+// write side of hydration. serializeGrid derives w:gridCol widths from a row's
+// cell widths; once cell widths are actually hydrated, a table whose first row
+// is a single merged full-width title cell would have that one width split
+// evenly across columns that are not equal, inventing a grid the source never
+// described. The second row describes the grid honestly, so it is used
+// instead.
+func TestReconstructTableGrid_MergedFirstRowDoesNotInventColumnWidths(t *testing.T) {
+	tableXML := `<w:tbl>
+<w:tblGrid><w:gridCol w:w="900"/><w:gridCol w:w="3100"/></w:tblGrid>
+<w:tr><w:tc>
+<w:tcPr><w:tcW w:w="4000" w:type="dxa"/><w:gridSpan w:val="2"/></w:tcPr>
+<w:p><w:r><w:t>Title</w:t></w:r></w:p>
+</w:tc></w:tr>
+<w:tr>
+<w:tc><w:tcPr><w:tcW w:w="900" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc>
+<w:tc><w:tcPr><w:tcW w:w="3100" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc>
+</w:tr>
+</w:tbl>`
+
+	_, doc := reconstructTableFromXML(t, tableXML)
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+
+	if strings.Contains(written, `<w:gridCol w:w="2000">`) {
+		t.Errorf("resaved document.xml split the merged title cell into two equal columns:\n%s", written)
+	}
+	for _, want := range []string{`<w:gridCol w:w="900">`, `<w:gridCol w:w="3100">`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document.xml is missing %s:\n%s", want, written)
+		}
+	}
+}

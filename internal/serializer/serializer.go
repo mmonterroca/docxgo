@@ -760,7 +760,47 @@ func (s *TableSerializer) serializeTableProperties(table domain.Table) *xml.Tabl
 		}
 	}
 
+	// Table-level borders (w:tblBorders). Distinct from a cell's w:tcBorders:
+	// same Border children, but a different element and two extra sides.
+	if borders := table.Borders(); s.hasTableLevelBorders(borders) {
+		props.Borders = s.serializeTableLevelBorders(borders)
+	}
+
 	return props
+}
+
+func (s *TableSerializer) hasTableLevelBorders(borders domain.TableLevelBorders) bool {
+	return borders.Top.Style != domain.BorderNone ||
+		borders.Bottom.Style != domain.BorderNone ||
+		borders.Left.Style != domain.BorderNone ||
+		borders.Right.Style != domain.BorderNone ||
+		borders.InsideH.Style != domain.BorderNone ||
+		borders.InsideV.Style != domain.BorderNone
+}
+
+func (s *TableSerializer) serializeTableLevelBorders(borders domain.TableLevelBorders) *xml.TableLevelBorders {
+	xmlBorders := &xml.TableLevelBorders{}
+
+	if borders.Top.Style != domain.BorderNone {
+		xmlBorders.Top = s.serializeBorder(borders.Top)
+	}
+	if borders.Left.Style != domain.BorderNone {
+		xmlBorders.Left = s.serializeBorder(borders.Left)
+	}
+	if borders.Bottom.Style != domain.BorderNone {
+		xmlBorders.Bottom = s.serializeBorder(borders.Bottom)
+	}
+	if borders.Right.Style != domain.BorderNone {
+		xmlBorders.Right = s.serializeBorder(borders.Right)
+	}
+	if borders.InsideH.Style != domain.BorderNone {
+		xmlBorders.InsideH = s.serializeBorder(borders.InsideH)
+	}
+	if borders.InsideV.Style != domain.BorderNone {
+		xmlBorders.InsideV = s.serializeBorder(borders.InsideV)
+	}
+
+	return xmlBorders
 }
 
 func (s *TableSerializer) serializeGrid(table domain.Table) *xml.TableGrid {
@@ -769,25 +809,39 @@ func (s *TableSerializer) serializeGrid(table domain.Table) *xml.TableGrid {
 		Cols: make([]*xml.GridCol, colCount),
 	}
 
-	// Try to derive column widths from the first row's cell widths.
-	// If cells have explicit widths, use them for the grid columns;
-	// otherwise fall back to nil (omitted) so Word auto-calculates.
+	// Prefer the first row that maps one-to-one onto the grid: one unspanned
+	// cell per column, so its widths *are* the column widths. Without this,
+	// a table whose first row is a single merged full-width title cell has
+	// that cell's width split evenly below, inventing equal columns the
+	// source never described -- and after table hydration that layout is
+	// common, not hypothetical.
+	if cells := s.gridDescribingRow(table, colCount); cells != nil {
+		for i, cell := range cells {
+			if w := cell.Width(); w > 0 {
+				grid.Cols[i] = &xml.GridCol{W: intPtr(w)}
+			} else {
+				grid.Cols[i] = &xml.GridCol{}
+			}
+		}
+		return grid
+	}
+
+	// No row describes the grid on its own. Fall back to reading row 0 and
+	// distributing a spanned cell's width evenly -- a guess, but the only
+	// information available, and the long-standing behaviour.
 	if table.RowCount() > 0 {
 		if firstRow, err := table.Row(0); err == nil {
-			cells := firstRow.Cells()
 			colIdx := 0
-			for _, cell := range cells {
+			for _, cell := range firstRow.Cells() {
 				if cell.IsHorizontallyMergedContinuation() {
 					continue
 				}
-				w := cell.Width()
 				span := cell.GridSpan()
 				if span < 1 {
 					span = 1
 				}
-				// Distribute the cell width evenly across spanned columns.
 				perCol := 0
-				if w > 0 && span > 0 {
+				if w := cell.Width(); w > 0 {
 					perCol = w / span
 				}
 				for j := 0; j < span && colIdx < colCount; j++ {
@@ -807,12 +861,47 @@ func (s *TableSerializer) serializeGrid(table domain.Table) *xml.TableGrid {
 		}
 	}
 
-	// Fallback: no rows or error – omit widths so Word auto-calculates.
+	// No rows, or the row lookup failed – omit widths so Word auto-calculates.
 	for i := 0; i < colCount; i++ {
 		grid.Cols[i] = &xml.GridCol{}
 	}
 
 	return grid
+}
+
+// gridDescribingRow returns the cells of the first row that has exactly one
+// unspanned cell per grid column, or nil when no row does. Such a row is the
+// only one whose cell widths can be read as column widths directly.
+func (s *TableSerializer) gridDescribingRow(table domain.Table, colCount int) []domain.TableCell {
+	if colCount == 0 {
+		return nil
+	}
+
+	for i := 0; i < table.RowCount(); i++ {
+		row, err := table.Row(i)
+		if err != nil {
+			continue
+		}
+
+		cells := make([]domain.TableCell, 0, colCount)
+		spanned := false
+		for _, cell := range row.Cells() {
+			if cell.IsHorizontallyMergedContinuation() {
+				continue
+			}
+			if cell.GridSpan() > 1 {
+				spanned = true
+				break
+			}
+			cells = append(cells, cell)
+		}
+
+		if !spanned && len(cells) == colCount {
+			return cells
+		}
+	}
+
+	return nil
 }
 
 func (s *TableSerializer) serializeRow(row domain.TableRow) *xml.TableRow {
@@ -942,22 +1031,25 @@ func (s *TableSerializer) serializeCellBorders(borders domain.TableBorders) *xml
 	xmlBorders := &xml.TableBorders{}
 
 	if borders.Top.Style != domain.BorderNone {
-		xmlBorders.Top = s.serializeCellBorder(borders.Top)
+		xmlBorders.Top = s.serializeBorder(borders.Top)
 	}
 	if borders.Bottom.Style != domain.BorderNone {
-		xmlBorders.Bottom = s.serializeCellBorder(borders.Bottom)
+		xmlBorders.Bottom = s.serializeBorder(borders.Bottom)
 	}
 	if borders.Left.Style != domain.BorderNone {
-		xmlBorders.Left = s.serializeCellBorder(borders.Left)
+		xmlBorders.Left = s.serializeBorder(borders.Left)
 	}
 	if borders.Right.Style != domain.BorderNone {
-		xmlBorders.Right = s.serializeCellBorder(borders.Right)
+		xmlBorders.Right = s.serializeBorder(borders.Right)
 	}
 
 	return xmlBorders
 }
 
-func (s *TableSerializer) serializeCellBorder(border domain.BorderStyle) *xml.Border {
+// serializeBorder converts one domain border to the xml.Border used by both
+// w:tcBorders and w:tblBorders -- the two elements differ in name and in which
+// sides they accept, not in the child shape.
+func (s *TableSerializer) serializeBorder(border domain.BorderStyle) *xml.Border {
 	return &xml.Border{
 		Val:   s.borderLineStyleToString(border.Style),
 		Sz:    border.Width,

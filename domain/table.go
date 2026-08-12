@@ -46,6 +46,19 @@ type Table interface {
 
 	// SetStyle sets the table style.
 	SetStyle(style TableStyle) error
+
+	// Borders returns the table-level borders (w:tblBorders).
+	Borders() TableLevelBorders
+
+	// SetBorders sets the table-level borders (w:tblBorders). Unlike
+	// TableCell.SetBorders these apply to the table as a whole, and can also
+	// describe the interior gridlines (InsideH/InsideV).
+	//
+	// A side left at BorderNone is omitted rather than written as
+	// w:val="none": BorderNone is the zero value, so it cannot be told apart
+	// from "explicitly no border", and a border a table style would otherwise
+	// supply cannot be suppressed through this API.
+	SetBorders(borders TableLevelBorders) error
 }
 
 // TableRow represents a row in a table.
