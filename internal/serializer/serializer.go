@@ -1007,23 +1007,36 @@ func (s *TableSerializer) serializeCellProperties(cell domain.TableCell) *xml.Ta
 	// value every new cell starts with -- so on its own it can't tell that
 	// apart from a cell explicitly shaded white on purpose. ShadingSet
 	// resolves it, the same explicit-vs-unset shape CapsSet uses for w:caps.
-	shouldEmitShading := cell.Shading() != domain.ColorWhite
-	if setter, ok := cell.(interface{ ShadingSet() bool }); ok && setter.ShadingSet() {
-		shouldEmitShading = true
+	// Both checks stay keyed off the domain.TableCell interface method
+	// (Shading()) first, with the structural assertions only adding to it --
+	// a foreign TableCell implementation with no ShadingSet()/ThemeFill()
+	// still emits its colour exactly as before this change.
+	shadingSet := cell.Shading() != domain.ColorWhite
+	if setter, ok := cell.(interface{ ShadingSet() bool }); ok {
+		shadingSet = setter.ShadingSet()
 	}
-	if shouldEmitShading {
-		shd := &xml.Shading{
-			Val:  "clear",
-			Fill: color.ToHex(cell.Shading()),
+	var themeFill, themeFillTint, themeFillShade string
+	if themed, ok := cell.(interface {
+		ThemeFill() (string, string, string)
+	}); ok {
+		themeFill, themeFillTint, themeFillShade = themed.ThemeFill()
+	}
+	// A theme-only cell (hydrated via HydrateThemeFill alone, source had no
+	// cached fallback) has shadingSet == false, so it needs its own trigger
+	// here -- otherwise the theme link a reader just preserved would go
+	// unemitted for want of a colour MS-OE376 doesn't require it to have.
+	if shadingSet || themeFill != "" {
+		shd := &xml.Shading{Val: "clear"}
+		// Only emit w:fill when a concrete colour was actually cached.
+		// Fabricating one from the zero-value ColorWhite for a theme-only
+		// cell would claim the source said "white" when it said nothing.
+		if shadingSet {
+			shd.Fill = color.ToHex(cell.Shading())
 		}
-		if themed, ok := cell.(interface {
-			ThemeFill() (string, string, string)
-		}); ok {
-			if fill, tint, shade := themed.ThemeFill(); fill != "" {
-				shd.ThemeFill = fill
-				shd.ThemeFillTint = tint
-				shd.ThemeFillShade = shade
-			}
+		if themeFill != "" {
+			shd.ThemeFill = themeFill
+			shd.ThemeFillTint = themeFillTint
+			shd.ThemeFillShade = themeFillShade
 		}
 		props.Shading = shd
 	}

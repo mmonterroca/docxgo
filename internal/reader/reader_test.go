@@ -2313,9 +2313,9 @@ func TestReconstructTableCellWidth_NonDxaIsNotHydrated(t *testing.T) {
 // declining to hydrate the link would not have preserved it -- it would
 // have deleted the shading and returned the cell white.
 //
-// A themeFill with no w:fill alongside it still hydrates nothing -- see
-// the "theme fill only" case below -- because then there is no cached
-// colour to keep or link to attach it to.
+// A themeFill with no w:fill alongside it still hydrates and round-trips the
+// link, just with no cached colour riding along -- see
+// TestReconstructTableCellShading_ThemeFillOnlyRoundTripsWithoutFabricatingFill.
 func TestReconstructTableCellShading_ThemedFillKeepsItsCachedColourAndTheLink(t *testing.T) {
 	tableXML := `<w:tbl>
 <w:tblGrid><w:gridCol/></w:tblGrid>
@@ -2359,6 +2359,62 @@ func TestReconstructTableCellShading_ThemedFillKeepsItsCachedColourAndTheLink(t 
 	}
 	if !strings.Contains(written, `w:fill="FF0000"`) {
 		t.Errorf("resaved document.xml lost the cached fallback colour:\n%s", written)
+	}
+}
+
+// TestReconstructTableCellShading_ThemeFillOnlyRoundTripsWithoutFabricatingFill
+// covers a producer that writes only w:themeFill, with no cached w:fill
+// alongside it -- MS-OE376 makes the theme reference the primary colour and
+// the cached fallback optional (used only when the reference is absent), so
+// this is valid input, not a malformed one. It used to be dropped entirely:
+// applyCellShading returned before ever reading w:themeFill because its
+// "is there a concrete colour" guard ran first. The regression to watch for
+// on the fix's other side is fabricating a fallback that was never there --
+// Shading() defaults to ColorWhite for an untouched cell, and blindly
+// emitting that as w:fill would claim the source said "white" when it
+// said nothing about a fallback colour at all.
+func TestReconstructTableCellShading_ThemeFillOnlyRoundTripsWithoutFabricatingFill(t *testing.T) {
+	tableXML := `<w:tbl>
+<w:tblGrid><w:gridCol/></w:tblGrid>
+<w:tr><w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:themeFill="accent1" w:themeFillTint="80"/></w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr>
+</w:tbl>`
+
+	table, doc := reconstructTableFromXML(t, tableXML)
+	row, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	if got := cell.Shading(); got != domain.ColorWhite {
+		t.Errorf("Cell(0).Shading() = %+v, want the untouched default %+v (no cached colour was ever present to hydrate)", got, domain.ColorWhite)
+	}
+
+	themed, ok := cell.(interface {
+		ThemeFill() (string, string, string)
+	})
+	if !ok {
+		t.Fatal("cell does not expose ThemeFill")
+	}
+	if fill, tint, shade := themed.ThemeFill(); fill != "accent1" || tint != "80" || shade != "" {
+		t.Errorf("ThemeFill() = (%q, %q, %q), want (\"accent1\", \"80\", \"\")", fill, tint, shade)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `w:themeFill="accent1"`) {
+		t.Errorf("resaved document.xml lost the theme-only link:\n%s", written)
+	}
+	if !strings.Contains(written, `w:themeFillTint="80"`) {
+		t.Errorf("resaved document.xml lost the theme tint:\n%s", written)
+	}
+	if strings.Contains(written, `w:fill=`) {
+		t.Errorf("resaved document.xml fabricated a w:fill that was never in the source:\n%s", written)
 	}
 }
 
@@ -2416,9 +2472,6 @@ func TestReconstructTableCellShading_OnlySolidFillsAreHydrated(t *testing.T) {
 	}{
 		{"pattern fill", `<w:shd w:val="pct25" w:color="auto" w:fill="DDEEFF"/>`},
 		{"auto fill", `<w:shd w:val="clear" w:color="auto" w:fill="auto"/>`},
-		// No w:fill at all, so there is no cached colour to fall back on --
-		// unlike the themed-with-fill case pinned above, which keeps one.
-		{"theme fill only", `<w:shd w:val="clear" w:color="auto" w:themeFill="accent1"/>`},
 		// A solid pattern takes its colour from w:color, so an "auto" one is
 		// exactly as unhydratable as an "auto" w:fill is under "clear" --
 		// even though this shd does carry a concrete w:fill, which a solid

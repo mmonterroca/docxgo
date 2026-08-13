@@ -2549,31 +2549,26 @@ func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 		return nil
 	}
 
-	raw, ok := getAttr(shdElem, source)
-	if !ok || !isHexRGB(raw) {
-		// Covers absent, "auto", and w:themeFill/w:themeColor-only shading.
-		return nil
-	}
-	clr, err := pkgcolor.FromHex(raw)
-	if err != nil {
-		return nil
-	}
-
-	if err := cell.SetShading(clr); err != nil {
-		return errors.Wrap(err, opHydrateTableCell)
+	// A cached concrete colour, if present, is set first -- SetShading clears
+	// any theme link (see its doc comment), so running it before the theme
+	// hydration below, not after, matters: reversed, it would wipe out the
+	// very link this same element is about to hydrate.
+	if raw, ok := getAttr(shdElem, source); ok && isHexRGB(raw) {
+		if clr, err := pkgcolor.FromHex(raw); err == nil {
+			if err := cell.SetShading(clr); err != nil {
+				return errors.Wrap(err, opHydrateTableCell)
+			}
+		}
 	}
 
-	// A producer writes the resolved colour into w:fill/w:color as a cached
-	// fallback for a consumer that doesn't resolve themes, alongside the
-	// theme reference itself in w:themeFill/w:themeColor (+ tint/shade) --
-	// SetShading above already captured the fallback. Capture the link too,
-	// on the same "fill" side regardless of which attribute it actually came
-	// from, matching how the writer already normalizes every shading to
-	// clear+w:fill on output (see the "solid" comment below): a source using
-	// w:val="solid"+w:themeColor and one using w:val="clear"+w:themeFill are
-	// visually identical outputs, so they collapse onto one representation
-	// instead of the domain needing to track which pattern the link came
-	// paired with.
+	// A producer writes that cached colour as a fallback for a consumer that
+	// doesn't resolve themes, but MS-OE376 is explicit that the theme
+	// reference is the primary colour and the cached fallback is only used
+	// when the reference is absent -- so a producer is free to write
+	// w:themeFill (or w:themeColor) with no cached w:fill/w:color at all, and
+	// that link must still be kept. This is why it isn't folded into an
+	// early-return guard alongside the block above: it must run whether or
+	// not a concrete colour was present there.
 	themeAttr, tintAttr, shadeAttr := "themeFill", "themeFillTint", "themeFillShade"
 	if source == "color" {
 		themeAttr, tintAttr, shadeAttr = "themeColor", "themeTint", "themeShade"
