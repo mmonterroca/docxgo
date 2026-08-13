@@ -97,6 +97,18 @@ func NewHyperlinkField(url, displayText string) domain.Field {
 	}
 	field.properties["url"] = url
 	field.properties["display"] = displayText
+	// A freshly created internal (#anchor) link defaults to w:history="1" --
+	// matching this package's long-standing output for that case. This must
+	// be decided here, at construction, not in the serializer: hydrateHyperlink
+	// (internal/reader/reconstruct.go) builds a field for a link read back from
+	// a source document without ever calling this constructor, so a property
+	// set here can never leak onto a hydrated field whose source omitted
+	// w:history -- which is exactly what must round-trip as omitted, not "1".
+	// External (non-#) links keep no default; that asymmetry predates this
+	// comment and is out of scope for it.
+	if strings.HasPrefix(url, "#") {
+		field.properties["history"] = "1"
+	}
 	field.code = fmt.Sprintf(`HYPERLINK "%s"`, safe)
 	field.result = displayText
 	field.isDirty = false

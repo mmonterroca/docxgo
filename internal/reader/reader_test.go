@@ -292,6 +292,34 @@ func TestReconstructHyperlink_ExplicitHistoryFalseRoundTrips(t *testing.T) {
 	}
 }
 
+// TestReconstructHyperlink_HydratedAnchorWithNoHistoryDoesNotInventOne covers
+// an internal (w:anchor) hyperlink read from a source that never wrote
+// w:history at all -- a real, common shape, not the explicit-"0" case above.
+// The two hyperlink-emission branches in the serializer disagreed here: the
+// external (r:id) branch already left History nil when the property was
+// never set, but the internal (w:anchor) branch defaulted to "1"
+// unconditionally, unable to tell "brand-new link, never touched" (which
+// does default to "1", set at construction -- see
+// TestAddHyperlink_InternalAnchorDefaultsToHistoryTrue in the top-level
+// package) apart from "hydrated from a source that omitted the attribute"
+// (which must round-trip as omitted).
+func TestReconstructHyperlink_HydratedAnchorWithNoHistoryDoesNotInventOne(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p>
+<w:hyperlink w:anchor="Chapter1">
+<w:r><w:t>Chapter 1</w:t></w:r>
+</w:hyperlink>
+</w:p>`)
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if strings.Contains(written, "w:history") {
+		t.Errorf("resaved document.xml invented a w:history attribute the source never had:\n%s", written)
+	}
+}
+
 // buildBookmarkPackage assembles a minimal single-part .docx around the
 // given word/document.xml body, for the bookmark hydration tests below.
 func buildBookmarkPackage(t *testing.T, bodyXML string) []byte {
@@ -407,6 +435,87 @@ func TestReconstructBookmark_SpanningParagraphsIsDropped(t *testing.T) {
 	written := documentXML(t, buf.Bytes())
 	if strings.Contains(written, "Spans") {
 		t.Errorf("resaved document.xml still references the dropped bookmark's name:\n%s", written)
+	}
+}
+
+// TestReconstructBookmark_PartialRunIsDropped covers a bookmark that, in the
+// source, wraps only "target" inside "prefix target suffix" -- all in one
+// paragraph, so the same-paragraph check alone would accept it. But
+// core.paragraph's single (id, name) pair has no notion of where within the
+// paragraph a bookmark starts or ends: hydrating it would re-serialize as
+// w:bookmarkStart at the very beginning of the paragraph and w:bookmarkEnd at
+// the very end, silently widening it to wrap "prefix", "target", and
+// "suffix" alike. A REF field pointed at this bookmark would then resolve
+// the whole paragraph's text instead of just "target". Representing this
+// correctly needs per-run position tracking that paragraph doesn't have, so
+// the partial bookmark is dropped instead of corrupted.
+func TestReconstructBookmark_PartialRunIsDropped(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p>
+<w:r><w:t xml:space="preserve">prefix </w:t></w:r>
+<w:bookmarkStart w:id="4" w:name="Target"/>
+<w:r><w:t>target</w:t></w:r>
+<w:bookmarkEnd w:id="4"/>
+<w:r><w:t xml:space="preserve"> suffix</w:t></w:r>
+</w:p>`)
+
+	paras := doc.Paragraphs()
+	if len(paras) != 1 {
+		t.Fatalf("len(Paragraphs()) = %d, want 1", len(paras))
+	}
+	bp, ok := paras[0].(bookmarkedParagraph)
+	if !ok {
+		t.Fatal("paragraph does not expose BookmarkID/BookmarkName")
+	}
+	if bp.BookmarkID() != "" {
+		t.Errorf("BookmarkID() = %q, want \"\" (bookmark wraps only part of the paragraph's runs, must be dropped)", bp.BookmarkID())
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if strings.Contains(written, "Target") {
+		t.Errorf("resaved document.xml still references the dropped partial bookmark's name:\n%s", written)
+	}
+	if strings.Contains(written, "bookmarkStart") || strings.Contains(written, "bookmarkEnd") {
+		t.Errorf("resaved document.xml re-emitted the dropped bookmark, necessarily widened to the whole paragraph:\n%s", written)
+	}
+}
+
+// TestReconstructBookmark_FullParagraphAcrossMultipleRunsHydrates is the
+// counterpart to the partial-run case above: a bookmark that legitimately
+// wraps a paragraph's entire content, even when that content is split across
+// several differently-formatted runs, must still hydrate -- the fix for the
+// partial case must key off position relative to the paragraph's content,
+// not merely "does the paragraph have more than one run".
+func TestReconstructBookmark_FullParagraphAcrossMultipleRunsHydrates(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p>
+<w:bookmarkStart w:id="9" w:name="WholeThing"/>
+<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Bold </w:t></w:r>
+<w:r><w:t>plain</w:t></w:r>
+<w:bookmarkEnd w:id="9"/>
+</w:p>`)
+
+	paras := doc.Paragraphs()
+	if len(paras) != 1 {
+		t.Fatalf("len(Paragraphs()) = %d, want 1", len(paras))
+	}
+	bp, ok := paras[0].(bookmarkedParagraph)
+	if !ok {
+		t.Fatal("paragraph does not expose BookmarkID/BookmarkName")
+	}
+	if bp.BookmarkID() != "9" || bp.BookmarkName() != "WholeThing" {
+		t.Errorf("BookmarkID/BookmarkName = %q/%q, want \"9\"/\"WholeThing\"", bp.BookmarkID(), bp.BookmarkName())
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `w:id="9" w:name="WholeThing"`) {
+		t.Errorf("resaved document.xml lost a bookmark that legitimately wraps the whole paragraph:\n%s", written)
 	}
 }
 

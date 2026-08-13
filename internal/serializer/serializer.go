@@ -478,7 +478,13 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 						xmlRun.Properties.Style = &xml.RunStyle{Val: "Hyperlink"}
 					}
 
-					history := stringPtr("1")
+					// No default here: a link with no "history" property emits
+					// no w:history attribute at all. NewHyperlinkField (called
+					// by the public AddHyperlink) sets the property itself for
+					// a brand-new "#anchor" link, so this only stays unset for
+					// a link hydrated from a source that omitted w:history --
+					// which must round-trip as omitted, not invented as "1".
+					var history *string
 					if hv, ok := accessor.GetProperty("history"); ok {
 						history = stringPtr(hv)
 					}

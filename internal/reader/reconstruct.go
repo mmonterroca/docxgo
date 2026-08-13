@@ -260,10 +260,38 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 	// pendingBookmarks collects every start seen so far in this paragraph;
 	// bookmarkHydrated fires on the first end that closes one of them, so a
 	// paragraph with several (possibly nested) bookmarks keeps exactly one.
+	//
+	// A same-paragraph bookmark is further required to wrap the paragraph's
+	// entire content, not just part of a run. core.paragraph re-serializes it
+	// as w:bookmarkStart at the very start of the paragraph and w:bookmarkEnd
+	// at the very end, so a bookmark that in the source wrapped only "target"
+	// inside "prefix target suffix" would silently expand to cover the whole
+	// paragraph on round-trip -- corrupting any REF field pointed at it.
+	// Representing a partial-run bookmark correctly needs per-run position
+	// tracking, which this single (id, name) pair can't hold; out of scope
+	// here, so a partial bookmark is dropped instead of silently widened.
+	// firstContentIdx/lastContentIdx locate the first and last content-bearing
+	// child (a run, hyperlink, or simple field) in this paragraph up front, so
+	// the position of each bookmarkStart/bookmarkEnd can be checked against
+	// them below.
+	firstContentIdx, lastContentIdx := -1, -1
+	for i, child := range elem.Children {
+		if child == nil {
+			continue
+		}
+		switch child.Name.Local {
+		case "r", "hyperlink", "fldSimple":
+			if firstContentIdx == -1 {
+				firstContentIdx = i
+			}
+			lastContentIdx = i
+		}
+	}
+
 	pendingBookmarks := make(map[string]string)
 	bookmarkHydrated := false
 
-	for _, child := range elem.Children {
+	for i, child := range elem.Children {
 		if child == nil {
 			continue
 		}
@@ -282,10 +310,16 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 				return err
 			}
 		case "bookmarkStart":
-			if id, ok := getAttr(child, "id"); ok && id != "" {
-				name, _ := getAttr(child, "name")
-				pendingBookmarks[id] = name
+			id, ok := getAttr(child, "id")
+			if !ok || id == "" {
+				continue
 			}
+			if firstContentIdx != -1 && i > firstContentIdx {
+				// Content already appeared before this start: partial.
+				continue
+			}
+			name, _ := getAttr(child, "name")
+			pendingBookmarks[id] = name
 		case "bookmarkEnd":
 			if bookmarkHydrated {
 				continue
@@ -296,6 +330,10 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 			}
 			name, started := pendingBookmarks[id]
 			if !started {
+				continue
+			}
+			if lastContentIdx != -1 && i < lastContentIdx {
+				// More content follows this end: partial.
 				continue
 			}
 			if hydrator, ok := para.(interface{ HydrateBookmark(string, string) }); ok {
