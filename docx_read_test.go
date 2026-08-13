@@ -985,6 +985,36 @@ func TestAddHyperlink_EmitsRealHyperlinkElement(t *testing.T) {
 	}
 }
 
+// TestAddHyperlink_InternalAnchorDefaultsToHistoryTrue pins this package's
+// long-standing default for a brand-new "#anchor" link: w:history="1". That
+// default is set once, at construction (NewHyperlinkField in
+// internal/core/field.go), specifically so it can never leak onto a link
+// hydrated from a source document that omitted w:history -- which must
+// round-trip as omitted, not "1" (see
+// TestReconstructHyperlink_HydratedAnchorWithNoHistoryDoesNotInventOne in
+// internal/reader/reader_test.go). This test guards the other half: that
+// fixing the hydration case didn't also drop the default for a genuinely new
+// link.
+func TestAddHyperlink_InternalAnchorDefaultsToHistoryTrue(t *testing.T) {
+	doc := NewDocument()
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	if _, err := para.AddHyperlink("#Chapter1", "See chapter 1"); err != nil {
+		t.Fatalf("AddHyperlink: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	documentXML := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	if !strings.Contains(documentXML, `w:history="1"`) {
+		t.Errorf("word/document.xml does not contain w:history=\"1\" for a brand-new internal hyperlink:\n%s", documentXML)
+	}
+}
+
 // TestAddHyperlink_RoundTrip guards against the fix regressing on a document
 // that is written, reopened, and written again -- the hyperlink and its
 // relationship must survive both trips.
