@@ -1583,3 +1583,97 @@ func TestTableSerializer_CellShading_SetShadingClearsHydratedThemeLink(t *testin
 		t.Errorf("w:shd still carries w:themeFill=%q after an explicit SetShading", props.Shading.ThemeFill)
 	}
 }
+
+func hyperlinkElements(p *xmlstructs.Paragraph) []*xmlstructs.Hyperlink {
+	links := make([]*xmlstructs.Hyperlink, 0)
+	for _, el := range p.Elements {
+		if link, ok := el.(*xmlstructs.Hyperlink); ok {
+			links = append(links, link)
+		}
+	}
+	return links
+}
+
+// TestParagraphSerializer_MergesConsecutiveHyperlinkRunsWithSameTarget covers
+// the post-pass in ParagraphSerializer.Serialize that folds adjacent
+// <w:hyperlink> elements sharing one target back into a single element.
+// expandRunWithFields only ever sees one run at a time, so a hyperlink built
+// from several runs with different formatting -- bold link text followed by
+// plain link text, say -- would otherwise serialize as one <w:hyperlink> per
+// run, which Word never itself produces for a single link.
+func TestParagraphSerializer_MergesConsecutiveHyperlinkRunsWithSameTarget(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	run1, err := para.AddHyperlink("https://example.com/", "First ")
+	if err != nil {
+		t.Fatalf("AddHyperlink: %v", err)
+	}
+	fields1, ok := run1.(interface{ Fields() []domain.Field })
+	if !ok || len(fields1.Fields()) != 1 {
+		t.Fatalf("run1 does not carry exactly one field")
+	}
+	accessor1, ok := fields1.Fields()[0].(interface {
+		GetProperty(string) (string, bool)
+	})
+	if !ok {
+		t.Fatal("field does not expose GetProperty")
+	}
+	relID, ok := accessor1.GetProperty("relationshipID")
+	if !ok || relID == "" {
+		t.Fatal("hyperlink field has no relationshipID")
+	}
+
+	// A second run for the same link, differently formatted -- reusing
+	// relID mirrors what hydrateHyperlink does for a multi-run source
+	// element (see run.AddField's "already has a relationship ID" branch).
+	run2, err := para.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run2.SetBold(true); err != nil {
+		t.Fatalf("SetBold: %v", err)
+	}
+	field2 := core.NewHyperlinkField("https://example.com/", "Second")
+	setter, ok := field2.(interface{ SetProperty(string, string) })
+	if !ok {
+		t.Fatal("field does not expose SetProperty")
+	}
+	setter.SetProperty("relationshipID", relID)
+	if err := run2.AddField(field2); err != nil {
+		t.Fatalf("AddField: %v", err)
+	}
+
+	xmlPara := serializer.NewParagraphSerializer().Serialize(para)
+
+	links := hyperlinkElements(xmlPara)
+	if len(links) != 1 {
+		t.Fatalf("got %d <w:hyperlink> elements, want 1 (two runs targeting the same relationship should merge)", len(links))
+	}
+	if len(links[0].Runs) != 2 {
+		t.Fatalf("merged hyperlink has %d runs, want 2", len(links[0].Runs))
+	}
+}
+
+// TestParagraphSerializer_DoesNotMergeHyperlinksWithDifferentTargets pins the
+// merge key: two distinct links sitting next to each other in the same
+// paragraph must stay two elements, never merge just because both are
+// hyperlinks.
+func TestParagraphSerializer_DoesNotMergeHyperlinksWithDifferentTargets(t *testing.T) {
+	doc := core.NewDocument()
+	para, _ := doc.AddParagraph()
+
+	if _, err := para.AddHyperlink("https://example.com/a", "A"); err != nil {
+		t.Fatalf("AddHyperlink a: %v", err)
+	}
+	if _, err := para.AddHyperlink("https://example.com/b", "B"); err != nil {
+		t.Fatalf("AddHyperlink b: %v", err)
+	}
+
+	xmlPara := serializer.NewParagraphSerializer().Serialize(para)
+
+	links := hyperlinkElements(xmlPara)
+	if len(links) != 2 {
+		t.Fatalf("got %d <w:hyperlink> elements, want 2 (different targets must not merge)", len(links))
+	}
+}

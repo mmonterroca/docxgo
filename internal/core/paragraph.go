@@ -64,7 +64,11 @@ type paragraph struct {
 	relManager         *manager.RelationshipManager
 	bookmarkID         string // ID for bookmark (if this paragraph needs one for TOC)
 	bookmarkName       string // Name for bookmark (e.g., "_Toc123456")
-	mediaManager       *manager.MediaManager
+	// bookmarkHydrated distinguishes a bookmark read from a source document
+	// from one generateHeadingBookmarks assigned on some earlier WriteTo (or
+	// one set through the public SetBookmark) -- see HydrateBookmark.
+	bookmarkHydrated bool
+	mediaManager     *manager.MediaManager
 }
 
 // NewParagraph creates a new Paragraph.
@@ -414,6 +418,25 @@ func (p *paragraph) StyleName() string {
 func (p *paragraph) SetBookmark(id, name string) {
 	p.bookmarkID = id
 	p.bookmarkName = name
+}
+
+// HydrateBookmark is like SetBookmark, but also marks the bookmark as having
+// come from a source document rather than from generateHeadingBookmarks or a
+// plain SetBookmark call. Only the reader should call this -- see
+// BookmarkHydrated. This is an internal method used by the reader.
+func (p *paragraph) HydrateBookmark(id, name string) {
+	p.bookmarkID = id
+	p.bookmarkName = name
+	p.bookmarkHydrated = true
+}
+
+// BookmarkHydrated reports whether the paragraph's bookmark came from
+// HydrateBookmark. generateHeadingBookmarks uses this to avoid overwriting
+// (and renumbering) a bookmark the source document actually had -- a REF
+// field's target, an internal hyperlink anchor, or one of Word's own
+// _Ref.../_GoBack bookmarks. This is an internal method used by the document.
+func (p *paragraph) BookmarkHydrated() bool {
+	return p.bookmarkHydrated
 }
 
 // BookmarkID returns the bookmark ID for this paragraph.

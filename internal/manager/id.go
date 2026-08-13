@@ -25,7 +25,6 @@ type IDGenerator struct {
 	imageCounter     atomic.Uint64
 	shapeCounter     atomic.Uint64
 	relCounter       atomic.Uint64
-	bookmarkCounter  atomic.Uint64
 	commentCounter   atomic.Uint64
 	footnoteCounter  atomic.Uint64
 	endnoteCounter   atomic.Uint64
@@ -84,12 +83,6 @@ func (g *IDGenerator) NextRelID() string {
 	return fmt.Sprintf("%s%d", constants.IDPrefixRel, id)
 }
 
-// NextBookmarkID generates the next bookmark ID.
-func (g *IDGenerator) NextBookmarkID() string {
-	id := g.bookmarkCounter.Add(1)
-	return fmt.Sprintf("%s%d", constants.IDPrefixBookmark, id)
-}
-
 // NextCommentID generates the next comment ID.
 func (g *IDGenerator) NextCommentID() string {
 	id := g.commentCounter.Add(1)
@@ -127,7 +120,6 @@ func (g *IDGenerator) Reset() {
 	g.imageCounter.Store(0)
 	g.shapeCounter.Store(0)
 	g.relCounter.Store(0)
-	g.bookmarkCounter.Store(0)
 	g.commentCounter.Store(0)
 	g.footnoteCounter.Store(0)
 	g.endnoteCounter.Store(0)

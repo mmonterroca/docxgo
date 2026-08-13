@@ -252,7 +252,46 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 
 	state := newFieldState(ctx)
 
-	for _, child := range elem.Children {
+	// Bookmarks are hydrated only when their w:bookmarkStart and
+	// w:bookmarkEnd both fall in this same paragraph -- core.paragraph holds
+	// one scalar (id, name) pair, so it cannot represent a bookmark spanning
+	// several paragraphs or one hanging directly off w:body (where Word's own
+	// _GoBack usually sits). Those are dropped, same as before this existed.
+	// pendingBookmarks collects every start seen so far in this paragraph;
+	// bookmarkHydrated fires on the first end that closes one of them, so a
+	// paragraph with several (possibly nested) bookmarks keeps exactly one.
+	//
+	// A same-paragraph bookmark is further required to wrap the paragraph's
+	// entire content, not just part of a run. core.paragraph re-serializes it
+	// as w:bookmarkStart at the very start of the paragraph and w:bookmarkEnd
+	// at the very end, so a bookmark that in the source wrapped only "target"
+	// inside "prefix target suffix" would silently expand to cover the whole
+	// paragraph on round-trip -- corrupting any REF field pointed at it.
+	// Representing a partial-run bookmark correctly needs per-run position
+	// tracking, which this single (id, name) pair can't hold; out of scope
+	// here, so a partial bookmark is dropped instead of silently widened.
+	// firstContentIdx/lastContentIdx locate the first and last content-bearing
+	// child (a run, hyperlink, or simple field) in this paragraph up front, so
+	// the position of each bookmarkStart/bookmarkEnd can be checked against
+	// them below.
+	firstContentIdx, lastContentIdx := -1, -1
+	for i, child := range elem.Children {
+		if child == nil {
+			continue
+		}
+		switch child.Name.Local {
+		case "r", "hyperlink", "fldSimple":
+			if firstContentIdx == -1 {
+				firstContentIdx = i
+			}
+			lastContentIdx = i
+		}
+	}
+
+	pendingBookmarks := make(map[string]string)
+	bookmarkHydrated := false
+
+	for i, child := range elem.Children {
 		if child == nil {
 			continue
 		}
@@ -269,6 +308,42 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 		case "fldSimple":
 			if err := hydrateSimpleField(para, child, ctx, state); err != nil {
 				return err
+			}
+		case "bookmarkStart":
+			id, ok := getAttr(child, "id")
+			if !ok || id == "" {
+				continue
+			}
+			if firstContentIdx != -1 && i > firstContentIdx {
+				// Content already appeared before this start: partial.
+				continue
+			}
+			name, _ := getAttr(child, "name")
+			pendingBookmarks[id] = name
+		case "bookmarkEnd":
+			if bookmarkHydrated {
+				continue
+			}
+			id, ok := getAttr(child, "id")
+			if !ok {
+				continue
+			}
+			name, started := pendingBookmarks[id]
+			if !started {
+				continue
+			}
+			if lastContentIdx != -1 && i < lastContentIdx {
+				// More content follows this end: partial.
+				continue
+			}
+			if hydrator, ok := para.(interface{ HydrateBookmark(string, string) }); ok {
+				hydrator.HydrateBookmark(id, name)
+				bookmarkHydrated = true
+				if ctx != nil {
+					if tracker, ok := ctx.doc.(interface{ ObserveHydratedBookmarkID(string) }); ok {
+						tracker.ObserveHydratedBookmarkID(id)
+					}
+				}
 			}
 		}
 	}
@@ -771,6 +846,10 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 		}
 	}
 
+	// w:history is ST_OnOff: "0" is a real, distinct value from the
+	// attribute being absent, so track presence rather than defaulting.
+	history, hasHistory := getAttr(elem, "history")
+
 	for _, child := range elem.Children {
 		if child == nil || child.Name.Local != "r" {
 			continue
@@ -794,6 +873,9 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 				// so the serializer can reuse it instead of generating new IDs
 				if originalRelID != "" && !strings.HasPrefix(url, "#") {
 					accessor.SetProperty("relationshipID", originalRelID)
+				}
+				if hasHistory {
+					accessor.SetProperty("history", history)
 				}
 			}
 			extraFields = []domain.Field{field}
