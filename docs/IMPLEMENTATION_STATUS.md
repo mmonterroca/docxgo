@@ -1,7 +1,7 @@
 # docxgo v2 Implementation Status
 
 **Last Updated**: August 2026
-**Version**: 2.12.0 (Stable)
+**Version**: 2.13.0 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -42,6 +42,7 @@ All development phases have been completed. The library has gone through multipl
 | v2.10.0     | Jul 2026 | In-place editing RPC methods recovered from #64, field-code injection fix, mandatory CI checks (CodeQL), `table.setCell` shrink, per-side paragraph indentation, builder page size/margins/default font wiring |
 | v2.11.0     | Jul 2026 | Code-review fixes: header/footer edits no longer report as replaced when discarded on save, strict RPC param decoding, no orphaned content on rejected requests, indentation flag staleness, single-backslash TOC switches, `Field.SetCode` control-character rejection |
 | v2.12.0     | Aug 2026 | `domain.Run.SetLanguage`/`Language` — per-run proofing language override, with `ConsolidateRuns` guarding against merging across a language boundary |
+| v2.13.0     | Aug 2026 | Header/footer tables, `Table.SetBorders`, `Run.SetCaps`, full header/footer edit round-trip, table property hydration overhaul, hyperlink/bookmark fidelity (#101), theme-linked cell shading |
 
 ---
 
