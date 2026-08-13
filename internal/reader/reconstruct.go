@@ -2601,7 +2601,9 @@ func applyCellBorders(cell domain.TableCell, tcPr *Element) error {
 // applyCellShading hydrates <w:shd> when it resolves to one flat colour, which
 // is all domain.TableCell.SetShading can hold. A pattern fill or an "auto"
 // colour has no single colour to map onto, and inventing one paints a
-// background the source never had.
+// background the source never had. When the shading is also theme-linked, the
+// link is captured too (see HydrateThemeFill) so the writer can keep it
+// following the document's theme instead of freezing the cached colour.
 func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 	shdElem := findChild(tcPr, "shd")
 	if shdElem == nil {
@@ -2629,19 +2631,38 @@ func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 		return nil
 	}
 
-	raw, ok := getAttr(shdElem, source)
-	if !ok || !isHexRGB(raw) {
-		// Covers absent, "auto", and w:themeFill/w:themeColor-only shading.
-		return nil
-	}
-	clr, err := pkgcolor.FromHex(raw)
-	if err != nil {
-		return nil
+	// A cached concrete colour, if present, is set first -- SetShading clears
+	// any theme link (see its doc comment), so running it before the theme
+	// hydration below, not after, matters: reversed, it would wipe out the
+	// very link this same element is about to hydrate.
+	if raw, ok := getAttr(shdElem, source); ok && isHexRGB(raw) {
+		if clr, err := pkgcolor.FromHex(raw); err == nil {
+			if err := cell.SetShading(clr); err != nil {
+				return errors.Wrap(err, opHydrateTableCell)
+			}
+		}
 	}
 
-	if err := cell.SetShading(clr); err != nil {
-		return errors.Wrap(err, opHydrateTableCell)
+	// A producer writes that cached colour as a fallback for a consumer that
+	// doesn't resolve themes, but MS-OE376 is explicit that the theme
+	// reference is the primary colour and the cached fallback is only used
+	// when the reference is absent -- so a producer is free to write
+	// w:themeFill (or w:themeColor) with no cached w:fill/w:color at all, and
+	// that link must still be kept. This is why it isn't folded into an
+	// early-return guard alongside the block above: it must run whether or
+	// not a concrete colour was present there.
+	themeAttr, tintAttr, shadeAttr := "themeFill", "themeFillTint", "themeFillShade"
+	if source == "color" {
+		themeAttr, tintAttr, shadeAttr = "themeColor", "themeTint", "themeShade"
 	}
+	if themeVal, ok := getAttr(shdElem, themeAttr); ok && themeVal != "" {
+		if hydrator, ok := cell.(interface{ HydrateThemeFill(string, string, string) }); ok {
+			tint, _ := getAttr(shdElem, tintAttr)
+			shade, _ := getAttr(shdElem, shadeAttr)
+			hydrator.HydrateThemeFill(themeVal, tint, shade)
+		}
+	}
+
 	return nil
 }
 
