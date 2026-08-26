@@ -24,6 +24,48 @@ import (
 	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
+func findChild(parent *Element, local string) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if child != nil && child.Name.Local == local {
+			return child
+		}
+	}
+	return nil
+}
+
+func findDescendant(parent *Element, local string) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if child == nil {
+			continue
+		}
+		if child.Name.Local == local {
+			return child
+		}
+		if found := findDescendant(child, local); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+func getAttr(elem *Element, local string) (string, bool) {
+	if elem == nil {
+		return "", false
+	}
+	for _, attr := range elem.Attr {
+		if attr.Name.Local == local {
+			return attr.Value, true
+		}
+	}
+	return "", false
+}
+
 // documentXML unzips a .docx buffer and returns the raw word/document.xml
 // bytes, so tests can assert on what was actually serialized rather than on
 // in-memory accessor values that can diverge from it.
@@ -323,6 +365,18 @@ func TestReconstructHyperlink_HydratedAnchorWithNoHistoryDoesNotInventOne(t *tes
 // buildBookmarkPackage assembles a minimal single-part .docx around the
 // given word/document.xml body, for the bookmark hydration tests below.
 func buildBookmarkPackage(t *testing.T, bodyXML string) []byte {
+	return buildBookmarkPackageWithPrefix(t, "w", bodyXML)
+}
+
+func buildBookmarkPackageWithPrefix(t *testing.T, prefix, bodyXML string) []byte {
+	return buildBookmarkPackageWithPrefixAndBodyAttrs(t, prefix, "", bodyXML)
+}
+
+func buildBookmarkPackageWithPrefixAndBodyAttrs(t *testing.T, prefix, bodyAttrs, bodyXML string) []byte {
+	return buildBookmarkPackageWithBindings(t, prefix, "", bodyAttrs, bodyXML)
+}
+
+func buildBookmarkPackageWithBindings(t *testing.T, prefix, rootAttrs, bodyAttrs, bodyXML string) []byte {
 	t.Helper()
 
 	contentTypesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -338,12 +392,12 @@ func buildBookmarkPackage(t *testing.T, bodyXML string) []byte {
 </Relationships>`
 
 	mainDocumentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="` + constants.NamespaceMain + `">
-<w:body>
+<` + prefix + `:document xmlns:` + prefix + `="` + constants.NamespaceMain + `"` + rootAttrs + `>
+<` + prefix + `:body` + bodyAttrs + `>
 ` + bodyXML + `
-<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
-</w:body>
-</w:document>`
+<` + prefix + `:sectPr><` + prefix + `:pgSz ` + prefix + `:w="12240" ` + prefix + `:h="15840"/></` + prefix + `:sectPr>
+</` + prefix + `:body>
+</` + prefix + `:document>`
 
 	return buildRawZipPackage(t, map[string]string{
 		"[Content_Types].xml": contentTypesXML,
@@ -369,9 +423,818 @@ func reconstructFromBookmarkBody(t *testing.T, bodyXML string) domain.Document {
 	return doc
 }
 
+func TestDocumentNamespacesRetainsOriginalPrefixBindings(t *testing.T) {
+	tree, err := parseXMLTree([]byte(`<x:document xmlns:x="` + constants.NamespaceMain + `" xmlns:rel="` + constants.NamespaceRelationships + `"><x:body xmlns:rel="urn:body"/></x:document>`))
+	if err != nil {
+		t.Fatalf("parseXMLTree: %v", err)
+	}
+	body := findChild(tree, "body")
+	got := documentNamespaces(tree, body)
+	if got["x"] != constants.NamespaceMain {
+		t.Errorf("x namespace = %q, want %q", got["x"], constants.NamespaceMain)
+	}
+	if got["rel"] != "urn:body" {
+		t.Errorf("rel namespace = %q, want body override", got["rel"])
+	}
+}
+
+type capturedBookmarkIDs []string
+
+func (ids *capturedBookmarkIDs) ObserveHydratedBookmarkID(id string) {
+	*ids = append(*ids, id)
+}
+
+func TestSourceIDScansUseAttributeQName(t *testing.T) {
+	tree, err := parseXMLTree([]byte(`<w:document xmlns:w="` + constants.NamespaceMain + `" xmlns:wp="` + constants.NamespaceWordprocessingDrawing + `" xmlns:x="urn:test"><w:bookmarkStart x:id="99" w:id="7"/><wp:docPr x:id="1" id="40"/></w:document>`))
+	if err != nil {
+		t.Fatalf("parseXMLTree: %v", err)
+	}
+	var ids capturedBookmarkIDs
+	observeSourceBookmarkIDs(tree, &ids)
+	if len(ids) != 1 || ids[0] != "7" {
+		t.Fatalf("observed bookmark IDs = %v, want [7]", ids)
+	}
+	if got := highestSourceDrawingID(tree); got != 40 {
+		t.Fatalf("highestSourceDrawingID = %d, want 40", got)
+	}
+}
+
+func TestWordHydrationIgnoresForeignAttributesWithSameLocalName(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:pPr><w:sectPr><w:pgMar xmlns:x="urn:opaque" x:top="999" w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720"/></w:sectPr></w:pPr></w:p>`)
+	sections := doc.Sections()
+	if len(sections) != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2", len(sections))
+	}
+	margins := sections[0].Margins()
+	if margins.Top != 1440 {
+		t.Fatalf("hydrated top margin = %d, want 1440", margins.Top)
+	}
+	margins.Right = 1500
+	if err := sections[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	for _, want := range []string{`x:top="999"`, `w:top="1440"`, `w:right="1500"`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document lost %s:\n%s", want, written)
+		}
+	}
+}
+
+func TestRoundTripMainDocument_ModifiesStrictOOXMLWithoutAddingTransitionalNamespace(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackage(t, `<w:p><w:r><w:t>Strict</w:t></w:r></w:p>`))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	pkg.MainDocument = bytes.ReplaceAll(pkg.MainDocument, []byte(constants.NamespaceMain), []byte(constants.NamespaceMainStrict))
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	sections := doc.Sections()
+	if len(sections) != 1 {
+		t.Fatalf("len(Sections()) = %d, want 1", len(sections))
+	}
+	margins := sections[0].Margins()
+	margins.Top = 1500
+	if err := sections[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if _, err := parseXMLTree([]byte(written)); err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	if !strings.Contains(written, constants.NamespaceMainStrict) || !strings.Contains(written, `w:top="1500"`) {
+		t.Errorf("resaved strict document did not contain the requested change:\n%s", written)
+	}
+	if strings.Contains(written, constants.NamespaceMain+`"`) {
+		t.Errorf("resaved strict document added the Transitional namespace:\n%s", written)
+	}
+	reopenedPackage, err := LoadPackageFromBytes(output.Bytes())
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes(first write): %v", err)
+	}
+	reopenedParsed, err := ParsePackage(reopenedPackage)
+	if err != nil {
+		t.Fatalf("ParsePackage(first write): %v", err)
+	}
+	reopened, err := ReconstructDocument(reopenedParsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument(first write): %v", err)
+	}
+	if err := reopened.Validate(); err != nil {
+		t.Fatalf("Validate(first write): %v", err)
+	}
+	var second bytes.Buffer
+	if _, err := reopened.WriteTo(&second); err != nil {
+		t.Fatalf("WriteTo(second write): %v", err)
+	}
+	if secondXML := documentXML(t, second.Bytes()); secondXML != written {
+		t.Errorf("second Strict write changed document.xml:\nfirst:  %s\nsecond: %s", written, secondXML)
+	}
+}
+
+func TestRoundTripMainDocument_TransitionalRootWinsOverUnusedStrictDeclaration(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackageWithBindings(
+		t,
+		"w",
+		` xmlns:s="`+constants.NamespaceMainStrict+`"`,
+		"",
+		`<w:p><w:r><w:t>Existing</w:t></w:r></w:p>`,
+	))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	paragraph, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := paragraph.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("Added"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	body := findWordChild(tree, "body")
+	if body == nil {
+		t.Fatalf("resaved document has no Transitional body:\n%s", written)
+	}
+	paragraphCount := 0
+	for _, child := range body.Children {
+		if child == nil || child.Name.Local != "p" {
+			continue
+		}
+		paragraphCount++
+		if child.Name.Space != constants.NamespaceMain {
+			t.Errorf("paragraph %d namespace = %q, want Transitional %q:\n%s", paragraphCount, child.Name.Space, constants.NamespaceMain, written)
+		}
+	}
+	if paragraphCount != 2 {
+		t.Fatalf("resaved body has %d paragraphs, want 2:\n%s", paragraphCount, written)
+	}
+	reopenedPackage, err := LoadPackageFromBytes(output.Bytes())
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes(output): %v", err)
+	}
+	reopenedParsed, err := ParsePackage(reopenedPackage)
+	if err != nil {
+		t.Fatalf("ParsePackage(output): %v", err)
+	}
+	reopened, err := ReconstructDocument(reopenedParsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument(output): %v", err)
+	}
+	var second bytes.Buffer
+	if _, err := reopened.WriteTo(&second); err != nil {
+		t.Fatalf("WriteTo(second): %v", err)
+	}
+	if secondXML := documentXML(t, second.Bytes()); secondXML != written {
+		t.Errorf("second Transitional write changed document.xml:\nfirst:  %s\nsecond: %s", written, secondXML)
+	}
+}
+
+func TestRoundTripMainDocument_StrictNewImageUsesStrictGraphicDataURI(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackage(t, `<w:p><w:r><w:t>Strict image</w:t></w:r></w:p>`))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	pkg.MainDocument = bytes.ReplaceAll(pkg.MainDocument, []byte(constants.NamespaceMain), []byte(constants.NamespaceMainStrict))
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	paragraph, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	if _, err := paragraph.AddImage(createTestPNG(t)); err != nil {
+		t.Fatalf("AddImage: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	graphicData := findDrawingDescendant(tree, "graphicData")
+	if graphicData == nil {
+		t.Fatalf("resaved Strict document has no a:graphicData:\n%s", written)
+	}
+	if uri, _ := getUnqualifiedAttr(graphicData, "uri"); uri != constants.NamespacePictureStrict {
+		t.Errorf("Strict graphicData URI = %q, want %q:\n%s", uri, constants.NamespacePictureStrict, written)
+	}
+	if strings.Contains(written, `uri="`+constants.NamespacePicture+`"`) {
+		t.Errorf("Strict graphicData retained the Transitional picture URI:\n%s", written)
+	}
+	reopenedPackage, err := LoadPackageFromBytes(output.Bytes())
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes(output): %v", err)
+	}
+	reopenedParsed, err := ParsePackage(reopenedPackage)
+	if err != nil {
+		t.Fatalf("ParsePackage(output): %v", err)
+	}
+	reopened, err := ReconstructDocument(reopenedParsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument(output): %v", err)
+	}
+	if err := reopened.Validate(); err != nil {
+		t.Fatalf("Validate(output): %v", err)
+	}
+	var second bytes.Buffer
+	if _, err := reopened.WriteTo(&second); err != nil {
+		t.Fatalf("WriteTo(second): %v", err)
+	}
+	if secondXML := documentXML(t, second.Bytes()); secondXML != written {
+		t.Errorf("second Strict image write changed document.xml:\nfirst:  %s\nsecond: %s", written, secondXML)
+	}
+}
+
+func TestRoundTripMainDocument_StrictNewHyperlinkUsesStrictRelationshipsNamespace(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackage(t, `<w:p><w:r><w:t>Strict</w:t></w:r></w:p>`))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	pkg.MainDocument = bytes.ReplaceAll(pkg.MainDocument, []byte(constants.NamespaceMain), []byte(constants.NamespaceMainStrict))
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	paragraphs := doc.Paragraphs()
+	if len(paragraphs) != 1 {
+		t.Fatalf("len(Paragraphs()) = %d, want 1", len(paragraphs))
+	}
+	if _, err := paragraphs[0].AddHyperlink("https://example.com/strict", "Strict link"); err != nil {
+		t.Fatalf("AddHyperlink: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if !strings.Contains(written, constants.NamespaceRelationshipsStrict) {
+		t.Errorf("new Strict hyperlink is missing the Strict relationships namespace:\n%s", written)
+	}
+	if strings.Contains(written, constants.NamespaceRelationships+`"`) {
+		t.Errorf("new Strict hyperlink introduced the Transitional relationships namespace:\n%s", written)
+	}
+	if _, err := parseXMLTree([]byte(written)); err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	reopenedPackage, err := LoadPackageFromBytes(output.Bytes())
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes(output): %v", err)
+	}
+	reopenedParsed, err := ParsePackage(reopenedPackage)
+	if err != nil {
+		t.Fatalf("ParsePackage(output): %v", err)
+	}
+	if _, err := ReconstructDocument(reopenedParsed); err != nil {
+		t.Fatalf("ReconstructDocument(output): %v", err)
+	}
+}
+
+func TestRoundTripMainDocument_StrictChangedSectionCarrierHasOneParagraphPropertiesElement(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackage(t, `<w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720"/></w:sectPr></w:pPr><w:r><w:t>First section</w:t></w:r></w:p><w:p><w:r><w:t>Second section</w:t></w:r></w:p>`))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	pkg.MainDocument = bytes.ReplaceAll(pkg.MainDocument, []byte(constants.NamespaceMain), []byte(constants.NamespaceMainStrict))
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	paragraphs := doc.Paragraphs()
+	if len(paragraphs) != 2 {
+		t.Fatalf("len(Paragraphs()) = %d, want 2", len(paragraphs))
+	}
+	if err := paragraphs[0].SetAlignment(domain.AlignmentCenter); err != nil {
+		t.Fatalf("SetAlignment: %v", err)
+	}
+	sections := doc.Sections()
+	margins := sections[0].Margins()
+	margins.Top = 1500
+	if err := sections[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if _, err := parseXMLTree([]byte(written)); err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	if count := strings.Count(written, `<w:pPr>`); count != 1 {
+		t.Fatalf("first Strict section carrier produced %d pPr elements, want 1:\n%s", count, written)
+	}
+	if count := strings.Count(written, `<w:sectPr>`); count != 2 {
+		t.Fatalf("Strict section count = %d, want one embedded and one final section:\n%s", count, written)
+	}
+	for _, want := range []string{`w:val="center"`, `w:top="1500"`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved Strict section carrier lost %s:\n%s", want, written)
+		}
+	}
+}
+
+func TestRoundTripMainDocument_AddSectionMovesFinalSectionOpaquePropertiesWithOriginalSection(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackage(t, `<w:p><w:r><w:t>Original section</w:t></w:r></w:p>`))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	originalFinal := `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>`
+	customFinal := `<!--final-anchor--><w:sectPr w:rsidR="AAAA"><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="72"/><w:docGrid w:linePitch="360"/></w:sectPr>`
+	pkg.MainDocument = bytes.Replace(pkg.MainDocument, []byte(originalFinal), []byte(customFinal), 1)
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	newSection, err := doc.AddSectionWithBreak(domain.SectionBreakTypeContinuous)
+	if err != nil {
+		t.Fatalf("AddSectionWithBreak: %v", err)
+	}
+	newMargins := newSection.Margins()
+	newMargins.Top = 1800
+	if err := newSection.SetMargins(newMargins); err != nil {
+		t.Fatalf("SetMargins(new section): %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	body := findWordChild(tree, "body")
+	var embeddedSection, finalSection *Element
+	for _, child := range body.Children {
+		switch {
+		case isWordElement(child, "p"):
+			if props := findWordChild(child, "pPr"); props != nil {
+				if section := findWordChild(props, "sectPr"); section != nil {
+					embeddedSection = section
+				}
+			}
+		case isWordElement(child, "sectPr"):
+			finalSection = child
+		}
+	}
+	if embeddedSection == nil || finalSection == nil {
+		t.Fatalf("resaved document is missing embedded or final section:\n%s", written)
+	}
+	if rsid, _ := getWordAttr(embeddedSection, "rsidR"); rsid != "AAAA" {
+		t.Errorf("embedded original section rsidR = %q, want AAAA", rsid)
+	}
+	if findWordChild(embeddedSection, "docGrid") == nil {
+		t.Errorf("embedded original section lost docGrid:\n%s", written)
+	}
+	if margins := findWordChild(embeddedSection, "pgMar"); margins == nil {
+		t.Errorf("embedded original section lost pgMar:\n%s", written)
+	} else if gutter, _ := getWordAttr(margins, "gutter"); gutter != "72" {
+		t.Errorf("embedded original section gutter = %q, want 72", gutter)
+	}
+	if sectionType := findWordChild(embeddedSection, "type"); sectionType == nil {
+		t.Errorf("embedded original section lost its new break type:\n%s", written)
+	} else if value, _ := getWordAttr(sectionType, "val"); value != "continuous" {
+		t.Errorf("embedded section break type = %q, want continuous", value)
+	}
+	if _, ok := getWordAttr(finalSection, "rsidR"); ok || findWordChild(finalSection, "docGrid") != nil {
+		t.Errorf("new final section inherited opaque properties from the original section:\n%s", written)
+	}
+	if margins := findWordChild(finalSection, "pgMar"); margins == nil {
+		t.Errorf("new final section is missing pgMar:\n%s", written)
+	} else {
+		if top, _ := getWordAttr(margins, "top"); top != "1800" {
+			t.Errorf("new final section top margin = %q, want 1800", top)
+		}
+		if _, ok := getWordAttr(margins, "gutter"); ok {
+			t.Errorf("new final section inherited gutter from original section:\n%s", written)
+		}
+	}
+	if anchor, section := strings.Index(written, `<!--final-anchor-->`), strings.Index(written, `<w:sectPr w:rsidR="AAAA"`); anchor < 0 || section < 0 || anchor > section {
+		t.Errorf("opaque final-section prefix did not move with the original section:\n%s", written)
+	}
+	reopenedPackage, err := LoadPackageFromBytes(output.Bytes())
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes(first write): %v", err)
+	}
+	reopenedParsed, err := ParsePackage(reopenedPackage)
+	if err != nil {
+		t.Fatalf("ParsePackage(first write): %v", err)
+	}
+	reopened, err := ReconstructDocument(reopenedParsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument(first write): %v", err)
+	}
+	if err := reopened.Validate(); err != nil {
+		t.Fatalf("Validate(first write): %v", err)
+	}
+	var second bytes.Buffer
+	if _, err := reopened.WriteTo(&second); err != nil {
+		t.Fatalf("WriteTo(second write): %v", err)
+	}
+	if secondXML := documentXML(t, second.Bytes()); secondXML != written {
+		t.Errorf("second write changed moved-section document.xml:\nfirst:  %s\nsecond: %s", written, secondXML)
+	}
+}
+
+func TestRoundTripMainDocument_RemovingEmptyFinalSectionMovesOpaquePropertiesToFinalSection(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:r><w:t>First section</w:t></w:r></w:p><w:p><w:pPr><w:sectPr w:rsidR="FIRST"><w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="72"/><w:docGrid w:linePitch="360"/></w:sectPr></w:pPr></w:p>`)
+	sections := doc.Sections()
+	if len(sections) != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2", len(sections))
+	}
+	remover, ok := doc.(interface {
+		RemoveLastSection(domain.Section) bool
+	})
+	if !ok {
+		t.Fatal("reconstructed document does not expose RemoveLastSection")
+	}
+	if !remover.RemoveLastSection(sections[1]) {
+		t.Fatal("RemoveLastSection returned false for an empty final section")
+	}
+
+	var first bytes.Buffer
+	if _, err := doc.WriteTo(&first); err != nil {
+		t.Fatalf("WriteTo(first): %v", err)
+	}
+	written := documentXML(t, first.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	body := findWordChild(tree, "body")
+	if body == nil {
+		t.Fatalf("resaved document has no body:\n%s", written)
+	}
+	var finalSection *Element
+	paragraphCount := 0
+	for _, child := range body.Children {
+		switch {
+		case isWordElement(child, "p"):
+			paragraphCount++
+		case isWordElement(child, "sectPr"):
+			if finalSection != nil {
+				t.Fatalf("resaved body has more than one final sectPr:\n%s", written)
+			}
+			finalSection = child
+		}
+	}
+	if paragraphCount != 1 || finalSection == nil {
+		t.Fatalf("resaved body has %d paragraphs and final sectPr %v, want 1 and present:\n%s", paragraphCount, finalSection != nil, written)
+	}
+	if rsid, _ := getWordAttr(finalSection, "rsidR"); rsid != "FIRST" {
+		t.Errorf("final section rsidR = %q, want FIRST", rsid)
+	}
+	if findWordChild(finalSection, "docGrid") == nil {
+		t.Errorf("final section lost embedded docGrid:\n%s", written)
+	}
+	if margins := findWordChild(finalSection, "pgMar"); margins == nil {
+		t.Errorf("final section lost embedded margins:\n%s", written)
+	} else if gutter, _ := getWordAttr(margins, "gutter"); gutter != "72" {
+		t.Errorf("final section gutter = %q, want 72", gutter)
+	}
+	if findWordChild(finalSection, "type") != nil {
+		t.Errorf("final section retained the intermediate break type:\n%s", written)
+	}
+
+	reopenedPackage, err := LoadPackageFromBytes(first.Bytes())
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes(first): %v", err)
+	}
+	reopenedParsed, err := ParsePackage(reopenedPackage)
+	if err != nil {
+		t.Fatalf("ParsePackage(first): %v", err)
+	}
+	reopened, err := ReconstructDocument(reopenedParsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument(first): %v", err)
+	}
+	if err := reopened.Validate(); err != nil {
+		t.Fatalf("Validate(first): %v", err)
+	}
+	var second bytes.Buffer
+	if _, err := reopened.WriteTo(&second); err != nil {
+		t.Fatalf("WriteTo(second): %v", err)
+	}
+	if secondXML := documentXML(t, second.Bytes()); secondXML != written {
+		t.Errorf("second write changed document.xml after removing the final section:\nfirst:  %s\nsecond: %s", written, secondXML)
+	}
+}
+
+func TestRoundTripMainDocument_ExpandsSelfClosingBodyBeforeAddingContent(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackage(t, ""))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	original := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="` + constants.NamespaceMain + `"><w:body/></w:document>`
+	pkg.MainDocument = []byte(original)
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+
+	var unchanged bytes.Buffer
+	if _, err := doc.WriteTo(&unchanged); err != nil {
+		t.Fatalf("WriteTo(unchanged): %v", err)
+	}
+	if got := documentXML(t, unchanged.Bytes()); got != original {
+		t.Fatalf("unchanged self-closing body was rewritten:\ngot:  %s\nwant: %s", got, original)
+	}
+	paragraph, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := paragraph.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("Added inside body"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	var changed bytes.Buffer
+	if _, err := doc.WriteTo(&changed); err != nil {
+		t.Fatalf("WriteTo(changed): %v", err)
+	}
+	written := documentXML(t, changed.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	body := findWordChild(tree, "body")
+	if body == nil || findWordChild(body, "p") == nil {
+		t.Fatalf("added paragraph is not inside w:body:\n%s", written)
+	}
+	for _, child := range tree.Children {
+		if isWordElement(child, "p") {
+			t.Fatalf("added paragraph was written as a sibling of w:body:\n%s", written)
+		}
+	}
+	reopenedPackage, err := LoadPackageFromBytes(changed.Bytes())
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes(changed): %v", err)
+	}
+	reopenedParsed, err := ParsePackage(reopenedPackage)
+	if err != nil {
+		t.Fatalf("ParsePackage(changed): %v", err)
+	}
+	reopened, err := ReconstructDocument(reopenedParsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument(changed): %v", err)
+	}
+	if len(reopened.Paragraphs()) != 1 {
+		t.Fatalf("reopened paragraph count = %d, want 1", len(reopened.Paragraphs()))
+	}
+}
+
+func TestRoundTripMainDocument_MergesSectionWithBodyScopedPrefix(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackageWithPrefixAndBodyAttrs(t, "w", ` xmlns:x="`+constants.NamespaceMain+`"`, `<x:p><x:pPr><x:sectPr><x:pgMar x:top="1440" x:right="1440" x:bottom="1440" x:left="1440" x:header="720" x:footer="720" x:gutter="36"/></x:sectPr></x:pPr></x:p>
+<x:p><x:r><x:t>Next</x:t></x:r></x:p>`))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	margins := doc.Sections()[0].Margins()
+	margins.Top = 1500
+	if err := doc.Sections()[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if _, err := parseXMLTree([]byte(written)); err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	for _, want := range []string{`<x:sectPr>`, `x:top="1500"`, `x:gutter="36"`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document lost %s:\n%s", want, written)
+		}
+	}
+	if strings.Contains(written, `x:top="1440"`) {
+		t.Errorf("resaved document retained the old margin:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_MergesSectionWithParagraphScopedPrefix(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<x:p xmlns:x="`+constants.NamespaceMain+`" xmlns:w="urn:not-wordprocessingml"><x:pPr><x:sectPr><x:pgMar x:top="1440" x:right="1440" x:bottom="1440" x:left="1440" x:header="720" x:footer="720" x:gutter="48"/></x:sectPr></x:pPr></x:p>
+<w:p><w:r><w:t>Next</w:t></w:r></w:p>`)
+	sections := doc.Sections()
+	if len(sections) != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2", len(sections))
+	}
+	margins := sections[0].Margins()
+	margins.Top = 1500
+	if err := sections[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if _, err := parseXMLTree([]byte(written)); err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	for _, want := range []string{`<x:sectPr>`, `x:top="1500"`, `x:gutter="48"`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document lost %s:\n%s", want, written)
+		}
+	}
+	if strings.Contains(written, `x:top="1440"`) || strings.Contains(written, `<w:pgMar`) {
+		t.Errorf("resaved section retained or duplicated the old margins:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_MergesSectionUsingOriginalPrefix(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackageWithPrefix(t, "x", `<x:p><x:pPr><x:sectPr><x:pgMar x:top="1440" x:right="1440" x:bottom="1440" x:left="1440" x:header="720" x:footer="720" x:gutter="24"/></x:sectPr></x:pPr></x:p>
+<x:p><x:r><x:t>Next</x:t></x:r></x:p>`))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	margins := doc.Sections()[0].Margins()
+	margins.Top = 1500
+	if err := doc.Sections()[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	for _, want := range []string{`<x:sectPr>`, `x:top="1500"`, `x:gutter="24"`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document lost %s:\n%s", want, written)
+		}
+	}
+	if strings.Contains(written, `xmlns:w=`) {
+		t.Errorf("resaved document added an unused w namespace:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_AvoidsConflictingSerializerPrefixes(t *testing.T) {
+	pkg, err := LoadPackageFromBytes(buildBookmarkPackageWithBindings(t, "x", ` xmlns:w="urn:not-wordprocessingml"`, "", `<x:p><x:pPr><x:sectPr><x:pgMar x:top="1440" x:right="1440" x:bottom="1440" x:left="1440" x:header="720" x:footer="720"/></x:sectPr></x:pPr></x:p>
+<x:p><x:r><x:t>Existing</x:t></x:r></x:p>`))
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes: %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage: %v", err)
+	}
+	doc, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument: %v", err)
+	}
+	margins := doc.Sections()[0].Margins()
+	margins.Top = 1500
+	if err := doc.Sections()[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+	paragraph, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := paragraph.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("Added"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if _, err := parseXMLTree([]byte(written)); err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	for _, want := range []string{`x:top="1500"`, `<x:t>Added</x:t>`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document lost %s:\n%s", want, written)
+		}
+	}
+	if strings.Contains(written, `<w:p`) || strings.Contains(written, `w:top="1500"`) {
+		t.Errorf("generated content used the conflicting w prefix:\n%s", written)
+	}
+}
+
 type bookmarkedParagraph interface {
 	BookmarkID() string
 	BookmarkName() string
+}
+
+func startTagHas(docXML, element string, attrs ...string) bool {
+	prefix := "<w:" + element
+	for rest := docXML; ; {
+		index := strings.Index(rest, prefix)
+		if index < 0 {
+			return false
+		}
+		rest = rest[index:]
+		end := strings.IndexByte(rest, '>')
+		if end < 0 {
+			return false
+		}
+		tag := rest[:end+1]
+		matches := true
+		for _, attr := range attrs {
+			if !strings.Contains(tag, attr) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return true
+		}
+		rest = rest[end+1:]
+	}
 }
 
 // TestReconstructBookmark_SameParagraphHydrates covers populateParagraph's
@@ -379,10 +1242,10 @@ type bookmarkedParagraph interface {
 // fall in one paragraph is the only shape core.paragraph's single (id, name)
 // pair can represent, and it must survive a read-then-write round trip.
 func TestReconstructBookmark_SameParagraphHydrates(t *testing.T) {
-	doc := reconstructFromBookmarkBody(t, `<w:p>
-<w:bookmarkStart w:id="3" w:name="MyBookmark"/>
+	doc := reconstructFromBookmarkBody(t, `<w:p xmlns:x="urn:test">
+<w:bookmarkStart x:id="99" x:name="Opaque" w:id="3" w:name="MyBookmark"/>
 <w:r><w:t>Hello</w:t></w:r>
-<w:bookmarkEnd w:id="3"/>
+<w:bookmarkEnd x:id="99" w:id="3"/>
 </w:p>`)
 
 	paras := doc.Paragraphs()
@@ -402,20 +1265,20 @@ func TestReconstructBookmark_SameParagraphHydrates(t *testing.T) {
 		t.Fatalf("WriteTo: %v", err)
 	}
 	written := documentXML(t, buf.Bytes())
-	if !strings.Contains(written, `<w:bookmarkStart w:id="3" w:name="MyBookmark"`) {
+	if !startTagHas(written, "bookmarkStart", `w:id="3"`, `w:name="MyBookmark"`) {
 		t.Errorf("resaved document.xml lost the bookmark start:\n%s", written)
 	}
-	if !strings.Contains(written, `<w:bookmarkEnd w:id="3"`) {
+	if !startTagHas(written, "bookmarkEnd", `w:id="3"`) {
 		t.Errorf("resaved document.xml lost the bookmark end:\n%s", written)
 	}
 }
 
-// TestReconstructBookmark_SpanningParagraphsIsDropped pins the documented
+// TestReconstructBookmark_SpanningParagraphsIsNotHydratedButIsPreserved pins the documented
 // limit of the single-paragraph model: a bookmark whose end falls in a
-// different paragraph than its start has nowhere to live and is discarded,
-// which is the pre-existing behavior this feature must not regress.
-func TestReconstructBookmark_SpanningParagraphsIsDropped(t *testing.T) {
-	doc := reconstructFromBookmarkBody(t, `<w:p><w:bookmarkStart w:id="1" w:name="Spans"/><w:r><w:t>A</w:t></w:r></w:p>
+// different paragraph than its start has nowhere to live in the domain model.
+// Raw XML preservation nevertheless keeps the unedited source intact.
+func TestReconstructBookmark_SpanningParagraphsIsNotHydratedButIsPreserved(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p xmlns:x="urn:test"><w:bookmarkStart x:id="999" w:id="1" w:name="Spans"/><w:r><w:t>A</w:t></w:r></w:p>
 <w:p><w:r><w:t>B</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>`)
 
 	for i, para := range doc.Paragraphs() {
@@ -433,12 +1296,49 @@ func TestReconstructBookmark_SpanningParagraphsIsDropped(t *testing.T) {
 		t.Fatalf("WriteTo: %v", err)
 	}
 	written := documentXML(t, buf.Bytes())
-	if strings.Contains(written, "Spans") {
-		t.Errorf("resaved document.xml still references the dropped bookmark's name:\n%s", written)
+	if !strings.Contains(written, `w:name="Spans"`) {
+		t.Errorf("resaved document.xml lost the unmodeled spanning bookmark:\n%s", written)
+	}
+
+	if err := doc.Paragraphs()[0].SetAlignment(domain.AlignmentCenter); err != nil {
+		t.Fatalf("SetAlignment: %v", err)
+	}
+	buf.Reset()
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo after edit: %v", err)
+	}
+	edited := documentXML(t, buf.Bytes())
+	if strings.Contains(edited, "bookmarkStart") || strings.Contains(edited, "bookmarkEnd") {
+		t.Errorf("editing one paragraph left an incomplete spanning bookmark:\n%s", edited)
 	}
 }
 
-// TestReconstructBookmark_PartialRunIsDropped covers a bookmark that, in the
+func TestRoundTripMainDocument_UnmatchedSourceRangeSurvivesUnrelatedEdit(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:bookmarkStart w:id="77" w:name="AlreadyUnmatched"/><w:r><w:t>Content</w:t></w:r></w:p>`)
+	sections := doc.Sections()
+	if len(sections) != 1 {
+		t.Fatalf("len(Sections()) = %d, want 1", len(sections))
+	}
+	margins := sections[0].Margins()
+	margins.Top = 1500
+	if err := sections[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if !strings.Contains(written, `w:name="AlreadyUnmatched"`) {
+		t.Errorf("unrelated section edit removed an unmatched source marker:\n%s", written)
+	}
+	if !strings.Contains(written, `w:top="1500"`) {
+		t.Errorf("section edit was not written:\n%s", written)
+	}
+}
+
+// TestReconstructBookmark_PartialRunIsNotHydratedButIsPreserved covers a bookmark that, in the
 // source, wraps only "target" inside "prefix target suffix" -- all in one
 // paragraph, so the same-paragraph check alone would accept it. But
 // core.paragraph's single (id, name) pair has no notion of where within the
@@ -448,8 +1348,9 @@ func TestReconstructBookmark_SpanningParagraphsIsDropped(t *testing.T) {
 // "suffix" alike. A REF field pointed at this bookmark would then resolve
 // the whole paragraph's text instead of just "target". Representing this
 // correctly needs per-run position tracking that paragraph doesn't have, so
-// the partial bookmark is dropped instead of corrupted.
-func TestReconstructBookmark_PartialRunIsDropped(t *testing.T) {
+// the partial bookmark is not hydrated. Its raw XML remains intact until that
+// paragraph is edited.
+func TestReconstructBookmark_PartialRunIsNotHydratedButIsPreserved(t *testing.T) {
 	doc := reconstructFromBookmarkBody(t, `<w:p>
 <w:r><w:t xml:space="preserve">prefix </w:t></w:r>
 <w:bookmarkStart w:id="4" w:name="Target"/>
@@ -475,11 +1376,19 @@ func TestReconstructBookmark_PartialRunIsDropped(t *testing.T) {
 		t.Fatalf("WriteTo: %v", err)
 	}
 	written := documentXML(t, buf.Bytes())
-	if strings.Contains(written, "Target") {
-		t.Errorf("resaved document.xml still references the dropped partial bookmark's name:\n%s", written)
+	if !strings.Contains(written, `w:name="Target"`) {
+		t.Errorf("resaved document.xml lost the unmodeled partial bookmark:\n%s", written)
 	}
-	if strings.Contains(written, "bookmarkStart") || strings.Contains(written, "bookmarkEnd") {
-		t.Errorf("resaved document.xml re-emitted the dropped bookmark, necessarily widened to the whole paragraph:\n%s", written)
+	if err := paras[0].SetAlignment(domain.AlignmentCenter); err != nil {
+		t.Fatalf("SetAlignment: %v", err)
+	}
+	buf.Reset()
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo after edit: %v", err)
+	}
+	edited := documentXML(t, buf.Bytes())
+	if strings.Contains(edited, "Target") || strings.Contains(edited, "bookmarkStart") || strings.Contains(edited, "bookmarkEnd") {
+		t.Errorf("edited paragraph re-emitted an unrepresentable partial bookmark:\n%s", edited)
 	}
 }
 
@@ -546,13 +1455,25 @@ func TestGenerateHeadingBookmarks_DoesNotClobberHydratedBookmark(t *testing.T) {
 }
 
 // TestGenerateHeadingBookmarks_StartsAboveHighestHydratedID covers the
-// allocator: a Heading-styled paragraph with no bookmark of its own still
-// gets one generated, but its numeric w:id must start above every bookmark
-// ID already hydrated from the source, anywhere in the document -- not
-// always at 0, or it could collide with one the file already had.
+// allocator: a newly added Heading-styled paragraph gets a bookmark whose
+// numeric w:id starts above every bookmark ID hydrated from the source.
 func TestGenerateHeadingBookmarks_StartsAboveHighestHydratedID(t *testing.T) {
 	doc := reconstructFromBookmarkBody(t, `<w:p><w:bookmarkStart w:id="5" w:name="SomeAnchor"/><w:r><w:t>Anchor</w:t></w:r><w:bookmarkEnd w:id="5"/></w:p>
 <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Chapter One</w:t></w:r></w:p>`)
+	newHeading, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	if err := newHeading.SetStyle("Heading1"); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	run, err := newHeading.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("Chapter Two"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
 
 	var buf bytes.Buffer
 	if _, err := doc.WriteTo(&buf); err != nil {
@@ -562,6 +1483,55 @@ func TestGenerateHeadingBookmarks_StartsAboveHighestHydratedID(t *testing.T) {
 
 	if !strings.Contains(written, `<w:bookmarkStart w:id="6" w:name="_Toc6"`) {
 		t.Errorf("resaved document.xml did not start the generated heading bookmark at id 6 (above the hydrated id 5):\n%s", written)
+	}
+}
+
+func TestGenerateHeadingBookmarks_ChangedOriginalParagraphStillGetsOne(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:r><w:t>Promote me</w:t></w:r></w:p>`)
+	paragraphs := doc.Paragraphs()
+	if len(paragraphs) != 1 {
+		t.Fatalf("len(Paragraphs()) = %d, want 1", len(paragraphs))
+	}
+	if err := paragraphs[0].SetStyle("Heading1"); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `<w:bookmarkStart w:id="0" w:name="_Toc0"`) {
+		t.Errorf("edited original paragraph did not receive a heading bookmark:\n%s", written)
+	}
+}
+
+func TestGenerateHeadingBookmarks_StartsAboveBookmarkInsideOpaqueContent(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:sdt><w:sdtContent><w:p>
+<w:bookmarkStart w:id="0" w:name="Opaque"/><w:r><w:t>Opaque</w:t></w:r><w:bookmarkEnd w:id="0"/>
+</w:p></w:sdtContent></w:sdt>`)
+	heading, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	if err := heading.SetStyle("Heading1"); err != nil {
+		t.Fatalf("SetStyle: %v", err)
+	}
+	run, err := heading.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("New heading"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `<w:bookmarkStart w:id="1" w:name="_Toc1"`) {
+		t.Errorf("generated heading bookmark collided with the opaque bookmark id 0:\n%s", written)
 	}
 }
 
@@ -833,13 +1803,11 @@ func TestReconstructSectionBreakWithContent_AgainstHandAuthoredPackage(t *testin
 	}
 	written := documentXML(t, buf.Bytes())
 
-	// Pins the known limitation: 2 source paragraphs resave as 3 -- the
-	// original content paragraph (now without its own sectPr, which moved to
-	// section level) plus a synthetic empty section-break carrier, plus the
-	// second content paragraph. See the doc comment above: not a regression
-	// from this PR, not fixed by it either.
-	if got := len(paragraphOpenTagRE.FindAllString(written, -1)); got != 3 {
-		t.Errorf("resaved document.xml contains %d <w:p> elements, want 3 (known limitation: content+sectPr paragraphs still split in two -- see test doc comment)", got)
+	// The source paragraph carries both content and sectPr. Raw preservation
+	// keeps that valid shape instead of splitting it into a content paragraph
+	// plus a synthetic empty section-break carrier.
+	if got := len(paragraphOpenTagRE.FindAllString(written, -1)); got != 2 {
+		t.Errorf("resaved document.xml contains %d <w:p> elements, want 2", got)
 	}
 	if got := strings.Count(written, "<w:sectPr"); got != 2 {
 		t.Errorf("resaved document.xml contains %d <w:sectPr> elements, want 2", got)
@@ -914,10 +1882,10 @@ func TestReconstructSectionBreakWithContent_NoExplicitType_AgainstHandAuthoredPa
 	}
 	written := documentXML(t, buf.Bytes())
 
-	// Same pinned known limitation as the w:type="nextPage" variant above:
-	// still 3 <w:p> elements, not a difference introduced by omitting w:type.
-	if got := len(paragraphOpenTagRE.FindAllString(written, -1)); got != 3 {
-		t.Errorf("resaved document.xml contains %d <w:p> elements, want 3 (known limitation: content+sectPr paragraphs still split in two -- see test doc comment)", got)
+	// The source shape is retained even when w:type is omitted and defaults to
+	// nextPage.
+	if got := len(paragraphOpenTagRE.FindAllString(written, -1)); got != 2 {
+		t.Errorf("resaved document.xml contains %d <w:p> elements, want 2", got)
 	}
 	if got := strings.Count(written, "<w:sectPr"); got != 2 {
 		t.Errorf("resaved document.xml contains %d <w:sectPr> elements, want 2", got)
@@ -2274,7 +3242,7 @@ func TestReconstructTableStyle_AgainstHandAuthoredPackage(t *testing.T) {
 		t.Fatalf("WriteTo: %v", err)
 	}
 	written := documentXML(t, buf.Bytes())
-	if !strings.Contains(written, `<w:tblStyle w:val="TableGrid">`) {
+	if !startTagHas(written, "tblStyle", `w:val="TableGrid"`) {
 		t.Errorf("resaved document.xml lost the table's tblStyle reference:\n%s", written)
 	}
 }
@@ -2430,6 +3398,42 @@ func TestApplyParagraphIndentation_AllowsFirstLineAndHangingBothPresent(t *testi
 // buildTableBodyDocx wraps a <w:tbl> fragment in a minimal, hand-authored
 // OOXML package -- raw bytes, not routed through docxgo's writer, so a reader
 // gap cannot be masked by a matching writer gap. See buildRawZipPackage.
+func TestParseMeasurementInt(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    int
+		wantErr bool
+	}{
+		{name: "integer", input: "9360", want: 9360},
+		{name: "float formatted integer", input: "9360.0", want: 9360},
+		{name: "fraction truncates", input: "9360.75", want: 9360},
+		{name: "negative fraction truncates toward zero", input: "-12.75", want: -12},
+		{name: "not a number", input: "broken", wantErr: true},
+		{name: "nan", input: "NaN", wantErr: true},
+		{name: "positive infinity", input: "+Inf", wantErr: true},
+		{name: "overflow", input: "1e100", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseMeasurementInt(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("parseMeasurementInt(%q) = %d, want error", tt.input, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseMeasurementInt(%q): %v", tt.input, err)
+			}
+			if got != tt.want {
+				t.Fatalf("parseMeasurementInt(%q) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func buildTableBodyDocx(t *testing.T, tableXML string) []byte {
 	t.Helper()
 
@@ -2458,6 +3462,554 @@ func buildTableBodyDocx(t *testing.T, tableXML string) []byte {
 		"_rels/.rels":         rootRelsXML,
 		"word/document.xml":   mainDocumentXML,
 	})
+}
+
+func TestRoundTripMainDocument_EditedParagraphKeepsOpaqueAdjacentBodyChild(t *testing.T) {
+	opaque := `<w:sdt><w:sdtPr><w:tag w:val="keep-verbatim"/></w:sdtPr><w:sdtContent><w:p><w:r><w:t>Opaque content</w:t></w:r></w:p></w:sdtContent></w:sdt>`
+	doc := reconstructFromBookmarkBody(t, opaque+`
+<w:p><w:r><w:t>Editable</w:t></w:r></w:p>`)
+
+	paragraphs := doc.Paragraphs()
+	if len(paragraphs) != 1 {
+		t.Fatalf("len(Paragraphs()) = %d, want 1 modeled paragraph", len(paragraphs))
+	}
+	if err := paragraphs[0].SetAlignment(domain.AlignmentCenter); err != nil {
+		t.Fatalf("SetAlignment: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, opaque) {
+		t.Errorf("resaved document.xml changed the adjacent opaque body child:\n%s", written)
+	}
+	if !startTagHas(written, "jc", `w:val="center"`) {
+		t.Errorf("resaved document.xml did not regenerate the edited paragraph:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_RegeneratedFragmentDeclaresRelationshipNamespace(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:r><w:t>Source</w:t></w:r></w:p>`)
+	paragraphs := doc.Paragraphs()
+	if len(paragraphs) != 1 {
+		t.Fatalf("len(Paragraphs()) = %d, want 1", len(paragraphs))
+	}
+	if _, err := paragraphs[0].AddHyperlink("https://example.com", "link"); err != nil {
+		t.Fatalf("AddHyperlink: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v", err)
+	}
+	hyperlink := findDescendant(tree, "hyperlink")
+	if hyperlink == nil {
+		t.Fatalf("resaved document.xml is missing the hyperlink:\n%s", written)
+	}
+	for _, attr := range hyperlink.Attr {
+		if attr.Name.Local == "id" {
+			if attr.Name.Space != constants.NamespaceRelationships {
+				t.Fatalf("hyperlink id namespace = %q, want %q:\n%s", attr.Name.Space, constants.NamespaceRelationships, written)
+			}
+			return
+		}
+	}
+	t.Fatalf("resaved hyperlink is missing r:id:\n%s", written)
+}
+
+func TestRoundTripMainDocument_NewDrawingStartsAboveOpaqueDrawingIDs(t *testing.T) {
+	opaque := `<w:sdt><w:sdtContent><w:p><w:r><w:drawing>` +
+		`<wp:inline xmlns:wp="` + constants.NamespaceWordprocessingDrawing + `">` +
+		`<wp:docPr id="40" name="Opaque drawing"/>` +
+		`</wp:inline></w:drawing></w:r></w:p></w:sdtContent></w:sdt>`
+	doc := reconstructFromBookmarkBody(t, opaque)
+	para, err := doc.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	if _, err := para.AddImage(createTestPNG(t)); err != nil {
+		t.Fatalf("AddImage: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, `<wp:docPr id="40" name="Opaque drawing"`) {
+		t.Errorf("resaved document.xml lost the opaque drawing ID:\n%s", written)
+	}
+	if !strings.Contains(written, `<wp:docPr id="41"`) {
+		t.Errorf("new drawing did not start above the opaque wp:docPr id 40:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_EditedTableRowKeepsShellAndOtherRows(t *testing.T) {
+	prefix := `<w:tbl><w:tblPr><w:tblpPr w:leftFromText="180" w:rightFromText="180"/></w:tblPr><w:tblGrid><w:gridCol w:w="2400"/></w:tblGrid>`
+	firstRow := `<w:tr w:rsidR="00112233"><w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>First</w:t></w:r></w:p></w:tc></w:tr>`
+	betweenRows := `<w:bookmarkStart w:id="9" w:name="BetweenRows"/><w:bookmarkEnd w:id="9"/>`
+	secondRow := `<w:tr w:rsidR="00445566"><w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Second</w:t></w:r></w:p></w:tc></w:tr>`
+	table, doc := reconstructTableFromXML(t, prefix+firstRow+betweenRows+secondRow+`</w:tbl>`)
+
+	row, err := table.Row(1)
+	if err != nil {
+		t.Fatalf("Row(1): %v", err)
+	}
+	if err := row.SetHeight(360); err != nil {
+		t.Fatalf("SetHeight: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, prefix) {
+		t.Errorf("resaved document.xml changed the table shell:\n%s", written)
+	}
+	if !strings.Contains(written, firstRow) {
+		t.Errorf("resaved document.xml changed the untouched first row:\n%s", written)
+	}
+	if !strings.Contains(written, betweenRows) {
+		t.Errorf("resaved document.xml lost the markup between rows:\n%s", written)
+	}
+	if strings.Contains(written, secondRow) {
+		t.Errorf("resaved document.xml kept stale raw XML for the edited second row:\n%s", written)
+	}
+	if !startTagHas(written, "trHeight", `w:val="360"`) {
+		t.Errorf("resaved document.xml did not serialize the edited row height:\n%s", written)
+	}
+
+	if err := table.DeleteRow(1); err != nil {
+		t.Fatalf("DeleteRow(1): %v", err)
+	}
+	buf.Reset()
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo after DeleteRow: %v", err)
+	}
+	written = documentXML(t, buf.Bytes())
+	if !strings.Contains(written, betweenRows) {
+		t.Errorf("deleting the following row also deleted the markup before it:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_EditedTableShellKeepsOpaquePropertiesAndGaps(t *testing.T) {
+	floating := `<w:tblpPr w:leftFromText="180" w:rightFromText="180"/>`
+	betweenRows := `<w:bookmarkStart w:id="9" w:name="BetweenRows"/><w:bookmarkEnd w:id="9"/>`
+	tableXML := `<w:tbl><w:tblPr>` + floating + `<w:tblW w:w="4800" w:type="dxa"/></w:tblPr>` +
+		`<w:tblGrid><w:gridCol w:w="2400"/></w:tblGrid>` +
+		`<w:tr><w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>First</w:t></w:r></w:p></w:tc></w:tr>` +
+		betweenRows +
+		`<w:tr><w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Second</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
+	table, doc := reconstructTableFromXML(t, tableXML)
+	if err := table.SetAlignment(domain.AlignmentCenter); err != nil {
+		t.Fatalf("SetAlignment: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, floating) {
+		t.Errorf("changing table alignment deleted w:tblpPr:\n%s", written)
+	}
+	if !strings.Contains(written, betweenRows) {
+		t.Errorf("changing table alignment deleted markup between rows:\n%s", written)
+	}
+	if !startTagHas(written, "jc", `w:val="center"`) {
+		t.Errorf("resaved document.xml did not contain the changed table alignment:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_EditedGridKeepsOpaqueGridChildren(t *testing.T) {
+	gridChange := `<w:tblGridChange w:id="7"><w:tblGrid><w:gridCol w:w="1800"/></w:tblGrid></w:tblGridChange>`
+	tableXML := `<w:tbl><w:tblPr><w:tblW w:w="2400" w:type="dxa"/></w:tblPr>` +
+		`<w:tblGrid><w:gridCol w:w="2400"/>` + gridChange + `</w:tblGrid>` +
+		`<w:tr><w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>`
+	table, doc := reconstructTableFromXML(t, tableXML)
+	row, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	if err := cell.SetWidth(3000); err != nil {
+		t.Fatalf("SetWidth: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	if !strings.Contains(written, gridChange) {
+		t.Errorf("changing the current grid deleted w:tblGridChange:\n%s", written)
+	}
+	if !startTagHas(written, "gridCol", `w:w="3000"`) {
+		t.Errorf("resaved document.xml did not contain the changed grid width:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_EmbeddedSectionStaysInContentParagraph(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p w:rsidR="AAAA"><w:pPr><w:spacing w:after="120"/><w:sectPr w:rsidR="BBBB"><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="72"/><w:docGrid w:linePitch="360"/></w:sectPr></w:pPr><w:r><w:t>First section</w:t></w:r></w:p>
+<w:p><w:r><w:t>Second section</w:t></w:r></w:p>`)
+	sections := doc.Sections()
+	if len(sections) != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2", len(sections))
+	}
+	margins := sections[0].Margins()
+	margins.Top = 1500
+	if err := sections[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var first bytes.Buffer
+	if _, err := doc.WriteTo(&first); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, first.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v", err)
+	}
+	body := findDescendant(tree, "body")
+	var paragraphs []*Element
+	for _, child := range body.Children {
+		if child != nil && child.Name.Local == "p" {
+			paragraphs = append(paragraphs, child)
+		}
+	}
+	if len(paragraphs) != 2 {
+		t.Fatalf("resaved body has %d paragraphs, want 2:\n%s", len(paragraphs), written)
+	}
+	if findDescendant(paragraphs[0], "sectPr") == nil {
+		t.Fatalf("first content paragraph lost its embedded sectPr:\n%s", written)
+	}
+	for _, want := range []string{`w:rsidR="AAAA"`, `w:rsidR="BBBB"`, `w:after="120"`, `w:top="1500"`, `w:gutter="72"`, `<w:docGrid w:linePitch="360"/>`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document lost %s:\n%s", want, written)
+		}
+	}
+
+	pkg, err := LoadPackageFromBytes(first.Bytes())
+	if err != nil {
+		t.Fatalf("LoadPackageFromBytes(first write): %v", err)
+	}
+	parsed, err := ParsePackage(pkg)
+	if err != nil {
+		t.Fatalf("ParsePackage(first write): %v", err)
+	}
+	reopened, err := ReconstructDocument(parsed)
+	if err != nil {
+		t.Fatalf("ReconstructDocument(first write): %v", err)
+	}
+	if err := reopened.Validate(); err != nil {
+		t.Fatalf("Validate(first write): %v", err)
+	}
+	var second bytes.Buffer
+	if _, err := reopened.WriteTo(&second); err != nil {
+		t.Fatalf("WriteTo(second write): %v", err)
+	}
+	if got := documentXML(t, second.Bytes()); got != written {
+		t.Errorf("second write changed document.xml:\nfirst:  %s\nsecond: %s", written, got)
+	}
+}
+
+func TestRoundTripMainDocument_SectionOnlyChangeKeepsHeadingParagraphRaw(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p w:rsidR="AAAA"><w:pPr><w:pStyle w:val="Heading1"/><w:kinsoku w:val="1"/><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720"/></w:sectPr></w:pPr><w:r><w:t>Heading section</w:t></w:r></w:p>
+<w:p><w:r><w:t>Second section</w:t></w:r></w:p>`)
+	sections := doc.Sections()
+	if len(sections) != 2 {
+		t.Fatalf("len(Sections()) = %d, want 2", len(sections))
+	}
+	margins := sections[0].Margins()
+	margins.Top = 1500
+	if err := sections[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	for _, want := range []string{`w:rsidR="AAAA"`, `<w:kinsoku w:val="1"/>`, `w:top="1500"`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("section-only change lost %s from the heading carrier: %s", want, written)
+		}
+	}
+	if strings.Contains(written, `<w:bookmarkStart`) {
+		t.Errorf("section-only change generated a bookmark in the unchanged heading: %s", written)
+	}
+}
+
+func TestRoundTripMainDocument_ForeignSectPrDoesNotShadowFinalSection(t *testing.T) {
+	foreign := `<x:sectPr xmlns:x="urn:opaque" x:marker="keep"/>`
+	doc := reconstructFromBookmarkBody(t, foreign+`<w:p><w:r><w:t>Body</w:t></w:r></w:p>`)
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection: %v", err)
+	}
+	margins := section.Margins()
+	margins.Top = 1500
+	if err := section.SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if !strings.Contains(written, foreign) {
+		t.Errorf("resaved document changed the foreign sectPr: %s", written)
+	}
+	finalStart := strings.LastIndex(written, `<w:sectPr`)
+	if finalStart < 0 {
+		t.Fatalf("resaved document has no WordprocessingML final sectPr: %s", written)
+	}
+	if final := written[finalStart:]; !strings.Contains(final, `w:top="1500"`) {
+		t.Errorf("final WordprocessingML sectPr did not receive the margin change: %s", written)
+	}
+}
+
+func TestRoundTripMainDocument_ChangedParagraphKeepsItsChangedSection(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p w:rsidR="AAAA"><w:pPr><w:spacing w:after="120"/><w:sectPr w:rsidR="BBBB"><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="72"/></w:sectPr></w:pPr><w:r><w:t>First section</w:t></w:r></w:p>
+<w:p><w:r><w:t>Second section</w:t></w:r></w:p>`)
+	paragraphs := doc.Paragraphs()
+	if len(paragraphs) != 2 {
+		t.Fatalf("len(Paragraphs()) = %d, want 2", len(paragraphs))
+	}
+	if err := paragraphs[0].SetAlignment(domain.AlignmentCenter); err != nil {
+		t.Fatalf("SetAlignment: %v", err)
+	}
+	margins := doc.Sections()[0].Margins()
+	margins.Top = 1500
+	if err := doc.Sections()[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v", err)
+	}
+	body := findDescendant(tree, "body")
+	var bodyParagraphs []*Element
+	for _, child := range body.Children {
+		if child != nil && child.Name.Local == "p" {
+			bodyParagraphs = append(bodyParagraphs, child)
+		}
+	}
+	if len(bodyParagraphs) != 2 {
+		t.Fatalf("resaved body has %d paragraphs, want 2:\n%s", len(bodyParagraphs), written)
+	}
+	first := bodyParagraphs[0]
+	if findDescendant(first, "sectPr") == nil || findDescendant(first, "jc") == nil {
+		t.Fatalf("changed paragraph did not retain both pPr changes and sectPr:\n%s", written)
+	}
+	for _, want := range []string{`w:val="center"`, `w:top="1500"`, `w:gutter="72"`} {
+		if !strings.Contains(written, want) {
+			t.Errorf("resaved document lost %s:\n%s", want, written)
+		}
+	}
+}
+
+func TestRoundTripMainDocument_ChangingColumnsDropsIncompatibleExplicitLayout(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:cols w:num="2" w:equalWidth="0" w:space="500" w:sep="1"><w:col w:w="3000" w:space="500"/><x:balance xmlns:x="urn:opaque" x:mode="keep"/><w:col w:w="7000" w:space="0"/></w:cols></w:sectPr></w:pPr></w:p>
+<w:p><w:r><w:t>Next section</w:t></w:r></w:p>`)
+	if err := doc.Sections()[0].SetColumns(3); err != nil {
+		t.Fatalf("SetColumns: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v", err)
+	}
+	cols := findDescendant(tree, "cols")
+	if cols == nil {
+		t.Fatalf("resaved document has no w:cols:\n%s", written)
+	}
+	if got, _ := getAttr(cols, "num"); got != "3" {
+		t.Errorf("w:cols/@w:num = %q, want 3", got)
+	}
+	if _, ok := getAttr(cols, "equalWidth"); ok {
+		t.Errorf("resaved w:cols retained incompatible equalWidth=0:\n%s", written)
+	}
+	if got, _ := getAttr(cols, "space"); got != "500" {
+		t.Errorf("w:cols/@w:space = %q, want preserved 500", got)
+	}
+	if got, _ := getAttr(cols, "sep"); got != "1" {
+		t.Errorf("w:cols/@w:sep = %q, want preserved 1", got)
+	}
+	if !strings.Contains(written, `<x:balance xmlns:x="urn:opaque" x:mode="keep"/>`) {
+		t.Errorf("resaved w:cols lost its compatible opaque child:\n%s", written)
+	}
+	for _, child := range cols.Children {
+		if child != nil && child.Name.Local == "col" {
+			t.Errorf("resaved w:cols retained an incompatible explicit w:col:\n%s", written)
+		}
+	}
+}
+
+func TestRoundTripMainDocument_ChangingBorderPreservesUnmodeledAttributesPerSide(t *testing.T) {
+	tableXML := `<w:tbl><w:tblPr><w:tblW w:w="2400" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="8" w:space="12" w:color="FF0000"/><w:bottom w:val="single" w:sz="8" w:space="13" w:color="00FF00"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="2400"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p/></w:tc></w:tr></w:tbl>`
+	table, doc := reconstructTableFromXML(t, tableXML)
+	borders := table.Borders()
+	borders.Top.Width = 16
+	if err := table.SetBorders(borders); err != nil {
+		t.Fatalf("SetBorders: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	tree, err := parseXMLTree([]byte(written))
+	if err != nil {
+		t.Fatalf("parse resaved document.xml: %v", err)
+	}
+	bordersElement := findDescendant(tree, "tblBorders")
+	top := findChild(bordersElement, "top")
+	bottom := findChild(bordersElement, "bottom")
+	if got, _ := getAttr(top, "sz"); got != "16" {
+		t.Errorf("top border size = %q, want 16", got)
+	}
+	if got, _ := getAttr(top, "space"); got != "12" {
+		t.Errorf("top border space = %q, want preserved 12", got)
+	}
+	if got, _ := getAttr(bottom, "space"); got != "13" {
+		t.Errorf("bottom border space = %q, want preserved 13", got)
+	}
+}
+
+func TestRoundTripMainDocument_NewRowAvoidsTableLocalPrefixCollision(t *testing.T) {
+	tableXML := `<x:tbl xmlns:x="` + constants.NamespaceMain + `" xmlns:w="urn:not-wordprocessingml"><x:tblPr><x:tblW x:w="2400" x:type="dxa"/></x:tblPr><x:tblGrid><x:gridCol x:w="2400"/></x:tblGrid><x:tr><x:tc><x:tcPr><x:tcW x:w="2400" x:type="dxa"/></x:tcPr><x:p/></x:tc></x:tr></x:tbl>`
+	table, doc := reconstructTableFromXML(t, tableXML)
+	if _, err := table.AddRow(); err != nil {
+		t.Fatalf("AddRow: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if _, err := parseXMLTree([]byte(written)); err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	if got := strings.Count(written, `<x:tr>`); got != 2 {
+		t.Fatalf("x:tr count = %d, want 2:\n%s", got, written)
+	}
+	if strings.Contains(written, `<w:tr`) {
+		t.Errorf("new row used the table-local conflicting w prefix:\n%s", written)
+	}
+}
+
+func TestRoundTripMainDocument_EditedTablePropertiesUseTableLocalNamespace(t *testing.T) {
+	tableXML := `<x:tbl xmlns:x="` + constants.NamespaceMain + `" xmlns:w="urn:not-wordprocessingml"><x:tblPr><x:tblW x:w="2400" x:type="dxa"/></x:tblPr><x:tblGrid><x:gridCol x:w="2400"/></x:tblGrid><x:tr><x:tc><x:tcPr><x:tcW x:w="2400" x:type="dxa"/></x:tcPr><x:p/></x:tc></x:tr></x:tbl>`
+	table, doc := reconstructTableFromXML(t, tableXML)
+	if err := table.SetWidth(domain.TableWidth{Type: domain.WidthDXA, Value: 3000}); err != nil {
+		t.Fatalf("SetWidth: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, output.Bytes())
+	if _, err := parseXMLTree([]byte(written)); err != nil {
+		t.Fatalf("parse resaved document.xml: %v\n%s", err, written)
+	}
+	if !strings.Contains(written, `<x:tblW x:w="3000"`) {
+		t.Errorf("edited table width did not use the table-local Word namespace:\n%s", written)
+	}
+	if strings.Contains(written, `<w:tblW`) {
+		t.Errorf("edited table width used the conflicting w prefix:\n%s", written)
+	}
+}
+
+func TestReconstructTableMeasurements_AcceptsFloatFormattedValues(t *testing.T) {
+	tableXML := `<w:tbl>
+<w:tblPr><w:tblW w:w="9360.0" w:type="dxa"/></w:tblPr>
+<w:tblGrid><w:gridCol w:w="4680"/></w:tblGrid>
+<w:tr>
+<w:trPr><w:trHeight w:val="240.9"/></w:trPr>
+<w:tc><w:tcPr><w:tcW w:w="4680.75" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc>
+</w:tr>
+</w:tbl>`
+
+	table, doc := reconstructTableFromXML(t, tableXML)
+	if got := table.Width(); got.Type != domain.WidthDXA || got.Value != 9360 {
+		t.Fatalf("Width() = %+v, want {WidthDXA 9360}", got)
+	}
+	row, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	if got := row.Height(); got != 240 {
+		t.Fatalf("Height() = %d, want 240", got)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	if got := cell.Width(); got != 4680 {
+		t.Fatalf("cell Width() = %d, want 4680", got)
+	}
+	// Change each hydrated measurement so the writer path emits canonical
+	// integer lexical values. A pure round trip deliberately keeps the source
+	// float spelling byte-for-byte.
+	if err := table.SetWidth(domain.TableWidth{Type: domain.WidthDXA, Value: 9361}); err != nil {
+		t.Fatalf("SetWidth: %v", err)
+	}
+	if err := table.SetAlignment(domain.AlignmentCenter); err != nil {
+		t.Fatalf("SetAlignment: %v", err)
+	}
+	if err := row.SetHeight(241); err != nil {
+		t.Fatalf("SetHeight: %v", err)
+	}
+	if err := cell.SetWidth(4681); err != nil {
+		t.Fatalf("cell SetWidth: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := documentXML(t, buf.Bytes())
+	for _, want := range []struct {
+		element string
+		attrs   []string
+	}{
+		{element: "tblW", attrs: []string{`w:type="dxa"`, `w:w="9361"`}},
+		{element: "trHeight", attrs: []string{`w:val="241"`, `w:hRule="atLeast"`}},
+		{element: "tcW", attrs: []string{`w:type="dxa"`, `w:w="4681"`}},
+	} {
+		if !startTagHas(written, want.element, want.attrs...) {
+			t.Errorf("resaved document.xml is missing w:%s with %v:\n%s", want.element, want.attrs, written)
+		}
+	}
 }
 
 // reconstructTableFromXML reads a hand-authored <w:tbl> back into the domain
@@ -2589,22 +4141,23 @@ func TestReconstructTableProperties_AgainstHandAuthoredPackage(t *testing.T) {
 	}
 	written := documentXML(t, buf.Bytes())
 
-	for _, want := range []string{
-		`<w:tblW w:type="dxa" w:w="5000">`,
-		`<w:jc w:val="center">`,
-		`<w:tblBorders>`,
-		`<w:insideV w:val="thick" w:sz="18" w:color="ABCDEF">`,
-		`<w:trHeight w:val="567" w:hRule="atLeast">`,
-		`<w:tcW w:type="dxa" w:w="918">`,
-		`<w:shd w:val="clear" w:fill="DDEEFF">`,
-		`<w:vAlign w:val="center">`,
-		// The grid columns come from the row's cell widths, so they have to
-		// match the source's <w:gridCol> values rather than being omitted.
-		`<w:gridCol w:w="918">`,
-		`<w:gridCol w:w="1111">`,
+	for _, want := range []struct {
+		element string
+		attrs   []string
+	}{
+		{element: "tblW", attrs: []string{`w:type="dxa"`, `w:w="5000"`}},
+		{element: "jc", attrs: []string{`w:val="center"`}},
+		{element: "tblBorders"},
+		{element: "insideV", attrs: []string{`w:val="thick"`, `w:sz="18"`, `w:color="ABCDEF"`}},
+		{element: "trHeight", attrs: []string{`w:val="567"`}},
+		{element: "tcW", attrs: []string{`w:type="dxa"`, `w:w="918"`}},
+		{element: "shd", attrs: []string{`w:val="clear"`, `w:fill="DDEEFF"`}},
+		{element: "vAlign", attrs: []string{`w:val="center"`}},
+		{element: "gridCol", attrs: []string{`w:w="918"`}},
+		{element: "gridCol", attrs: []string{`w:w="1111"`}},
 	} {
-		if !strings.Contains(written, want) {
-			t.Errorf("resaved document.xml is missing %s:\n%s", want, written)
+		if !startTagHas(written, want.element, want.attrs...) {
+			t.Errorf("resaved document.xml is missing w:%s with %v:\n%s", want.element, want.attrs, written)
 		}
 	}
 }
@@ -2794,6 +4347,11 @@ func TestReconstructTableCellShading_SolidThemeColourNormalizesToThemeFill(t *te
 	if fill, tint, shade := themed.ThemeFill(); fill != "accent2" || tint != "" || shade != "40" {
 		t.Errorf("ThemeFill() = (%q, %q, %q), want (\"accent2\", \"\", \"40\")", fill, tint, shade)
 	}
+	// Regenerate this row so the assertion below exercises the modeled
+	// normalization path rather than unchanged raw-fragment preservation.
+	if err := cell.SetVerticalAlignment(domain.VerticalAlignCenter); err != nil {
+		t.Fatalf("SetVerticalAlignment: %v", err)
+	}
 
 	var buf bytes.Buffer
 	if _, err := doc.WriteTo(&buf); err != nil {
@@ -2931,12 +4489,12 @@ func TestReconstructTableGrid_MergedFirstRowDoesNotInventColumnWidths(t *testing
 	}
 	written := documentXML(t, buf.Bytes())
 
-	if strings.Contains(written, `<w:gridCol w:w="2000">`) {
+	if startTagHas(written, "gridCol", `w:w="2000"`) {
 		t.Errorf("resaved document.xml split the merged title cell into two equal columns:\n%s", written)
 	}
-	for _, want := range []string{`<w:gridCol w:w="900">`, `<w:gridCol w:w="3100">`} {
-		if !strings.Contains(written, want) {
-			t.Errorf("resaved document.xml is missing %s:\n%s", want, written)
+	for _, width := range []string{"900", "3100"} {
+		if !startTagHas(written, "gridCol", `w:w="`+width+`"`) {
+			t.Errorf("resaved document.xml is missing gridCol width %s:\n%s", width, written)
 		}
 	}
 }

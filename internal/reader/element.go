@@ -13,10 +13,14 @@ import (
 
 // Element represents a generic XML element with nested children.
 type Element struct {
-	Name     xml.Name
-	Attr     []xml.Attr
-	Text     string
-	Children []*Element
+	Name               xml.Name
+	Attr               []xml.Attr
+	Text               string
+	Children           []*Element
+	StartOffset        int
+	ContentStartOffset int
+	ContentEndOffset   int
+	EndOffset          int
 }
 
 // findOrCreateChild attaches a child to the element, creating the slice lazily.
@@ -31,23 +35,27 @@ func (e *Element) addChild(child *Element) {
 func parseXMLTree(data []byte) (*Element, error) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	for {
+		startOffset := int(dec.InputOffset())
 		tok, err := dec.Token()
 		if err != nil {
 			return nil, err
 		}
 		if start, ok := tok.(xml.StartElement); ok {
-			return parseElement(dec, start)
+			return parseElement(dec, start, startOffset)
 		}
 	}
 }
 
-func parseElement(dec *xml.Decoder, start xml.StartElement) (*Element, error) {
+func parseElement(dec *xml.Decoder, start xml.StartElement, startOffset int) (*Element, error) {
 	elem := &Element{
-		Name: start.Name,
-		Attr: append([]xml.Attr(nil), start.Attr...),
+		Name:               start.Name,
+		Attr:               append([]xml.Attr(nil), start.Attr...),
+		StartOffset:        startOffset,
+		ContentStartOffset: int(dec.InputOffset()),
 	}
 
 	for {
+		tokenStart := int(dec.InputOffset())
 		tok, err := dec.Token()
 		if err != nil {
 			return nil, err
@@ -55,13 +63,15 @@ func parseElement(dec *xml.Decoder, start xml.StartElement) (*Element, error) {
 
 		switch t := tok.(type) {
 		case xml.StartElement:
-			child, err := parseElement(dec, t)
+			child, err := parseElement(dec, t, tokenStart)
 			if err != nil {
 				return nil, err
 			}
 			elem.addChild(child)
 		case xml.EndElement:
 			if t.Name.Local == start.Name.Local && t.Name.Space == start.Name.Space {
+				elem.ContentEndOffset = tokenStart
+				elem.EndOffset = int(dec.InputOffset())
 				return elem, nil
 			}
 		case xml.CharData:

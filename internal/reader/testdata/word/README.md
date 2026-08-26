@@ -22,3 +22,12 @@ tests built against it.
 Shared voluntarily by the reporter as a minimal repro attached to a public
 GitHub issue; contains no content beyond placeholder text ("Title: should be
 all caps", "Copyright", "Author", "Organization", table cell placeholders).
+
+## issue-116-input.docx
+
+Attached by the reporter to
+[issue #116](https://github.com/mmonterroca/docxgo/issues/116). It contains
+markup that docxgo does not model directly, including `mc:AlternateContent`,
+a body-level content control, floating-table properties and explicit border
+values. The regression test verifies that an unedited open-and-save preserves
+the original `word/document.xml` byte-for-byte.

@@ -44,22 +44,27 @@ const (
 // OOXML Namespaces
 const (
 	// Main document namespace
-	NamespaceMain = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+	NamespaceMain       = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+	NamespaceMainStrict = "http://purl.oclc.org/ooxml/wordprocessingml/main"
 
 	// Relationships namespace
-	NamespaceRelationships = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+	NamespaceRelationships       = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+	NamespaceRelationshipsStrict = "http://purl.oclc.org/ooxml/officeDocument/relationships"
 
 	// Package relationships namespace
 	NamespacePackageRels = "http://schemas.openxmlformats.org/package/2006/relationships"
 
 	// Drawing namespace
-	NamespaceDrawing = "http://schemas.openxmlformats.org/drawingml/2006/main"
+	NamespaceDrawing       = "http://schemas.openxmlformats.org/drawingml/2006/main"
+	NamespaceDrawingStrict = "http://purl.oclc.org/ooxml/drawingml/main"
 
 	// Picture namespace
-	NamespacePicture = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+	NamespacePicture       = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+	NamespacePictureStrict = "http://purl.oclc.org/ooxml/drawingml/picture"
 
 	// WordprocessingDrawing namespace
-	NamespaceWordprocessingDrawing = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+	NamespaceWordprocessingDrawing       = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+	NamespaceWordprocessingDrawingStrict = "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing"
 
 	// Content Types namespace
 	NamespaceContentTypes = "http://schemas.openxmlformats.org/package/2006/content-types"

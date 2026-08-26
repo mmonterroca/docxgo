@@ -19,6 +19,7 @@ type Document struct {
 	XMLnsWP    string      `xml:"xmlns:wp,attr,omitempty"`
 	Background *Background `xml:"w:background,omitempty"`
 	Body       *Body       `xml:"w:body"`
+	Raw        []byte      `xml:"-"`
 }
 
 // Body represents w:body element.

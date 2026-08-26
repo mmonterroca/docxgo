@@ -214,6 +214,60 @@ func TestDocument_HeaderFooterSerialization(t *testing.T) {
 	}
 }
 
+func TestDocument_SectionReferenceOrderIsStable(t *testing.T) {
+	doc := NewDocument()
+	section, err := doc.DefaultSection()
+	if err != nil {
+		t.Fatalf("DefaultSection failed: %v", err)
+	}
+
+	for _, headerType := range []domain.HeaderType{domain.HeaderEven, domain.HeaderDefault, domain.HeaderFirst} {
+		if _, err := section.Header(headerType); err != nil {
+			t.Fatalf("Header(%v) failed: %v", headerType, err)
+		}
+	}
+	for _, footerType := range []domain.FooterType{domain.FooterEven, domain.FooterDefault, domain.FooterFirst} {
+		if _, err := section.Footer(footerType); err != nil {
+			t.Fatalf("Footer(%v) failed: %v", footerType, err)
+		}
+	}
+
+	writeDocumentXML := func() string {
+		t.Helper()
+		var output bytes.Buffer
+		if _, err := doc.WriteTo(&output); err != nil {
+			t.Fatalf("WriteTo failed: %v", err)
+		}
+		return zipPartText(t, output.Bytes(), "word/document.xml")
+	}
+
+	first := writeDocumentXML()
+	second := writeDocumentXML()
+	if second != first {
+		t.Fatalf("second write changed document.xml:\nfirst:  %s\nsecond: %s", first, second)
+	}
+
+	ordered := []string{
+		`<w:headerReference w:type="default"`,
+		`<w:headerReference w:type="first"`,
+		`<w:headerReference w:type="even"`,
+		`<w:footerReference w:type="default"`,
+		`<w:footerReference w:type="first"`,
+		`<w:footerReference w:type="even"`,
+	}
+	previous := -1
+	for _, fragment := range ordered {
+		position := strings.Index(first, fragment)
+		if position < 0 {
+			t.Fatalf("document.xml does not contain %q: %s", fragment, first)
+		}
+		if position <= previous {
+			t.Fatalf("section reference %q is out of order: %s", fragment, first)
+		}
+		previous = position
+	}
+}
+
 // zipPartText reads a named part's content as a string from a resaved DOCX
 // package, failing the test if the part is missing or unreadable.
 func zipPartText(t *testing.T, docBytes []byte, name string) string {

@@ -625,6 +625,77 @@ func TestCellBuilder_Formatting(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 	})
+
+	t.Run("aligns every existing paragraph", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Text("First").
+			Text("Second").
+			Alignment(domain.AlignmentCenter).
+			End().
+			End().
+			End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		paragraphs := firstTableCellParagraphs(t, doc)
+		if len(paragraphs) != 2 {
+			t.Fatalf("expected 2 paragraphs, got %d", len(paragraphs))
+		}
+		for i, para := range paragraphs {
+			if got := para.Alignment(); got != domain.AlignmentCenter {
+				t.Errorf("paragraph %d alignment = %v, want center", i, got)
+			}
+		}
+	})
+
+	t.Run("is a no-op before the cell has paragraphs", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Alignment(domain.AlignmentCenter).
+			Text("Added later").
+			End().
+			End().
+			End()
+
+		doc, err := builder.Build()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		paragraphs := firstTableCellParagraphs(t, doc)
+		if len(paragraphs) != 1 {
+			t.Fatalf("expected 1 paragraph, got %d", len(paragraphs))
+		}
+		if got := paragraphs[0].Alignment(); got != domain.AlignmentLeft {
+			t.Fatalf("later paragraph alignment = %v, want default left", got)
+		}
+	})
+
+	t.Run("records one error for an invalid alignment", func(t *testing.T) {
+		builder := NewDocumentBuilder()
+		builder.AddTable(1, 1).
+			Row(0).
+			Cell(0).
+			Text("First").
+			Text("Second").
+			Alignment(domain.Alignment(999)).
+			End().
+			End().
+			End()
+
+		if _, err := builder.Build(); err == nil {
+			t.Fatal("expected invalid alignment error, got nil")
+		}
+		if got := len(builder.errors); got != 1 {
+			t.Fatalf("builder recorded %d errors, want 1", got)
+		}
+	})
 }
 
 func TestCellBuilder_RunFormatting(t *testing.T) {

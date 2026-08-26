@@ -80,6 +80,7 @@ type document struct {
 	preservedWebSettings  []byte            // Original webSettings.xml
 	preservedCustomProps  []byte            // Original docProps/custom.xml
 	preservedRootRels     []byte            // Original _rels/.rels
+	roundTripMain         *roundTripMainDocument
 
 	// maxHydratedBookmarkID is the highest numeric w:id seen among bookmarks
 	// hydrated from a source document, or -1 if none were. It seeds
@@ -351,16 +352,18 @@ func (d *document) generateHeadingBookmarks() {
 			if p.BookmarkHydrated() {
 				continue
 			}
-
 			styleName := p.StyleName()
-
-			// Check if this paragraph has a Heading style
-			if strings.HasPrefix(styleName, "Heading") {
-				bookmarkID := fmt.Sprintf("%d", bookmarkCounter)
-				bookmarkName := fmt.Sprintf("_Toc%d", bookmarkCounter)
-				p.SetBookmark(bookmarkID, bookmarkName)
-				bookmarkCounter++
+			if !strings.HasPrefix(styleName, "Heading") {
+				continue
 			}
+			if d.roundTripMain != nil && d.roundTripMain.originalParagraphUnchanged(para) {
+				continue
+			}
+
+			bookmarkID := fmt.Sprintf("%d", bookmarkCounter)
+			bookmarkName := fmt.Sprintf("_Toc%d", bookmarkCounter)
+			p.SetBookmark(bookmarkID, bookmarkName)
+			bookmarkCounter++
 		}
 	}
 }
@@ -735,6 +738,11 @@ func (d *document) WriteTo(w io.Writer) (int64, error) {
 	// Serialize domain objects to XML structures
 	ser := serializer.NewDocumentSerializer()
 	xmlDoc := ser.SerializeDocument(d)
+	if rawDocument, err := d.composeRoundTripMainDocument(); err != nil {
+		return 0, errors.Wrap(err, "Document.WriteTo")
+	} else if len(rawDocument) > 0 {
+		xmlDoc.Raw = rawDocument
+	}
 	headers, footers := ser.SerializeSectionParts(d)
 
 	// Relationships owned by individual header/footer parts (an image or

@@ -14,6 +14,7 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -1248,7 +1249,7 @@ func TestOpenDocument_PreservesTableStyle(t *testing.T) {
 	}
 
 	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
-	if !strings.Contains(written, `<w:tblStyle w:val="TableGrid">`) {
+	if !documentStartTagHas(written, "tblStyle", `w:val="TableGrid"`) {
 		t.Errorf("resaved document.xml lost the table's tblStyle reference:\n%s", written)
 	}
 }
@@ -1324,14 +1325,246 @@ func TestOpenDocument_PreservesTableCellWidths(t *testing.T) {
 	}
 
 	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
-	for _, want := range []string{
-		`<w:tcW w:type="dxa" w:w="918">`,
-		`<w:tcW w:type="dxa" w:w="1111">`,
-		`<w:gridCol w:w="918">`,
-		`<w:gridCol w:w="1111">`,
+	for _, want := range []struct {
+		element string
+		attrs   []string
+	}{
+		{element: "tcW", attrs: []string{`w:type="dxa"`, `w:w="918"`}},
+		{element: "tcW", attrs: []string{`w:type="dxa"`, `w:w="1111"`}},
+		{element: "gridCol", attrs: []string{`w:w="918"`}},
+		{element: "gridCol", attrs: []string{`w:w="1111"`}},
 	} {
-		if !strings.Contains(written, want) {
-			t.Errorf("resaved document.xml lost %s:\n%s", want, written)
+		if !documentStartTagHas(written, want.element, want.attrs...) {
+			t.Errorf("resaved document.xml lost w:%s with %v:\n%s", want.element, want.attrs, written)
+		}
+	}
+}
+
+// TestOpenDocument_Issue116PreservesUnmodeledMainDocumentXML is the
+// end-to-end regression for issue #116. The reporter's document contains
+// valid WordprocessingML constructs that are intentionally outside docxgo's
+// domain model. An unedited open-and-save must retain those constructs instead
+// of rebuilding word/document.xml from only the subset docxgo understands.
+func TestOpenDocument_Issue116PreservesUnmodeledMainDocumentXML(t *testing.T) {
+	fixture := filepath.Join("internal", "reader", "testdata", "word", "issue-116-input.docx")
+	input, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	doc, err := OpenDocumentFromBytes(input)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+
+	want := zipPart(t, input, "word/document.xml")
+	got := zipPart(t, buf.Bytes(), "word/document.xml")
+	if !bytes.Equal(got, want) {
+		t.Fatalf("resaved word/document.xml differs from the issue #116 input: got %d bytes, want %d", len(got), len(want))
+	}
+}
+
+func TestOpenDocument_Issue116AddingRowOnlyInsertsRowXML(t *testing.T) {
+	fixture := filepath.Join("internal", "reader", "testdata", "word", "issue-116-input.docx")
+	input, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	doc, err := OpenDocumentFromBytes(input)
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+	tables := doc.Tables()
+	if len(tables) == 0 {
+		t.Fatal("opened document has no tables")
+	}
+	if _, err := tables[0].AddRow(); err != nil {
+		t.Fatalf("AddRow: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	want := zipPart(t, input, "word/document.xml")
+	got := zipPart(t, output.Bytes(), "word/document.xml")
+	if len(got) <= len(want) {
+		t.Fatalf("document.xml length = %d after AddRow, want more than %d", len(got), len(want))
+	}
+	prefix := 0
+	for prefix < len(want) && want[prefix] == got[prefix] {
+		prefix++
+	}
+	suffix := 0
+	for suffix < len(want)-prefix && want[len(want)-1-suffix] == got[len(got)-1-suffix] {
+		suffix++
+	}
+	if prefix+suffix != len(want) {
+		t.Fatalf("adding one row changed existing document.xml bytes: common prefix %d + suffix %d, want %d", prefix, suffix, len(want))
+	}
+	inserted := got[prefix : len(got)-suffix]
+	if !bytes.Contains(inserted, []byte("w:tr>")) || !bytes.Contains(inserted, []byte("</w:tr>")) {
+		t.Fatalf("inserted XML does not contain a table row: %s", inserted)
+	}
+}
+
+func TestOpenDocument_SetBackgroundColorRewritesPreservedDocumentPrefix(t *testing.T) {
+	fixture := filepath.Join("internal", "reader", "testdata", "word", "issue-102-input.docx")
+	doc, err := OpenDocument(fixture)
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+	if err := doc.SetBackgroundColor(domain.Color{R: 0x12, G: 0x34, B: 0x56}); err != nil {
+		t.Fatalf("SetBackgroundColor: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	if !documentStartTagHas(written, "background", `w:color="123456"`) {
+		t.Errorf("resaved document.xml did not contain the requested background color:\n%s", written)
+	}
+}
+
+func TestOpenDocument_SetBackgroundColorReplacesExistingBackground(t *testing.T) {
+	original := NewDocument()
+	paragraph, err := original.AddParagraph()
+	if err != nil {
+		t.Fatalf("AddParagraph: %v", err)
+	}
+	run, err := paragraph.AddRun()
+	if err != nil {
+		t.Fatalf("AddRun: %v", err)
+	}
+	if err := run.SetText("Background replacement"); err != nil {
+		t.Fatalf("SetText: %v", err)
+	}
+	if err := original.SetBackgroundColor(domain.Color{R: 0xAA, G: 0xBB, B: 0xCC}); err != nil {
+		t.Fatalf("SetBackgroundColor original: %v", err)
+	}
+	var input bytes.Buffer
+	if _, err := original.WriteTo(&input); err != nil {
+		t.Fatalf("WriteTo original: %v", err)
+	}
+
+	reopened, err := OpenDocumentFromBytes(input.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+	if err := reopened.SetBackgroundColor(domain.Color{R: 0x12, G: 0x34, B: 0x56}); err != nil {
+		t.Fatalf("SetBackgroundColor replacement: %v", err)
+	}
+	var output bytes.Buffer
+	if _, err := reopened.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo replacement: %v", err)
+	}
+
+	written := string(zipPart(t, output.Bytes(), "word/document.xml"))
+	if !documentStartTagHas(written, "background", `w:color="123456"`) {
+		t.Errorf("resaved document.xml did not contain the replacement background color:\n%s", written)
+	}
+	if documentStartTagHas(written, "background", `w:color="AABBCC"`) {
+		t.Errorf("resaved document.xml retained the old background color:\n%s", written)
+	}
+}
+
+func TestOpenDocument_ChangingFinalSectionMarginsPreservesUnmodeledProperties(t *testing.T) {
+	fixture := filepath.Join("internal", "reader", "testdata", "word", "issue-116-input.docx")
+	doc, err := OpenDocument(fixture)
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+	sections := doc.Sections()
+	if len(sections) == 0 {
+		t.Fatal("opened document has no sections")
+	}
+	lastSection := sections[len(sections)-1]
+	margins := lastSection.Margins()
+	margins.Top = 1500
+	if err := lastSection.SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := string(zipPart(t, output.Bytes(), "word/document.xml"))
+	sectionStart := strings.LastIndex(written, "<w:sectPr")
+	if sectionStart < 0 {
+		t.Fatalf("resaved document.xml has no final w:sectPr:\n%s", written)
+	}
+	sectionEnd := strings.Index(written[sectionStart:], "</w:sectPr>")
+	if sectionEnd < 0 {
+		t.Fatalf("resaved final w:sectPr is not closed:\n%s", written[sectionStart:])
+	}
+	finalSection := written[sectionStart : sectionStart+sectionEnd+len("</w:sectPr>")]
+
+	if !documentStartTagHas(finalSection, "pgMar", `w:top="1500"`) {
+		t.Errorf("resaved final section did not contain the changed top margin:\n%s", finalSection)
+	}
+	for _, preserved := range []string{
+		`w:rsidR="002B7C7F"`,
+		`w:rsidRPr="002B7C7F"`,
+		`w:gutter="0"`,
+		`<w:cols w:space="720"/>`,
+		`<w:docGrid w:linePitch="360"/>`,
+	} {
+		if !strings.Contains(finalSection, preserved) {
+			t.Errorf("resaved final section lost %s:\n%s", preserved, finalSection)
+		}
+	}
+}
+
+func TestOpenDocument_ChangingEmbeddedSectionMarginsPreservesUnmodeledProperties(t *testing.T) {
+	fixture := filepath.Join("internal", "reader", "testdata", "word", "issue-116-input.docx")
+	doc, err := OpenDocument(fixture)
+	if err != nil {
+		t.Fatalf("OpenDocument: %v", err)
+	}
+	sections := doc.Sections()
+	if len(sections) < 2 {
+		t.Fatalf("opened document has %d sections, want at least 2", len(sections))
+	}
+	margins := sections[0].Margins()
+	margins.Top = 1500
+	if err := sections[0].SetMargins(margins); err != nil {
+		t.Fatalf("SetMargins: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := string(zipPart(t, output.Bytes(), "word/document.xml"))
+	sectionStart := strings.Index(written, "<w:sectPr")
+	if sectionStart < 0 {
+		t.Fatalf("resaved document.xml has no embedded w:sectPr:\n%s", written)
+	}
+	sectionEnd := strings.Index(written[sectionStart:], "</w:sectPr>")
+	if sectionEnd < 0 {
+		t.Fatalf("resaved embedded w:sectPr is not closed:\n%s", written[sectionStart:])
+	}
+	embeddedSection := written[sectionStart : sectionStart+sectionEnd+len("</w:sectPr>")]
+
+	if !documentStartTagHas(embeddedSection, "pgMar", `w:top="1500"`) {
+		t.Errorf("resaved embedded section did not contain the changed top margin:\n%s", embeddedSection)
+	}
+	for _, preserved := range []string{
+		`w:rsidR="00D937BC"`,
+		`<w:footerReference w:type="even" r:id="rId7"/>`,
+		`w:gutter="0"`,
+		`<w:cols w:space="720"/>`,
+		`<w:docGrid w:linePitch="360"/>`,
+	} {
+		if !strings.Contains(embeddedSection, preserved) {
+			t.Errorf("resaved embedded section lost %s:\n%s", preserved, embeddedSection)
 		}
 	}
 }
@@ -1629,6 +1862,94 @@ func TestOpenDocument_EditingTheBodyDoesNotDirtyAHeader(t *testing.T) {
 	before, after := zipPart(t, built, "word/header1.xml"), zipPart(t, resaved, "word/header1.xml")
 	if !bytes.Equal(before, after) {
 		t.Errorf("adding an image to the body regenerated the untouched header1.xml:\nbefore: %s\n\nafter:  %s", before, after)
+	}
+}
+
+func TestOpenDocument_AddedBodyImagesUseUniqueIDsAbovePreservedDrawings(t *testing.T) {
+	doc, err := OpenDocumentFromBytes(docxWithBodyAndHeaderImages(t))
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+
+	for i := 0; i < 2; i++ {
+		para, err := doc.AddParagraph()
+		if err != nil {
+			t.Fatalf("AddParagraph(%d): %v", i, err)
+		}
+		if _, err := para.AddImageFromBytes(encodeTestPNG(t), domain.ImageFormatPNG); err != nil {
+			t.Fatalf("AddImageFromBytes(%d): %v", i, err)
+		}
+	}
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	written := string(zipPart(t, buf.Bytes(), "word/document.xml"))
+	matches := regexp.MustCompile(`<wp:docPr\b[^>]*\bid="([^"]+)"`).FindAllStringSubmatch(written, -1)
+	if len(matches) != 3 {
+		t.Fatalf("document.xml has %d wp:docPr elements, want 3:\n%s", len(matches), written)
+	}
+	seen := make(map[string]bool, len(matches))
+	for _, match := range matches {
+		if seen[match[1]] {
+			t.Fatalf("document.xml reuses wp:docPr id %q:\n%s", match[1], written)
+		}
+		seen[match[1]] = true
+	}
+}
+
+func TestOpenDocument_RegeneratedTableRowUsesUniqueDrawingIDs(t *testing.T) {
+	original := NewDocument()
+	table, err := original.AddTable(1, 1)
+	if err != nil {
+		t.Fatalf("AddTable: %v", err)
+	}
+	row, err := table.Row(0)
+	if err != nil {
+		t.Fatalf("Row(0): %v", err)
+	}
+	cell, err := row.Cell(0)
+	if err != nil {
+		t.Fatalf("Cell(0): %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		para, err := cell.AddParagraph()
+		if err != nil {
+			t.Fatalf("AddParagraph(%d): %v", i, err)
+		}
+		if _, err := para.AddImageFromBytes(encodeTestPNG(t), domain.ImageFormatPNG); err != nil {
+			t.Fatalf("AddImageFromBytes(%d): %v", i, err)
+		}
+	}
+
+	var source bytes.Buffer
+	if _, err := original.WriteTo(&source); err != nil {
+		t.Fatalf("WriteTo source: %v", err)
+	}
+	doc, err := OpenDocumentFromBytes(source.Bytes())
+	if err != nil {
+		t.Fatalf("OpenDocumentFromBytes: %v", err)
+	}
+	openedRow, err := doc.Tables()[0].Row(0)
+	if err != nil {
+		t.Fatalf("opened Row(0): %v", err)
+	}
+	if err := openedRow.SetHeight(360); err != nil {
+		t.Fatalf("SetHeight: %v", err)
+	}
+
+	var output bytes.Buffer
+	if _, err := doc.WriteTo(&output); err != nil {
+		t.Fatalf("WriteTo output: %v", err)
+	}
+	written := string(zipPart(t, output.Bytes(), "word/document.xml"))
+	matches := regexp.MustCompile(`<wp:docPr\b[^>]*\bid="([^"]+)"`).FindAllStringSubmatch(written, -1)
+	if len(matches) != 2 {
+		t.Fatalf("document.xml has %d wp:docPr elements, want 2:\n%s", len(matches), written)
+	}
+	if matches[0][1] == matches[1][1] {
+		t.Fatalf("regenerated table row reuses wp:docPr id %q:\n%s", matches[0][1], written)
 	}
 }
 
@@ -2219,4 +2540,31 @@ func zipPart(t *testing.T, docxBytes []byte, name string) []byte {
 	}
 	t.Fatalf("%s not found in archive", name)
 	return nil
+}
+
+func documentStartTagHas(docXML, element string, attrs ...string) bool {
+	prefix := "<w:" + element
+	for rest := docXML; ; {
+		index := strings.Index(rest, prefix)
+		if index < 0 {
+			return false
+		}
+		rest = rest[index:]
+		end := strings.IndexByte(rest, '>')
+		if end < 0 {
+			return false
+		}
+		tag := rest[:end+1]
+		matches := true
+		for _, attr := range attrs {
+			if !strings.Contains(tag, attr) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return true
+		}
+		rest = rest[end+1:]
+	}
 }

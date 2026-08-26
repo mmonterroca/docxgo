@@ -402,6 +402,9 @@ func (zw *ZipWriter) writeRootRels() error {
 
 // writeMainDocument writes word/document.xml
 func (zw *ZipWriter) writeMainDocument(doc *xmlstructs.Document) error {
+	if doc != nil && len(doc.Raw) > 0 {
+		return zw.writeRaw("word/document.xml", doc.Raw)
+	}
 	return zw.writeXML("word/document.xml", doc)
 }
 

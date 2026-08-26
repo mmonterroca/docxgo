@@ -846,6 +846,26 @@ func (cb *CellBuilder) FontSize(points int) *CellBuilder {
 	return cb
 }
 
+// Alignment sets the horizontal alignment of every paragraph currently in
+// the cell. Calling it before the cell has paragraphs is a no-op; paragraphs
+// added later keep their own default alignment until Alignment is called
+// again.
+func (cb *CellBuilder) Alignment(align domain.Alignment) *CellBuilder {
+	if cb.err != nil {
+		return cb
+	}
+
+	for _, para := range cb.cell.Paragraphs() {
+		if err := para.SetAlignment(align); err != nil {
+			cb.err = err
+			cb.parent.parent.parent.errors = append(cb.parent.parent.parent.errors, err)
+			return cb
+		}
+	}
+
+	return cb
+}
+
 // Underline sets the underline style of the last run of the last paragraph.
 func (cb *CellBuilder) Underline(style domain.UnderlineStyle) *CellBuilder {
 	if cb.err != nil {
