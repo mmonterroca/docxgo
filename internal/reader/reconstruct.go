@@ -2375,21 +2375,6 @@ func mapHighlightColor(value string) (domain.HighlightColor, bool) {
 	}
 }
 
-func findChild(parent *Element, local string) *Element {
-	if parent == nil {
-		return nil
-	}
-	for _, child := range parent.Children {
-		if child == nil {
-			continue
-		}
-		if child.Name.Local == local {
-			return child
-		}
-	}
-	return nil
-}
-
 func isWordNamespace(namespace string) bool {
 	return namespace == constants.NamespaceMain || namespace == constants.NamespaceMainStrict
 }
@@ -2502,39 +2487,6 @@ func findDescendantMatching(parent *Element, matches func(*Element) bool) *Eleme
 		}
 	}
 	return nil
-}
-
-func findDescendant(parent *Element, local string) *Element {
-	if parent == nil {
-		return nil
-	}
-	for _, child := range parent.Children {
-		if child == nil {
-			continue
-		}
-		if child.Name.Local == local {
-			return child
-		}
-		if found := findDescendant(child, local); found != nil {
-			return found
-		}
-	}
-	return nil
-}
-
-// getAttr returns the first attribute with the requested local name. Model
-// hydration must use one of the namespace-aware helpers below; this remains
-// for generic XML inspection in package-level tests.
-func getAttr(elem *Element, local string) (string, bool) {
-	if elem == nil {
-		return "", false
-	}
-	for _, attr := range elem.Attr {
-		if attr.Name.Local == local {
-			return attr.Value, true
-		}
-	}
-	return "", false
 }
 
 func getAttrQName(elem *Element, namespace, local string) (string, bool) {

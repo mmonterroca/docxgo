@@ -799,15 +799,16 @@ func (t *roundTripTable) composeShell(props *xmlstructs.TableProperties, grid *x
 		switch child.name {
 		case "tblPr":
 			propertiesEmitted = true
-			if !propsChanged {
+			switch {
+			case !propsChanged:
 				out.Write(child.raw)
-			} else if child.properties != nil {
+			case child.properties != nil:
 				merged, err := child.properties.compose(propsXML, []byte(t.propertiesSnapshot))
 				if err != nil {
 					return nil, err
 				}
 				out.Write(merged)
-			} else {
+			default:
 				generated, err := renderGeneratedFragment(propsXML, t.namespaces, t.mainNamespace)
 				if err != nil {
 					return nil, err
@@ -1294,11 +1295,10 @@ func rangeMarker(start xml.StartElement) (string, int, bool) {
 		return "", 0, false
 	}
 	local := start.Name.Local
-	side := -1
+	side := 0
 	base := ""
 	switch {
 	case strings.HasSuffix(local, "Start"):
-		side = 0
 		base = strings.TrimSuffix(local, "Start")
 	case strings.HasSuffix(local, "End"):
 		side = 1

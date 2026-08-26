@@ -24,6 +24,48 @@ import (
 	"github.com/mmonterroca/docxgo/v2/pkg/constants"
 )
 
+func findChild(parent *Element, local string) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if child != nil && child.Name.Local == local {
+			return child
+		}
+	}
+	return nil
+}
+
+func findDescendant(parent *Element, local string) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if child == nil {
+			continue
+		}
+		if child.Name.Local == local {
+			return child
+		}
+		if found := findDescendant(child, local); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+func getAttr(elem *Element, local string) (string, bool) {
+	if elem == nil {
+		return "", false
+	}
+	for _, attr := range elem.Attr {
+		if attr.Name.Local == local {
+			return attr.Value, true
+		}
+	}
+	return "", false
+}
+
 // documentXML unzips a .docx buffer and returns the raw word/document.xml
 // bytes, so tests can assert on what was actually serialized rather than on
 // in-memory accessor values that can diverge from it.
