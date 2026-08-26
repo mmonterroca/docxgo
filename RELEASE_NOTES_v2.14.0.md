@@ -72,7 +72,7 @@ Requested by @drkisler in #117.
 
 ### Tolerant table widths
 
-The reader accepts an integer-valued decimal string such as `9360.0` for `w:tblW/@w:w`. The value is validated before conversion, so fractional values, `NaN`, infinities, negatives, and integer overflow remain errors.
+The reader accepts decimal strings such as `9360.0` for `w:tblW/@w:w`. Decimal measurements are truncated toward zero before the model validates them. Malformed values, `NaN`, infinities, and values outside the range of `int` remain errors.
 
 This fixes the v2.13.0 regression tracked in #118.
 
