@@ -88,7 +88,7 @@ func reconstructFromPackage(pkg *reader.Package, op string) (domain.Document, er
 }
 
 // Version is the library version.
-const Version = "2.13.0"
+const Version = "2.14.0"
 
 // Common color constants exported for convenience.
 var (
