@@ -1,3 +1,33 @@
+## v2.14.0 - 2026-08-26
+
+### Added
+
+- **`CellBuilder.Alignment(domain.Alignment)`** applies horizontal alignment to every paragraph currently present in a table cell. Calling it on an empty cell is a no-op, and invalid values are recorded and returned by `Build()` like other builder errors (#117).
+
+### Fixed
+
+- **Editing one part of `word/document.xml` no longer rebuilds unrelated body content** (#116). Opened documents now retain byte ranges and model identities for original paragraphs, tables, rows, gaps, and section properties. An untouched write preserves `document.xml` byte-for-byte; an explicit API edit replaces only the affected unit and keeps compatible unknown OOXML around it. This preserves content controls such as TOCs, text boxes, floating-table positioning, row-level formatting, opaque markup, and whitespace that the domain model does not represent.
+- **Adding a table row preserves every existing row byte-for-byte.** New rows are inserted in model order, while bookmarks, proofing markers, and other opaque markup between source rows stay anchored to the original following row.
+- **Section edits no longer move an embedded `w:sectPr` or add a second paragraph.** A section property block remains inside its original paragraph's `w:pPr`; changing only the section patches that block in place, and changing both the paragraph and section emits one combined paragraph. The final section uses the same merge policies.
+- **Section and table properties now merge without discarding compatible source attributes.** Page margins retain `gutter`; page size retains orthogonal attributes; header/footer references match by type; incompatible explicit column definitions are removed when the column count changes; table borders retain `space` and theme attributes; table grids retain unknown per-column attributes; and modeled removals clear dependent opaque properties.
+- **`w:tblW` accepts integer-valued decimal syntax such as `9360.0`** (#118). Real documents emitted by tolerant editors open again, while fractional, non-finite, negative, and overflowing values are still rejected.
+- **OOXML matching uses complete QNames instead of local names.** Elements or attributes from unrelated namespaces can no longer be mistaken for WordprocessingML or relationship properties during hydration and merging.
+- **Preserved drawings and bookmarks reserve their source IDs before new content is serialized.** New images and bookmarks no longer collide with IDs that survive in raw XML.
+
+### Changed
+
+- **`internal/ooxmlmerge` is the shared lossless XML merge engine for `word/document.xml`.** It parses resolved QNames, original prefixes, attributes, children, source offsets, and original bytes; supports preserve, replace, attribute merge, child merge, and splice policies; and applies range replacements from the end of the document toward the beginning.
+- **Round-trip state now uses source anchors and separate fingerprints** for blocks, tables, rows, table properties, grids, and sections instead of specialized reconstruction helpers.
+
+### Compatibility
+
+- No public API was removed or changed. `CellBuilder.Alignment` is additive, so this is a minor release.
+- Lossless merging is limited to `word/document.xml`. Headers, footers, styles, relationships, and other package parts keep their existing mechanisms.
+- Explicit API mutations take precedence when retaining original XML would contradict the requested result.
+- Modified paragraphs and existing rows remain atomic replacement units except for an embedded `sectPr`, which stays anchored to its source paragraph.
+
+---
+
 ## v2.13.0 — 2026-08-13
 
 ### Added
