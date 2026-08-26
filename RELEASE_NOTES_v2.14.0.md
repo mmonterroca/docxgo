@@ -10,6 +10,20 @@ The practical result is that adding a row or changing a section no longer rewrit
 
 This release also adds `CellBuilder.Alignment` and restores compatibility with real-world documents whose table widths use integer-valued decimal syntax such as `9360.0`.
 
+## Upgrade
+
+Go:
+
+```bash
+go get github.com/mmonterroca/docxgo/v2@v2.14.0
+```
+
+Node.js:
+
+```bash
+npm install @mmonterroca/docxgo@2.14.0
+```
+
 ## Highlights
 
 ### Lossless `document.xml` round-trip
