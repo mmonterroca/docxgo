@@ -420,8 +420,7 @@ func ensureRequiredDocumentNamespaces(data []byte) []byte {
 	if insertAt > root.Start && data[insertAt-1] == '/' {
 		insertAt--
 	}
-	result := make([]byte, 0, len(data)+declarations.Len())
-	result = append(result, data[:insertAt]...)
+	result := append([]byte(nil), data[:insertAt]...)
 	result = append(result, declarations.Bytes()...)
 	result = append(result, data[insertAt:]...)
 	return result
@@ -745,8 +744,7 @@ func (rt *roundTripMainDocument) prefixWithCurrentBackground(d domain.Document) 
 	if start < 0 || end > len(rt.prefix) {
 		return nil, fmt.Errorf("document background offsets are outside the preserved prefix")
 	}
-	result := make([]byte, 0, len(rt.prefix)-(end-start)+len(background))
-	result = append(result, rt.prefix[:start]...)
+	result := append([]byte(nil), rt.prefix[:start]...)
 	result = append(result, background...)
 	result = append(result, rt.prefix[end:]...)
 	return result, nil

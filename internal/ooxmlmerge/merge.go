@@ -189,7 +189,7 @@ func (n *Node) Attr(name QName) (string, bool) {
 }
 
 func cloneNamespaces(source map[string]string) map[string]string {
-	result := make(map[string]string, len(source)+1)
+	result := make(map[string]string)
 	for prefix, namespace := range source {
 		result[prefix] = namespace
 	}
@@ -1038,8 +1038,7 @@ func ApplyEdits(source []byte, edits []Edit) ([]byte, error) {
 		if edit.Start < 0 || edit.End < edit.Start || edit.End > len(source) || edit.End > lastStart {
 			return nil, fmt.Errorf("overlapping or invalid XML edit [%d:%d]", edit.Start, edit.End)
 		}
-		next := make([]byte, 0, len(result)-(edit.End-edit.Start)+len(edit.Replacement))
-		next = append(next, result[:edit.Start]...)
+		next := append([]byte(nil), result[:edit.Start]...)
 		next = append(next, edit.Replacement...)
 		next = append(next, result[edit.End:]...)
 		result = next
