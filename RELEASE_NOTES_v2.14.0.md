@@ -24,6 +24,8 @@ Node.js:
 npm install @mmonterroca/docxgo@2.14.0
 ```
 
+The complete source diff is available in the [v2.13.0...v2.14.0 comparison](https://github.com/mmonterroca/docxgo/compare/v2.13.0...v2.14.0).
+
 ## Highlights
 
 ### Lossless `document.xml` round-trip
