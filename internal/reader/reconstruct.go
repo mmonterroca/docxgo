@@ -7,8 +7,10 @@
 package reader
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -72,7 +74,7 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 		return nil, errors.Errorf(errors.ErrCodeInvalidState, opReconstructDocument, "document part is missing")
 	}
 
-	body := findChild(parsed.DocumentTree, "body")
+	body := findWordChild(parsed.DocumentTree, "body")
 	if body == nil {
 		return nil, errors.Errorf(errors.ErrCodeInvalidState, opReconstructDocument, "document body is missing")
 	}
@@ -84,6 +86,17 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 	}
 
 	ctx := newReconstructContext(doc, parsed, defaultSection)
+	roundTripEntries := make([]core.RoundTripBodyEntrySource, 0, len(body.Children))
+	mainNamespaces := documentNamespaces(parsed.DocumentTree, body)
+	var mainDocumentXML []byte
+	if parsed.Package != nil {
+		mainDocumentXML = parsed.Package.MainDocument
+	}
+	rawCursor := body.ContentStartOffset
+	if tracker, ok := doc.(interface{ ObserveHydratedBookmarkID(string) }); ok {
+		observeSourceBookmarkIDs(parsed.DocumentTree, tracker)
+	}
+	maxDrawingID := highestSourceDrawingID(parsed.DocumentTree)
 
 	if registrar, ok := doc.(interface {
 		RegisterExistingRelationship(string, string, string, string) error
@@ -146,20 +159,50 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 		if child == nil {
 			continue
 		}
+		if isWordElement(child, "sectPr") {
+			continue
+		}
 
-		switch child.Name.Local {
-		case "p":
+		beforeBlocks := len(doc.Blocks())
+
+		switch {
+		case isWordElement(child, "p"):
 			if err := hydrateParagraph(doc, child, ctx); err != nil {
 				return nil, errors.Wrap(err, opReconstructDocument)
 			}
-		case "tbl":
+		case isWordElement(child, "tbl"):
 			if err := hydrateTable(doc, child, ctx); err != nil {
 				return nil, errors.Wrap(err, opReconstructDocument)
 			}
 		}
+
+		afterBlocks := doc.Blocks()
+		entry := core.RoundTripBodyEntrySource{
+			Prefix: rawRange(mainDocumentXML, rawCursor, child.StartOffset),
+			Raw:    rawElementBytes(mainDocumentXML, child),
+		}
+		rawCursor = child.EndOffset
+		if beforeBlocks < len(afterBlocks) {
+			entry.Blocks = append([]domain.Block(nil), afterBlocks[beforeBlocks:]...)
+		}
+		if isWordElement(child, "tbl") && len(entry.Blocks) == 1 && entry.Blocks[0].Table != nil {
+			entry.Table = roundTripTableSource(mainDocumentXML, child, entry.Blocks[0].Table, mainNamespaces)
+		}
+		if isWordElement(child, "p") {
+			if props := findWordChild(child, "pPr"); props != nil {
+				if sectPr := findWordChild(props, "sectPr"); sectPr != nil {
+					entry.Section = roundTripSectionPropertiesSource(
+						mainDocumentXML,
+						sectPr,
+						extendNamespaces(mainNamespaces, child, props, sectPr),
+					)
+				}
+			}
+		}
+		roundTripEntries = append(roundTripEntries, entry)
 	}
 
-	if sectPr := findChild(body, "sectPr"); sectPr != nil {
+	if sectPr := findWordChild(body, "sectPr"); sectPr != nil {
 		if err := ctx.applySectionProperties(sectPr, false); err != nil {
 			return nil, errors.Wrap(err, opReconstructDocument)
 		}
@@ -174,7 +217,224 @@ func ReconstructDocument(parsed *ParsedPackage) (domain.Document, error) {
 		snapshotter.SnapshotHeaderFooterParts()
 	}
 
+	if setter, ok := doc.(interface {
+		SetRoundTripMainDocument(*core.RoundTripMainDocumentSource) error
+	}); ok && len(mainDocumentXML) > 0 {
+		mainXML := mainDocumentXML
+		documentPrefix, documentSuffix := roundTripDocumentBoundaries(mainXML, body)
+		source := &core.RoundTripMainDocumentSource{
+			Original:        mainXML,
+			Prefix:          documentPrefix,
+			Suffix:          documentSuffix,
+			MainNamespace:   parsed.DocumentTree.Name.Space,
+			MaxDrawingID:    maxDrawingID,
+			BodyStartOffset: body.StartOffset,
+			BackgroundStart: -1,
+			BackgroundEnd:   -1,
+			Namespaces:      mainNamespaces,
+			Entries:         roundTripEntries,
+		}
+		if background := findWordChild(parsed.DocumentTree, "background"); background != nil {
+			source.BackgroundStart = background.StartOffset
+			source.BackgroundEnd = background.EndOffset
+		}
+		if sectPr := findWordChild(body, "sectPr"); sectPr != nil {
+			source.FinalSectionPrefix = rawRange(mainXML, rawCursor, sectPr.StartOffset)
+			source.FinalSectionRaw = rawElementBytes(mainXML, sectPr)
+			source.FinalSection = roundTripSectionPropertiesSource(
+				mainXML,
+				sectPr,
+				extendNamespaces(mainNamespaces, sectPr),
+			)
+			source.BodyTail = rawRange(mainXML, sectPr.EndOffset, body.ContentEndOffset)
+		} else {
+			source.BodyTail = rawRange(mainXML, rawCursor, body.ContentEndOffset)
+		}
+		if err := setter.SetRoundTripMainDocument(source); err != nil {
+			return nil, errors.Wrap(err, opReconstructDocument)
+		}
+	}
+
 	return doc, nil
+}
+
+func documentNamespaces(elements ...*Element) map[string]string {
+	result := make(map[string]string)
+	for _, element := range elements {
+		if element == nil {
+			continue
+		}
+		for _, attr := range element.Attr {
+			switch {
+			case attr.Name.Space == "xmlns":
+				result[attr.Name.Local] = attr.Value
+			case attr.Name.Space == "" && attr.Name.Local == "xmlns":
+				result[""] = attr.Value
+			}
+		}
+	}
+	return result
+}
+
+func extendNamespaces(base map[string]string, elements ...*Element) map[string]string {
+	result := make(map[string]string, len(base))
+	for prefix, namespace := range base {
+		result[prefix] = namespace
+	}
+	for prefix, namespace := range documentNamespaces(elements...) {
+		result[prefix] = namespace
+	}
+	return result
+}
+
+func roundTripSectionPropertiesSource(source []byte, elem *Element, namespaces map[string]string) *core.RoundTripSectionPropertiesSource {
+	if elem == nil {
+		return nil
+	}
+	return &core.RoundTripSectionPropertiesSource{
+		Raw:        rawElementBytes(source, elem),
+		Namespaces: namespaces,
+	}
+}
+
+type bookmarkIDObserver interface {
+	ObserveHydratedBookmarkID(string)
+}
+
+func observeSourceBookmarkIDs(elem *Element, observer bookmarkIDObserver) {
+	if elem == nil || observer == nil {
+		return
+	}
+	if isWordElement(elem, "bookmarkStart") {
+		if id, ok := getWordAttr(elem, "id"); ok {
+			observer.ObserveHydratedBookmarkID(id)
+		}
+	}
+	for _, child := range elem.Children {
+		observeSourceBookmarkIDs(child, observer)
+	}
+}
+
+func highestSourceDrawingID(elem *Element) int {
+	if elem == nil {
+		return 0
+	}
+	maxID := 0
+	if isWordprocessingDrawingElement(elem, "docPr") {
+		if rawID, ok := getAttrQName(elem, "", "id"); ok {
+			if id, err := strconv.Atoi(rawID); err == nil && id > maxID {
+				maxID = id
+			}
+		}
+	}
+	for _, child := range elem.Children {
+		if childMax := highestSourceDrawingID(child); childMax > maxID {
+			maxID = childMax
+		}
+	}
+	return maxID
+}
+
+func rawRange(source []byte, start, end int) []byte {
+	if start < 0 || end < start || end > len(source) {
+		return nil
+	}
+	out := make([]byte, end-start)
+	copy(out, source[start:end])
+	return out
+}
+
+func rawElementBytes(source []byte, elem *Element) []byte {
+	if elem == nil {
+		return nil
+	}
+	return rawRange(source, elem.StartOffset, elem.EndOffset)
+}
+
+func roundTripDocumentBoundaries(source []byte, body *Element) ([]byte, []byte) {
+	if body == nil {
+		return nil, nil
+	}
+	prefix := rawRange(source, 0, body.ContentStartOffset)
+	suffix := rawRange(source, body.ContentEndOffset, len(source))
+	open := rawRange(source, body.StartOffset, body.ContentStartOffset)
+	slash := bytes.LastIndex(open, []byte("/>"))
+	if slash < 0 || slash+2 != len(open) || body.ContentStartOffset != body.EndOffset {
+		return prefix, suffix
+	}
+
+	nameStart := 1
+	nameEnd := nameStart
+	for nameEnd < len(open) && open[nameEnd] != ' ' && open[nameEnd] != '\t' && open[nameEnd] != '\r' && open[nameEnd] != '\n' && open[nameEnd] != '/' && open[nameEnd] != '>' {
+		nameEnd++
+	}
+	if nameEnd == nameStart {
+		return prefix, suffix
+	}
+
+	slashOffset := body.StartOffset + slash
+	expandedPrefix := make([]byte, 0, len(prefix)-1)
+	expandedPrefix = append(expandedPrefix, source[:slashOffset]...)
+	expandedPrefix = append(expandedPrefix, source[slashOffset+1:body.ContentStartOffset]...)
+	closeTag := append([]byte("</"), open[nameStart:nameEnd]...)
+	closeTag = append(closeTag, '>')
+	expandedSuffix := make([]byte, 0, len(closeTag)+len(source)-body.EndOffset)
+	expandedSuffix = append(expandedSuffix, closeTag...)
+	expandedSuffix = append(expandedSuffix, source[body.EndOffset:]...)
+	return expandedPrefix, expandedSuffix
+}
+
+func roundTripTableSource(source []byte, elem *Element, table domain.Table, inheritedNamespaces map[string]string) *core.RoundTripTableSource {
+	if elem == nil || table == nil {
+		return nil
+	}
+	rowElems := make([]*Element, 0, table.RowCount())
+	for _, child := range elem.Children {
+		if isWordElement(child, "tr") {
+			rowElems = append(rowElems, child)
+		}
+	}
+	rows := table.Rows()
+	if len(rowElems) == 0 || len(rowElems) != len(rows) {
+		return nil
+	}
+
+	result := &core.RoundTripTableSource{
+		Table:         table,
+		Namespaces:    extendNamespaces(inheritedNamespaces, elem),
+		Open:          rawRange(source, elem.StartOffset, elem.ContentStartOffset),
+		ShellChildren: make([]core.RoundTripTableShellChildSource, 0),
+		Suffix:        rawRange(source, rowElems[len(rowElems)-1].EndOffset, elem.EndOffset),
+		Rows:          make([]core.RoundTripRowSource, 0, len(rows)),
+	}
+	shellCursor := elem.ContentStartOffset
+	for _, child := range elem.Children {
+		if child == nil || child.StartOffset >= rowElems[0].StartOffset {
+			break
+		}
+		name := ""
+		if isWordNamespace(child.Name.Space) {
+			name = child.Name.Local
+		}
+		shellChild := core.RoundTripTableShellChildSource{
+			Prefix: rawRange(source, shellCursor, child.StartOffset),
+			Raw:    rawElementBytes(source, child),
+			Name:   name,
+		}
+		result.ShellChildren = append(result.ShellChildren, shellChild)
+		shellCursor = child.EndOffset
+	}
+	result.ShellTail = rawRange(source, shellCursor, rowElems[0].StartOffset)
+	previousEnd := rowElems[0].StartOffset
+	for i, row := range rows {
+		result.Rows = append(result.Rows, core.RoundTripRowSource{
+			Prefix: rawRange(source, previousEnd, rowElems[i].StartOffset),
+			Raw:    rawElementBytes(source, rowElems[i]),
+			Row:    row,
+		})
+		previousEnd = rowElems[i].EndOffset
+	}
+	return result
 }
 
 func hydrateParagraph(doc domain.Document, elem *Element, ctx *reconstructContext) error {
@@ -213,7 +473,7 @@ func bareSectionBreakSectPr(elem *Element) (*Element, bool) {
 		if child == nil {
 			continue
 		}
-		if child.Name.Local != "pPr" {
+		if !isWordElement(child, "pPr") {
 			return nil, false
 		}
 		props = child
@@ -227,7 +487,7 @@ func bareSectionBreakSectPr(elem *Element) (*Element, bool) {
 		if child == nil {
 			continue
 		}
-		if child.Name.Local != "sectPr" {
+		if !isWordElement(child, "sectPr") {
 			return nil, false
 		}
 		sectPr = child
@@ -244,7 +504,7 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 		return nil
 	}
 
-	if props := findChild(elem, "pPr"); props != nil {
+	if props := findWordChild(elem, "pPr"); props != nil {
 		if err := applyParagraphProperties(para, props); err != nil {
 			return err
 		}
@@ -279,8 +539,8 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 		if child == nil {
 			continue
 		}
-		switch child.Name.Local {
-		case "r", "hyperlink", "fldSimple":
+		switch {
+		case isWordElement(child, "r"), isWordElement(child, "hyperlink"), isWordElement(child, "fldSimple"):
 			if firstContentIdx == -1 {
 				firstContentIdx = i
 			}
@@ -296,21 +556,21 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 			continue
 		}
 
-		switch child.Name.Local {
-		case "r":
+		switch {
+		case isWordElement(child, "r"):
 			if err := hydrateRun(para, child, ctx, state, nil); err != nil {
 				return err
 			}
-		case "hyperlink":
+		case isWordElement(child, "hyperlink"):
 			if err := hydrateHyperlink(para, child, ctx, state); err != nil {
 				return err
 			}
-		case "fldSimple":
+		case isWordElement(child, "fldSimple"):
 			if err := hydrateSimpleField(para, child, ctx, state); err != nil {
 				return err
 			}
-		case "bookmarkStart":
-			id, ok := getAttr(child, "id")
+		case isWordElement(child, "bookmarkStart"):
+			id, ok := getWordAttr(child, "id")
 			if !ok || id == "" {
 				continue
 			}
@@ -318,13 +578,13 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 				// Content already appeared before this start: partial.
 				continue
 			}
-			name, _ := getAttr(child, "name")
+			name, _ := getWordAttr(child, "name")
 			pendingBookmarks[id] = name
-		case "bookmarkEnd":
+		case isWordElement(child, "bookmarkEnd"):
 			if bookmarkHydrated {
 				continue
 			}
-			id, ok := getAttr(child, "id")
+			id, ok := getWordAttr(child, "id")
 			if !ok {
 				continue
 			}
@@ -351,8 +611,8 @@ func populateParagraph(para domain.Paragraph, elem *Element, ctx *reconstructCon
 	state.reset()
 
 	if ctx != nil {
-		if props := findChild(elem, "pPr"); props != nil {
-			if sectPr := findChild(props, "sectPr"); sectPr != nil {
+		if props := findWordChild(elem, "pPr"); props != nil {
+			if sectPr := findWordChild(props, "sectPr"); sectPr != nil {
 				if err := ctx.applySectionProperties(sectPr, true); err != nil {
 					return err
 				}
@@ -384,12 +644,12 @@ func applyParagraphProperties(para domain.Paragraph, props *Element) error {
 }
 
 func applyParagraphStyle(para domain.Paragraph, props *Element) error {
-	pStyleElem := findChild(props, "pStyle")
+	pStyleElem := findWordChild(props, "pStyle")
 	if pStyleElem == nil {
 		return nil
 	}
 
-	if styleID, ok := getAttr(pStyleElem, "val"); ok && styleID != "" {
+	if styleID, ok := getWordAttr(pStyleElem, "val"); ok && styleID != "" {
 		if err := para.SetStyle(styleID); err != nil {
 			return errors.WrapWithContext(err, "applyParagraphStyle", map[string]interface{}{"styleID": styleID})
 		}
@@ -399,12 +659,12 @@ func applyParagraphStyle(para domain.Paragraph, props *Element) error {
 }
 
 func applyParagraphSpacing(para domain.Paragraph, props *Element) error {
-	spacingElem := findChild(props, "spacing")
+	spacingElem := findWordChild(props, "spacing")
 	if spacingElem == nil {
 		return nil
 	}
 
-	if val, ok := getAttr(spacingElem, "before"); ok && val != "" {
+	if val, ok := getWordAttr(spacingElem, "before"); ok && val != "" {
 		twips, err := strconv.Atoi(val)
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphSpacing, map[string]interface{}{"attr": "before", "value": val})
@@ -414,7 +674,7 @@ func applyParagraphSpacing(para domain.Paragraph, props *Element) error {
 		}
 	}
 
-	if val, ok := getAttr(spacingElem, "after"); ok && val != "" {
+	if val, ok := getWordAttr(spacingElem, "after"); ok && val != "" {
 		twips, err := strconv.Atoi(val)
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphSpacing, map[string]interface{}{"attr": "after", "value": val})
@@ -428,7 +688,7 @@ func applyParagraphSpacing(para domain.Paragraph, props *Element) error {
 	valueChanged := false
 	ruleChanged := false
 
-	if val, ok := getAttr(spacingElem, "line"); ok && val != "" {
+	if val, ok := getWordAttr(spacingElem, "line"); ok && val != "" {
 		twips, err := strconv.Atoi(val)
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphSpacing, map[string]interface{}{"attr": "line", "value": val})
@@ -437,7 +697,7 @@ func applyParagraphSpacing(para domain.Paragraph, props *Element) error {
 		valueChanged = true
 	}
 
-	if val, ok := getAttr(spacingElem, "lineRule"); ok && val != "" {
+	if val, ok := getWordAttr(spacingElem, "lineRule"); ok && val != "" {
 		lineSpacing.Rule = mapLineSpacingRule(val)
 		ruleChanged = true
 	}
@@ -452,12 +712,12 @@ func applyParagraphSpacing(para domain.Paragraph, props *Element) error {
 }
 
 func applyParagraphAlignment(para domain.Paragraph, props *Element) error {
-	jc := findChild(props, "jc")
+	jc := findWordChild(props, "jc")
 	if jc == nil {
 		return nil
 	}
 
-	if val, ok := getAttr(jc, "val"); ok && val != "" {
+	if val, ok := getWordAttr(jc, "val"); ok && val != "" {
 		if align, ok := mapAlignment(val); ok {
 			if err := para.SetAlignment(align); err != nil {
 				return errors.Wrap(err, opApplyParagraphAlignment)
@@ -477,12 +737,12 @@ func applyParagraphAlignment(para domain.Paragraph, props *Element) error {
 // specified left, clobbering a style's own right indentation on a side this
 // element never touched.
 func applyParagraphIndentation(para domain.Paragraph, props *Element) error {
-	ind := findChild(props, "ind")
+	ind := findWordChild(props, "ind")
 	if ind == nil {
 		return nil
 	}
 
-	if val, ok := getAttr(ind, "left"); ok && val != "" {
+	if val, ok := getWordAttr(ind, "left"); ok && val != "" {
 		twips, err := strconv.Atoi(val)
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphIndent, map[string]interface{}{"attr": "left", "value": val})
@@ -492,7 +752,7 @@ func applyParagraphIndentation(para domain.Paragraph, props *Element) error {
 		}
 	}
 
-	if val, ok := getAttr(ind, "right"); ok && val != "" {
+	if val, ok := getWordAttr(ind, "right"); ok && val != "" {
 		twips, err := strconv.Atoi(val)
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphIndent, map[string]interface{}{"attr": "right", "value": val})
@@ -502,7 +762,7 @@ func applyParagraphIndentation(para domain.Paragraph, props *Element) error {
 		}
 	}
 
-	if val, ok := getAttr(ind, "firstLine"); ok && val != "" {
+	if val, ok := getWordAttr(ind, "firstLine"); ok && val != "" {
 		twips, err := strconv.Atoi(val)
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphIndent, map[string]interface{}{"attr": "firstLine", "value": val})
@@ -512,7 +772,7 @@ func applyParagraphIndentation(para domain.Paragraph, props *Element) error {
 		}
 	}
 
-	if val, ok := getAttr(ind, "hanging"); ok && val != "" {
+	if val, ok := getWordAttr(ind, "hanging"); ok && val != "" {
 		twips, err := strconv.Atoi(val)
 		if err != nil {
 			return errors.WrapWithContext(err, opApplyParagraphIndent, map[string]interface{}{"attr": "hanging", "value": val})
@@ -530,7 +790,7 @@ func applyParagraphNumbering(para domain.Paragraph, props *Element) error {
 		return nil
 	}
 
-	numPr := findChild(props, "numPr")
+	numPr := findWordChild(props, "numPr")
 	if numPr == nil {
 		para.ClearNumbering()
 		return nil
@@ -539,8 +799,8 @@ func applyParagraphNumbering(para domain.Paragraph, props *Element) error {
 	ref := domain.NumberingReference{}
 	foundID := false
 
-	if numID := findChild(numPr, "numId"); numID != nil {
-		if val, ok := getAttr(numID, "val"); ok && val != "" {
+	if numID := findWordChild(numPr, "numId"); numID != nil {
+		if val, ok := getWordAttr(numID, "val"); ok && val != "" {
 			id, err := strconv.Atoi(val)
 			if err != nil {
 				return errors.WrapWithContext(err, opApplyParagraphNumbering, map[string]interface{}{"attr": "numId", "value": val})
@@ -555,8 +815,8 @@ func applyParagraphNumbering(para domain.Paragraph, props *Element) error {
 		return nil
 	}
 
-	if ilvl := findChild(numPr, "ilvl"); ilvl != nil {
-		if val, ok := getAttr(ilvl, "val"); ok && val != "" {
+	if ilvl := findWordChild(numPr, "ilvl"); ilvl != nil {
+		if val, ok := getWordAttr(ilvl, "val"); ok && val != "" {
 			lvl, err := strconv.Atoi(val)
 			if err != nil {
 				return errors.WrapWithContext(err, opApplyParagraphNumbering, map[string]interface{}{"attr": "ilvl", "value": val})
@@ -589,26 +849,26 @@ func hydrateRun(para domain.Paragraph, elem *Element, ctx *reconstructContext, s
 			continue
 		}
 
-		switch child.Name.Local {
-		case "t":
+		switch {
+		case isWordElement(child, "t"):
 			textBuilder.WriteString(child.Text)
-		case "tab":
+		case isWordElement(child, "tab"):
 			textBuilder.WriteRune('\t')
-		case "br":
+		case isWordElement(child, "br"):
 			breaks = append(breaks, mapBreakType(child))
-		case "fldChar":
+		case isWordElement(child, "fldChar"):
 			if state != nil {
 				if err := state.handleFieldChar(child); err != nil {
 					return err
 				}
 			}
-		case "instrText":
+		case isWordElement(child, "instrText"):
 			if state != nil {
 				state.appendInstruction(child.Text)
 			}
-		case "rPr":
+		case isWordElement(child, "rPr"):
 			props = child
-		case "drawing":
+		case isWordElement(child, "drawing"):
 			drawings = append(drawings, child)
 		}
 	}
@@ -682,7 +942,7 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		return nil
 	}
 
-	if boldElem := findChild(props, "b"); boldElem != nil {
+	if boldElem := findWordChild(props, "b"); boldElem != nil {
 		if val, ok := parseOnOff(boldElem); ok {
 			if err := run.SetBold(val); err != nil {
 				return errors.Wrap(err, opApplyRunProperties)
@@ -690,7 +950,7 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
-	if italicElem := findChild(props, "i"); italicElem != nil {
+	if italicElem := findWordChild(props, "i"); italicElem != nil {
 		if val, ok := parseOnOff(italicElem); ok {
 			if err := run.SetItalic(val); err != nil {
 				return errors.Wrap(err, opApplyRunProperties)
@@ -698,7 +958,7 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
-	if capsElem := findChild(props, "caps"); capsElem != nil {
+	if capsElem := findWordChild(props, "caps"); capsElem != nil {
 		if val, ok := parseOnOff(capsElem); ok {
 			if err := run.SetCaps(val); err != nil {
 				return errors.Wrap(err, opApplyRunProperties)
@@ -706,7 +966,7 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
-	if strikeElem := findChild(props, "strike"); strikeElem != nil {
+	if strikeElem := findWordChild(props, "strike"); strikeElem != nil {
 		if val, ok := parseOnOff(strikeElem); ok {
 			if err := run.SetStrike(val); err != nil {
 				return errors.Wrap(err, opApplyRunProperties)
@@ -714,8 +974,8 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
-	if underlineElem := findChild(props, "u"); underlineElem != nil {
-		underlineVal, ok := getAttr(underlineElem, "val")
+	if underlineElem := findWordChild(props, "u"); underlineElem != nil {
+		underlineVal, ok := getWordAttr(underlineElem, "val")
 		if !ok || underlineVal == "" {
 			underlineVal = constants.UnderlineValueSingle
 		}
@@ -726,8 +986,8 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
-	if colorElem := findChild(props, "color"); colorElem != nil {
-		if val, ok := getAttr(colorElem, "val"); ok && val != "" && !strings.EqualFold(val, "auto") {
+	if colorElem := findWordChild(props, "color"); colorElem != nil {
+		if val, ok := getWordAttr(colorElem, "val"); ok && val != "" && !strings.EqualFold(val, "auto") {
 			clr, err := pkgcolor.FromHex(val)
 			if err != nil {
 				return errors.WrapWithContext(err, opApplyRunProperties, map[string]interface{}{"attr": "color", "value": val})
@@ -739,14 +999,14 @@ func applyRunProperties(run domain.Run, props *Element) error {
 	}
 
 	sizeVal := ""
-	if szElem := findChild(props, "sz"); szElem != nil {
-		if val, ok := getAttr(szElem, "val"); ok && val != "" {
+	if szElem := findWordChild(props, "sz"); szElem != nil {
+		if val, ok := getWordAttr(szElem, "val"); ok && val != "" {
 			sizeVal = val
 		}
 	}
 	if sizeVal == "" {
-		if szCsElem := findChild(props, "szCs"); szCsElem != nil {
-			if val, ok := getAttr(szCsElem, "val"); ok && val != "" {
+		if szCsElem := findWordChild(props, "szCs"); szCsElem != nil {
+			if val, ok := getWordAttr(szCsElem, "val"); ok && val != "" {
 				sizeVal = val
 			}
 		}
@@ -761,25 +1021,25 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
-	if fontElem := findChild(props, "rFonts"); fontElem != nil {
+	if fontElem := findWordChild(props, "rFonts"); fontElem != nil {
 		current := run.Font()
 		updated := current
 		changed := false
 
-		if val, ok := getAttr(fontElem, "ascii"); ok && val != "" {
+		if val, ok := getWordAttr(fontElem, "ascii"); ok && val != "" {
 			updated.Name = val
 			changed = true
-		} else if val, ok := getAttr(fontElem, "hAnsi"); ok && val != "" {
+		} else if val, ok := getWordAttr(fontElem, "hAnsi"); ok && val != "" {
 			updated.Name = val
 			changed = true
 		}
 
-		if val, ok := getAttr(fontElem, "eastAsia"); ok && val != "" {
+		if val, ok := getWordAttr(fontElem, "eastAsia"); ok && val != "" {
 			updated.EastAsia = val
 			changed = true
 		}
 
-		if val, ok := getAttr(fontElem, "cs"); ok && val != "" {
+		if val, ok := getWordAttr(fontElem, "cs"); ok && val != "" {
 			updated.CS = val
 			changed = true
 		}
@@ -794,8 +1054,8 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
-	if highlightElem := findChild(props, "highlight"); highlightElem != nil {
-		if val, ok := getAttr(highlightElem, "val"); ok && val != "" {
+	if highlightElem := findWordChild(props, "highlight"); highlightElem != nil {
+		if val, ok := getWordAttr(highlightElem, "val"); ok && val != "" {
 			if highlight, mapped := mapHighlightColor(val); mapped && highlight != domain.HighlightNone {
 				if err := run.SetHighlight(highlight); err != nil {
 					return errors.Wrap(err, opApplyRunProperties)
@@ -804,10 +1064,10 @@ func applyRunProperties(run domain.Run, props *Element) error {
 		}
 	}
 
-	if langElem := findChild(props, "lang"); langElem != nil {
-		val, _ := getAttr(langElem, "val")
-		eastAsia, _ := getAttr(langElem, "eastAsia")
-		bidi, _ := getAttr(langElem, "bidi")
+	if langElem := findWordChild(props, "lang"); langElem != nil {
+		val, _ := getWordAttr(langElem, "val")
+		eastAsia, _ := getWordAttr(langElem, "eastAsia")
+		bidi, _ := getWordAttr(langElem, "bidi")
 		if val != "" || eastAsia != "" || bidi != "" {
 			if err := run.SetLanguage(&domain.Language{Val: val, EastAsia: eastAsia, Bidi: bidi}); err != nil {
 				return errors.Wrap(err, opApplyRunProperties)
@@ -829,7 +1089,7 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 
 	url := ""
 	originalRelID := "" // Preserve the original relationship ID for external hyperlinks
-	if relID, ok := getAttr(elem, "id"); ok {
+	if relID, ok := getRelationshipAttr(elem, "id"); ok {
 		if target, found := ctx.resolveRelationshipTarget(relID); found {
 			url = target
 			originalRelID = relID // Store the original relationship ID
@@ -837,7 +1097,7 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 	}
 
 	if url == "" {
-		if anchor, ok := getAttr(elem, "anchor"); ok && anchor != "" {
+		if anchor, ok := getWordAttr(elem, "anchor"); ok && anchor != "" {
 			if strings.HasPrefix(anchor, "#") {
 				url = anchor
 			} else {
@@ -848,10 +1108,10 @@ func hydrateHyperlink(para domain.Paragraph, elem *Element, ctx *reconstructCont
 
 	// w:history is ST_OnOff: "0" is a real, distinct value from the
 	// attribute being absent, so track presence rather than defaulting.
-	history, hasHistory := getAttr(elem, "history")
+	history, hasHistory := getWordAttr(elem, "history")
 
 	for _, child := range elem.Children {
-		if child == nil || child.Name.Local != "r" {
+		if !isWordElement(child, "r") {
 			continue
 		}
 
@@ -902,10 +1162,10 @@ func hydrateSimpleField(para domain.Paragraph, elem *Element, ctx *reconstructCo
 		state.reset()
 	}
 
-	instr, _ := getAttr(elem, "instr")
+	instr, _ := getWordAttr(elem, "instr")
 
 	for _, child := range elem.Children {
-		if child == nil || child.Name.Local != "r" {
+		if !isWordElement(child, "r") {
 			continue
 		}
 
@@ -937,10 +1197,10 @@ func hydrateDrawing(para domain.Paragraph, run domain.Run, elem *Element, ctx *r
 		return nil
 	}
 
-	container := findChild(elem, "inline")
+	container := findWordprocessingDrawingChild(elem, "inline")
 	floating := false
 	if container == nil {
-		container = findChild(elem, "anchor")
+		container = findWordprocessingDrawingChild(elem, "anchor")
 		floating = container != nil
 	}
 	if container == nil {
@@ -1030,32 +1290,32 @@ func extractDrawingRelationshipID(elem *Element) string {
 		return ""
 	}
 
-	graphic := findChild(elem, "graphic")
+	graphic := findDrawingChild(elem, "graphic")
 	if graphic == nil {
 		return ""
 	}
 
-	data := findChild(graphic, "graphicData")
+	data := findDrawingChild(graphic, "graphicData")
 	if data == nil {
 		return ""
 	}
 
-	pic := findChild(data, "pic")
+	pic := findPictureChild(data, "pic")
 	if pic == nil {
 		return ""
 	}
 
-	blipFill := findChild(pic, "blipFill")
+	blipFill := findPictureChild(pic, "blipFill")
 	if blipFill == nil {
 		return ""
 	}
 
-	blip := findChild(blipFill, "blip")
+	blip := findDrawingChild(blipFill, "blip")
 	if blip == nil {
 		return ""
 	}
 
-	if relID, ok := getAttr(blip, "embed"); ok {
+	if relID, ok := getRelationshipAttr(blip, "embed"); ok {
 		return relID
 	}
 
@@ -1067,7 +1327,7 @@ func extractDrawingExtent(elem *Element) (int, int) {
 		return 0, 0
 	}
 
-	if extent := findChild(elem, "extent"); extent != nil {
+	if extent := findWordprocessingDrawingChild(elem, "extent"); extent != nil {
 		width := attrToInt(extent, "cx")
 		height := attrToInt(extent, "cy")
 		if width > 0 && height > 0 {
@@ -1075,7 +1335,7 @@ func extractDrawingExtent(elem *Element) (int, int) {
 		}
 	}
 
-	if ext := findDescendant(elem, "ext"); ext != nil {
+	if ext := findDrawingDescendant(elem, "ext"); ext != nil {
 		width := attrToInt(ext, "cx")
 		height := attrToInt(ext, "cy")
 		if width > 0 && height > 0 {
@@ -1091,14 +1351,14 @@ func extractDrawingDescription(elem *Element) string {
 		return ""
 	}
 
-	if docPr := findChild(elem, "docPr"); docPr != nil {
-		if desc, ok := getAttr(docPr, "descr"); ok {
+	if docPr := findWordprocessingDrawingChild(elem, "docPr"); docPr != nil {
+		if desc, ok := getUnqualifiedAttr(docPr, "descr"); ok {
 			return desc
 		}
 	}
 
-	if cNvPr := findDescendant(elem, "cNvPr"); cNvPr != nil {
-		if desc, ok := getAttr(cNvPr, "descr"); ok {
+	if cNvPr := findPictureDescendant(elem, "cNvPr"); cNvPr != nil {
+		if desc, ok := getUnqualifiedAttr(cNvPr, "descr"); ok {
 			return desc
 		}
 	}
@@ -1110,25 +1370,25 @@ func buildFloatingPosition(elem *Element) domain.ImagePosition {
 	pos := domain.DefaultImagePosition()
 	pos.Type = domain.ImagePositionFloating
 
-	if val, ok := getAttr(elem, "behindDoc"); ok {
+	if val, ok := getUnqualifiedAttr(elem, "behindDoc"); ok {
 		pos.BehindText = parseBoolAttr(val)
 	}
-	if val, ok := getAttr(elem, "relativeHeight"); ok {
+	if val, ok := getUnqualifiedAttr(elem, "relativeHeight"); ok {
 		if n, err := strconv.Atoi(val); err == nil {
 			pos.ZOrder = n
 		}
 	}
 
 	if wrap := findWrapElement(elem); wrap != nil {
-		if wrapText, ok := getAttr(wrap, "wrapText"); ok {
+		if wrapText, ok := getUnqualifiedAttr(wrap, "wrapText"); ok {
 			if mapped, ok := mapWrapTextValue(wrapText); ok {
 				pos.WrapText = mapped
 			}
 		}
 	}
 
-	if positionH := findChild(elem, "positionH"); positionH != nil {
-		if align := findChild(positionH, "align"); align != nil {
+	if positionH := findWordprocessingDrawingChild(elem, "positionH"); positionH != nil {
+		if align := findWordprocessingDrawingChild(positionH, "align"); align != nil {
 			if mapped, ok := mapHorizontalAlignValue(strings.TrimSpace(align.Text)); ok {
 				pos.HAlign = mapped
 			}
@@ -1139,8 +1399,8 @@ func buildFloatingPosition(elem *Element) domain.ImagePosition {
 		}
 	}
 
-	if positionV := findChild(elem, "positionV"); positionV != nil {
-		if align := findChild(positionV, "align"); align != nil {
+	if positionV := findWordprocessingDrawingChild(elem, "positionV"); positionV != nil {
+		if align := findWordprocessingDrawingChild(positionV, "align"); align != nil {
 			if mapped, ok := mapVerticalAlignValue(strings.TrimSpace(align.Text)); ok {
 				pos.VAlign = mapped
 			}
@@ -1165,7 +1425,7 @@ func findWrapElement(elem *Element) *Element {
 			continue
 		}
 		for _, name := range candidates {
-			if child.Name.Local == name {
+			if isWordprocessingDrawingElement(child, name) {
 				return child
 			}
 		}
@@ -1242,7 +1502,7 @@ func parseChildInt(elem *Element, local string) (int, bool) {
 	if elem == nil {
 		return 0, false
 	}
-	child := findChild(elem, local)
+	child := findWordprocessingDrawingChild(elem, local)
 	if child == nil {
 		return 0, false
 	}
@@ -1261,7 +1521,7 @@ func attrToInt(elem *Element, name string) int {
 	if elem == nil {
 		return 0
 	}
-	if val, ok := getAttr(elem, name); ok && val != "" {
+	if val, ok := getUnqualifiedAttr(elem, name); ok && val != "" {
 		if n, err := strconv.Atoi(val); err == nil {
 			return n
 		}
@@ -1300,7 +1560,7 @@ func mapBreakType(elem *Element) domain.BreakType {
 		return domain.BreakTypeLine
 	}
 
-	if val, ok := getAttr(elem, "type"); ok {
+	if val, ok := getWordAttr(elem, "type"); ok {
 		switch strings.ToLower(val) {
 		case "page":
 			return domain.BreakTypePage
@@ -1444,7 +1704,7 @@ func (s *fieldState) handleFieldChar(elem *Element) error {
 		return nil
 	}
 
-	typ, _ := getAttr(elem, "fldCharType")
+	typ, _ := getWordAttr(elem, "fldCharType")
 	switch strings.ToLower(typ) {
 	case "begin":
 		s.reset()
@@ -1667,7 +1927,7 @@ func (ctx *reconstructContext) applySectionLayout(section domain.Section, sectPr
 		return nil
 	}
 
-	if pgSz := findChild(sectPr, "pgSz"); pgSz != nil {
+	if pgSz := findWordChild(sectPr, "pgSz"); pgSz != nil {
 		width, hasWidth := parseIntAttr(pgSz, "w")
 		height, hasHeight := parseIntAttr(pgSz, "h")
 
@@ -1677,7 +1937,7 @@ func (ctx *reconstructContext) applySectionLayout(section domain.Section, sectPr
 			}
 		}
 
-		if orientVal, ok := getAttr(pgSz, "orient"); ok && orientVal != "" {
+		if orientVal, ok := getWordAttr(pgSz, "orient"); ok && orientVal != "" {
 			if orient, mapped := mapOrientation(orientVal); mapped {
 				if err := section.SetOrientation(orient); err != nil {
 					return errors.Wrap(err, opApplySectionProperties)
@@ -1694,7 +1954,7 @@ func (ctx *reconstructContext) applySectionLayout(section domain.Section, sectPr
 		}
 	}
 
-	if pgMar := findChild(sectPr, "pgMar"); pgMar != nil {
+	if pgMar := findWordChild(sectPr, "pgMar"); pgMar != nil {
 		margins := section.Margins()
 		if val, ok := parseIntAttr(pgMar, "top"); ok {
 			margins.Top = val
@@ -1720,7 +1980,7 @@ func (ctx *reconstructContext) applySectionLayout(section domain.Section, sectPr
 		}
 	}
 
-	if cols := findChild(sectPr, "cols"); cols != nil {
+	if cols := findWordChild(sectPr, "cols"); cols != nil {
 		if val, ok := parseIntAttr(cols, "num"); ok && val >= 1 {
 			if err := section.SetColumns(val); err != nil {
 				return errors.Wrap(err, opApplySectionProperties)
@@ -1737,11 +1997,11 @@ func (ctx *reconstructContext) applySectionHeaders(section domain.Section, sectP
 	}
 
 	for _, child := range sectPr.Children {
-		if child == nil || child.Name.Local != "headerReference" {
+		if !isWordElement(child, "headerReference") {
 			continue
 		}
 
-		relID, ok := getAttr(child, "id")
+		relID, ok := getRelationshipAttr(child, "id")
 		if !ok || relID == "" {
 			continue
 		}
@@ -1751,7 +2011,7 @@ func (ctx *reconstructContext) applySectionHeaders(section domain.Section, sectP
 			continue
 		}
 
-		headerTypeVal, _ := getAttr(child, "type")
+		headerTypeVal, _ := getWordAttr(child, "type")
 		headerType := mapHeaderType(headerTypeVal)
 		if !ctx.markHeaderHydrated(section, headerType) {
 			continue
@@ -1771,11 +2031,11 @@ func (ctx *reconstructContext) applySectionFooters(section domain.Section, sectP
 	}
 
 	for _, child := range sectPr.Children {
-		if child == nil || child.Name.Local != "footerReference" {
+		if !isWordElement(child, "footerReference") {
 			continue
 		}
 
-		relID, ok := getAttr(child, "id")
+		relID, ok := getRelationshipAttr(child, "id")
 		if !ok || relID == "" {
 			continue
 		}
@@ -1785,7 +2045,7 @@ func (ctx *reconstructContext) applySectionFooters(section domain.Section, sectP
 			continue
 		}
 
-		footerTypeVal, _ := getAttr(child, "type")
+		footerTypeVal, _ := getWordAttr(child, "type")
 		footerType := mapFooterType(footerTypeVal)
 		if !ctx.markFooterHydrated(section, footerType) {
 			continue
@@ -1859,8 +2119,8 @@ func (ctx *reconstructContext) hydratePartBlocks(container partBlockContainer, t
 				if child == nil {
 					continue
 				}
-				switch child.Name.Local {
-				case "p":
+				switch {
+				case isWordElement(child, "p"):
 					para, err := container.AddParagraph()
 					if err != nil {
 						return errors.Wrap(err, op)
@@ -1868,7 +2128,7 @@ func (ctx *reconstructContext) hydratePartBlocks(container partBlockContainer, t
 					if err := populateParagraph(para, child, ctx); err != nil {
 						return err
 					}
-				case "tbl":
+				case isWordElement(child, "tbl"):
 					// Best-effort: skip a table docxgo can't hydrate rather
 					// than failing the whole document (see doc comment above).
 					// hydrateTable's own AddTable call already attached the
@@ -1981,7 +2241,7 @@ func parseIntAttr(elem *Element, name string) (int, bool) {
 	if elem == nil {
 		return 0, false
 	}
-	val, ok := getAttr(elem, name)
+	val, ok := getWordAttr(elem, name)
 	if !ok || val == "" {
 		return 0, false
 	}
@@ -1992,15 +2252,45 @@ func parseIntAttr(elem *Element, name string) (int, bool) {
 	return n, true
 }
 
+// parseMeasurementInt accepts both the integer spelling required by OOXML
+// and the float-formatted measurements emitted by some real-world producers
+// (for example "9360.0"). Measurements in the domain model are integers, so
+// a fractional value is truncated toward zero. Non-finite and out-of-range
+// values are rejected instead of relying on implementation-defined float to
+// int conversion behavior.
+func parseMeasurementInt(text string) (int, error) {
+	if n, err := strconv.Atoi(text); err == nil {
+		return n, nil
+	}
+
+	f, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, fmt.Errorf("measurement is not finite: %q", text)
+	}
+
+	// int's positive limit is 2^(bits-1)-1 and its negative limit is
+	// -2^(bits-1). Checking against the power-of-two boundary avoids the
+	// float64 rounding problem around MaxInt64.
+	limit := math.Ldexp(1, strconv.IntSize-1)
+	if f >= limit || f < -limit {
+		return 0, fmt.Errorf("measurement is outside int range: %q", text)
+	}
+
+	return int(math.Trunc(f)), nil
+}
+
 func extractSectionBreakType(sectPr *Element) (domain.SectionBreakType, bool) {
 	if sectPr == nil {
 		return domain.SectionBreakTypeNextPage, false
 	}
-	typeElem := findChild(sectPr, "type")
+	typeElem := findWordChild(sectPr, "type")
 	if typeElem == nil {
 		return domain.SectionBreakTypeNextPage, false
 	}
-	val, ok := getAttr(typeElem, "val")
+	val, ok := getWordAttr(typeElem, "val")
 	if !ok || val == "" {
 		return domain.SectionBreakTypeNextPage, false
 	}
@@ -2012,7 +2302,7 @@ func parseOnOff(elem *Element) (bool, bool) {
 		return false, false
 	}
 
-	if val, ok := getAttr(elem, "val"); ok {
+	if val, ok := getWordAttr(elem, "val"); ok {
 		normalized := strings.ToLower(val)
 		switch normalized {
 		case "0", "false", "off":
@@ -2100,6 +2390,120 @@ func findChild(parent *Element, local string) *Element {
 	return nil
 }
 
+func isWordNamespace(namespace string) bool {
+	return namespace == constants.NamespaceMain || namespace == constants.NamespaceMainStrict
+}
+
+func isRelationshipNamespace(namespace string) bool {
+	return namespace == constants.NamespaceRelationships || namespace == constants.NamespaceRelationshipsStrict
+}
+
+func isWordprocessingDrawingNamespace(namespace string) bool {
+	return namespace == constants.NamespaceWordprocessingDrawing || namespace == constants.NamespaceWordprocessingDrawingStrict
+}
+
+func isDrawingNamespace(namespace string) bool {
+	return namespace == constants.NamespaceDrawing || namespace == constants.NamespaceDrawingStrict
+}
+
+func isPictureNamespace(namespace string) bool {
+	return namespace == constants.NamespacePicture || namespace == constants.NamespacePictureStrict
+}
+
+func isWordElement(elem *Element, local string) bool {
+	return elem != nil && isWordNamespace(elem.Name.Space) && elem.Name.Local == local
+}
+
+func isWordprocessingDrawingElement(elem *Element, local string) bool {
+	return elem != nil && isWordprocessingDrawingNamespace(elem.Name.Space) && elem.Name.Local == local
+}
+
+func isDrawingElement(elem *Element, local string) bool {
+	return elem != nil && isDrawingNamespace(elem.Name.Space) && elem.Name.Local == local
+}
+
+func isPictureElement(elem *Element, local string) bool {
+	return elem != nil && isPictureNamespace(elem.Name.Space) && elem.Name.Local == local
+}
+
+func findWordChild(parent *Element, local string) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if isWordElement(child, local) {
+			return child
+		}
+	}
+	return nil
+}
+
+func findWordprocessingDrawingChild(parent *Element, local string) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if isWordprocessingDrawingElement(child, local) {
+			return child
+		}
+	}
+	return nil
+}
+
+func findDrawingChild(parent *Element, local string) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if isDrawingElement(child, local) {
+			return child
+		}
+	}
+	return nil
+}
+
+func findPictureChild(parent *Element, local string) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if isPictureElement(child, local) {
+			return child
+		}
+	}
+	return nil
+}
+
+func findDrawingDescendant(parent *Element, local string) *Element {
+	return findDescendantMatching(parent, func(elem *Element) bool {
+		return isDrawingElement(elem, local)
+	})
+}
+
+func findPictureDescendant(parent *Element, local string) *Element {
+	return findDescendantMatching(parent, func(elem *Element) bool {
+		return isPictureElement(elem, local)
+	})
+}
+
+func findDescendantMatching(parent *Element, matches func(*Element) bool) *Element {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Children {
+		if child == nil {
+			continue
+		}
+		if matches(child) {
+			return child
+		}
+		if found := findDescendantMatching(child, matches); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
 func findDescendant(parent *Element, local string) *Element {
 	if parent == nil {
 		return nil
@@ -2118,6 +2522,9 @@ func findDescendant(parent *Element, local string) *Element {
 	return nil
 }
 
+// getAttr returns the first attribute with the requested local name. Model
+// hydration must use one of the namespace-aware helpers below; this remains
+// for generic XML inspection in package-level tests.
 func getAttr(elem *Element, local string) (string, bool) {
 	if elem == nil {
 		return "", false
@@ -2128,6 +2535,46 @@ func getAttr(elem *Element, local string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func getAttrQName(elem *Element, namespace, local string) (string, bool) {
+	if elem == nil {
+		return "", false
+	}
+	for _, attr := range elem.Attr {
+		if attr.Name.Space == namespace && attr.Name.Local == local {
+			return attr.Value, true
+		}
+	}
+	return "", false
+}
+
+func getWordAttr(elem *Element, local string) (string, bool) {
+	if elem == nil {
+		return "", false
+	}
+	for _, attr := range elem.Attr {
+		if isWordNamespace(attr.Name.Space) && attr.Name.Local == local {
+			return attr.Value, true
+		}
+	}
+	return "", false
+}
+
+func getRelationshipAttr(elem *Element, local string) (string, bool) {
+	if elem == nil {
+		return "", false
+	}
+	for _, attr := range elem.Attr {
+		if isRelationshipNamespace(attr.Name.Space) && attr.Name.Local == local {
+			return attr.Value, true
+		}
+	}
+	return "", false
+}
+
+func getUnqualifiedAttr(elem *Element, local string) (string, bool) {
+	return getAttrQName(elem, "", local)
 }
 
 func mapLineSpacingRule(value string) domain.LineSpacingRule {
@@ -2221,7 +2668,7 @@ func hydrateTable(doc tableAdder, elem *Element, ctx *reconstructContext) error 
 
 	rows := make([]*Element, 0, len(elem.Children))
 	for _, child := range elem.Children {
-		if child == nil || child.Name.Local != "tr" {
+		if !isWordElement(child, "tr") {
 			continue
 		}
 		rows = append(rows, child)
@@ -2236,7 +2683,7 @@ func hydrateTable(doc tableAdder, elem *Element, ctx *reconstructContext) error 
 	for idx, row := range rows {
 		cells := make([]*Element, 0, len(row.Children))
 		for _, child := range row.Children {
-			if child == nil || child.Name.Local != "tc" {
+			if !isWordElement(child, "tc") {
 				continue
 			}
 			cells = append(cells, child)
@@ -2298,14 +2745,13 @@ func hydrateTable(doc tableAdder, elem *Element, ctx *reconstructContext) error 
 }
 
 // applyTableProperties hydrates the <w:tblPr> children the domain model can
-// hold. Everything else in tblPr (tblInd, tblCellMar, tblLayout, tblLook,
-// table-level shd, ...) has no domain representation and is dropped, which
-// also means it is rewritten from defaults on save -- see the CHANGELOG.
+// hold. The round-trip merger retains the remaining children in the source
+// XML until an explicit model change conflicts with them.
 func applyTableProperties(table domain.Table, elem *Element) error {
 	if table == nil || elem == nil {
 		return nil
 	}
-	tblPr := findChild(elem, "tblPr")
+	tblPr := findWordChild(elem, "tblPr")
 	if tblPr == nil {
 		return nil
 	}
@@ -2328,11 +2774,11 @@ func applyTableProperties(table domain.Table, elem *Element) error {
 // repeated on every table; dropping the reference orphans that rendering even
 // though the style definition itself survives untouched in styles.xml.
 func applyTableStyle(table domain.Table, tblPr *Element) error {
-	styleElem := findChild(tblPr, "tblStyle")
+	styleElem := findWordChild(tblPr, "tblStyle")
 	if styleElem == nil {
 		return nil
 	}
-	val, ok := getAttr(styleElem, "val")
+	val, ok := getWordAttr(styleElem, "val")
 	if !ok || val == "" {
 		return nil
 	}
@@ -2342,12 +2788,12 @@ func applyTableStyle(table domain.Table, tblPr *Element) error {
 // applyTableWidth hydrates <w:tblW>. Unlike a cell width, domain.TableWidth
 // carries its own type, so pct and auto round-trip as themselves.
 func applyTableWidth(table domain.Table, tblPr *Element) error {
-	widthElem := findChild(tblPr, "tblW")
+	widthElem := findWordChild(tblPr, "tblW")
 	if widthElem == nil {
 		return nil
 	}
 
-	typeVal, _ := getAttr(widthElem, "type")
+	typeVal, _ := getWordAttr(widthElem, "type")
 	widthType, ok := mapWidthType(typeVal)
 	if !ok {
 		return nil
@@ -2357,11 +2803,11 @@ func applyTableWidth(table domain.Table, tblPr *Element) error {
 		return nil
 	}
 
-	val, ok := getAttr(widthElem, "w")
+	val, ok := getWordAttr(widthElem, "w")
 	if !ok || val == "" {
 		return nil
 	}
-	n, err := strconv.Atoi(val)
+	n, err := parseMeasurementInt(val)
 	if err != nil {
 		return errors.WrapWithContext(err, opHydrateTable, map[string]interface{}{"attr": "tblW/w", "value": val})
 	}
@@ -2375,11 +2821,11 @@ func applyTableWidth(table domain.Table, tblPr *Element) error {
 // applyTableAlignment hydrates <w:jc>, which positions the table itself within
 // the text column -- not the text inside its cells.
 func applyTableAlignment(table domain.Table, tblPr *Element) error {
-	jcElem := findChild(tblPr, "jc")
+	jcElem := findWordChild(tblPr, "jc")
 	if jcElem == nil {
 		return nil
 	}
-	val, ok := getAttr(jcElem, "val")
+	val, ok := getWordAttr(jcElem, "val")
 	if !ok || val == "" {
 		return nil
 	}
@@ -2395,18 +2841,18 @@ func applyTableAlignment(table domain.Table, tblPr *Element) error {
 // of) per-cell w:tcBorders, so reading only the cell borders leaves a
 // hand-bordered table looking borderless.
 func applyTableBorders(table domain.Table, tblPr *Element) error {
-	bordersElem := findChild(tblPr, "tblBorders")
+	bordersElem := findWordChild(tblPr, "tblBorders")
 	if bordersElem == nil {
 		return nil
 	}
 
 	borders := domain.TableLevelBorders{
-		Top:     parseBorder(findChild(bordersElem, "top")),
-		Left:    parseBorder(findChild(bordersElem, "left")),
-		Bottom:  parseBorder(findChild(bordersElem, "bottom")),
-		Right:   parseBorder(findChild(bordersElem, "right")),
-		InsideH: parseBorder(findChild(bordersElem, "insideH")),
-		InsideV: parseBorder(findChild(bordersElem, "insideV")),
+		Top:     parseBorder(findWordChild(bordersElem, "top")),
+		Left:    parseBorder(findWordChild(bordersElem, "left")),
+		Bottom:  parseBorder(findWordChild(bordersElem, "bottom")),
+		Right:   parseBorder(findWordChild(bordersElem, "right")),
+		InsideH: parseBorder(findWordChild(bordersElem, "insideH")),
+		InsideV: parseBorder(findWordChild(bordersElem, "insideV")),
 	}
 	if borders == (domain.TableLevelBorders{}) {
 		return nil
@@ -2422,20 +2868,20 @@ func applyRowProperties(row domain.TableRow, elem *Element) error {
 	if row == nil || elem == nil {
 		return nil
 	}
-	trPr := findChild(elem, "trPr")
+	trPr := findWordChild(elem, "trPr")
 	if trPr == nil {
 		return nil
 	}
 
-	heightElem := findChild(trPr, "trHeight")
+	heightElem := findWordChild(trPr, "trHeight")
 	if heightElem == nil {
 		return nil
 	}
-	val, ok := getAttr(heightElem, "val")
+	val, ok := getWordAttr(heightElem, "val")
 	if !ok || val == "" {
 		return nil
 	}
-	n, err := strconv.Atoi(val)
+	n, err := parseMeasurementInt(val)
 	if err != nil {
 		return errors.WrapWithContext(err, opHydrateTable, map[string]interface{}{"attr": "trHeight/val", "value": val})
 	}
@@ -2456,19 +2902,19 @@ func parseBorder(elem *Element) domain.BorderStyle {
 		return domain.BorderStyle{}
 	}
 
-	val, _ := getAttr(elem, "val")
+	val, _ := getWordAttr(elem, "val")
 	style, ok := mapBorderLineStyle(val)
 	if !ok {
 		return domain.BorderStyle{}
 	}
 
 	border := domain.BorderStyle{Style: style}
-	if sz, ok := getAttr(elem, "sz"); ok && sz != "" {
+	if sz, ok := getWordAttr(elem, "sz"); ok && sz != "" {
 		if n, err := strconv.Atoi(sz); err == nil && n > 0 {
 			border.Width = n
 		}
 	}
-	if c, ok := getAttr(elem, "color"); ok && c != "" && !strings.EqualFold(c, "auto") {
+	if c, ok := getWordAttr(elem, "color"); ok && c != "" && !strings.EqualFold(c, "auto") {
 		if clr, err := pkgcolor.FromHex(c); err == nil {
 			border.Color = clr
 		}
@@ -2547,19 +2993,19 @@ func applyCellProperties(cell domain.TableCell, tcPr *Element) error {
 // so a non-dxa width is left alone: it degrades to auto, which still lays out
 // sensibly.
 func applyCellWidth(cell domain.TableCell, tcPr *Element) error {
-	widthElem := findChild(tcPr, "tcW")
+	widthElem := findWordChild(tcPr, "tcW")
 	if widthElem == nil {
 		return nil
 	}
-	if typeVal, ok := getAttr(widthElem, "type"); ok && !strings.EqualFold(typeVal, constants.WidthTypeDXA) {
+	if typeVal, ok := getWordAttr(widthElem, "type"); ok && !strings.EqualFold(typeVal, constants.WidthTypeDXA) {
 		return nil
 	}
 
-	val, ok := getAttr(widthElem, "w")
+	val, ok := getWordAttr(widthElem, "w")
 	if !ok || val == "" {
 		return nil
 	}
-	n, err := strconv.Atoi(val)
+	n, err := parseMeasurementInt(val)
 	if err != nil {
 		return errors.WrapWithContext(err, opHydrateTableCell, map[string]interface{}{"attr": "tcW/w", "value": val})
 	}
@@ -2577,16 +3023,16 @@ func applyCellWidth(cell domain.TableCell, tcPr *Element) error {
 // domain.TableBorders has no insideH/insideV, and those are meaningless on a
 // single cell anyway.
 func applyCellBorders(cell domain.TableCell, tcPr *Element) error {
-	bordersElem := findChild(tcPr, "tcBorders")
+	bordersElem := findWordChild(tcPr, "tcBorders")
 	if bordersElem == nil {
 		return nil
 	}
 
 	borders := domain.TableBorders{
-		Top:    parseBorder(findChild(bordersElem, "top")),
-		Left:   parseBorder(findChild(bordersElem, "left")),
-		Bottom: parseBorder(findChild(bordersElem, "bottom")),
-		Right:  parseBorder(findChild(bordersElem, "right")),
+		Top:    parseBorder(findWordChild(bordersElem, "top")),
+		Left:   parseBorder(findWordChild(bordersElem, "left")),
+		Bottom: parseBorder(findWordChild(bordersElem, "bottom")),
+		Right:  parseBorder(findWordChild(bordersElem, "right")),
 	}
 	if borders == (domain.TableBorders{}) {
 		return nil
@@ -2605,7 +3051,7 @@ func applyCellBorders(cell domain.TableCell, tcPr *Element) error {
 // link is captured too (see HydrateThemeFill) so the writer can keep it
 // following the document's theme instead of freezing the cached colour.
 func applyCellShading(cell domain.TableCell, tcPr *Element) error {
-	shdElem := findChild(tcPr, "shd")
+	shdElem := findWordChild(tcPr, "shd")
 	if shdElem == nil {
 		return nil
 	}
@@ -2617,7 +3063,7 @@ func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 	// is the opposite extreme, a 100% foreground fill that hides the
 	// background entirely, so w:color is. Reading w:fill for both turns a
 	// solid red-on-blue cell blue.
-	val, _ := getAttr(shdElem, "val")
+	val, _ := getWordAttr(shdElem, "val")
 	var source string
 	switch {
 	case val == "" || strings.EqualFold(val, "clear"):
@@ -2635,7 +3081,7 @@ func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 	// any theme link (see its doc comment), so running it before the theme
 	// hydration below, not after, matters: reversed, it would wipe out the
 	// very link this same element is about to hydrate.
-	if raw, ok := getAttr(shdElem, source); ok && isHexRGB(raw) {
+	if raw, ok := getWordAttr(shdElem, source); ok && isHexRGB(raw) {
 		if clr, err := pkgcolor.FromHex(raw); err == nil {
 			if err := cell.SetShading(clr); err != nil {
 				return errors.Wrap(err, opHydrateTableCell)
@@ -2655,10 +3101,10 @@ func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 	if source == "color" {
 		themeAttr, tintAttr, shadeAttr = "themeColor", "themeTint", "themeShade"
 	}
-	if themeVal, ok := getAttr(shdElem, themeAttr); ok && themeVal != "" {
+	if themeVal, ok := getWordAttr(shdElem, themeAttr); ok && themeVal != "" {
 		if hydrator, ok := cell.(interface{ HydrateThemeFill(string, string, string) }); ok {
-			tint, _ := getAttr(shdElem, tintAttr)
-			shade, _ := getAttr(shdElem, shadeAttr)
+			tint, _ := getWordAttr(shdElem, tintAttr)
+			shade, _ := getWordAttr(shdElem, shadeAttr)
 			hydrator.HydrateThemeFill(themeVal, tint, shade)
 		}
 	}
@@ -2669,11 +3115,11 @@ func applyCellShading(cell domain.TableCell, tcPr *Element) error {
 // applyCellVerticalAlignment hydrates <w:vAlign>. ST_VerticalJc's "both"
 // (distribute vertically) has no domain equivalent and is dropped.
 func applyCellVerticalAlignment(cell domain.TableCell, tcPr *Element) error {
-	vAlignElem := findChild(tcPr, "vAlign")
+	vAlignElem := findWordChild(tcPr, "vAlign")
 	if vAlignElem == nil {
 		return nil
 	}
-	val, ok := getAttr(vAlignElem, "val")
+	val, ok := getWordAttr(vAlignElem, "val")
 	if !ok || val == "" {
 		return nil
 	}
@@ -2718,12 +3164,12 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 	}
 
 	// Parse cell properties (w:tcPr) for merge info and appearance.
-	if tcPr := findChild(elem, "tcPr"); tcPr != nil {
+	if tcPr := findWordChild(elem, "tcPr"); tcPr != nil {
 		if err := applyCellProperties(cell, tcPr); err != nil {
 			return err
 		}
-		if gs := findChild(tcPr, "gridSpan"); gs != nil {
-			if val, ok := getAttr(gs, "val"); ok && val != "" {
+		if gs := findWordChild(tcPr, "gridSpan"); gs != nil {
+			if val, ok := getWordAttr(gs, "val"); ok && val != "" {
 				span, err := strconv.Atoi(val)
 				if err != nil {
 					return errors.WrapWithContext(err, opHydrateTableCell, map[string]interface{}{"attr": "gridSpan", "value": val})
@@ -2735,8 +3181,8 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 				}
 			}
 		}
-		if vm := findChild(tcPr, "vMerge"); vm != nil {
-			val, _ := getAttr(vm, "val")
+		if vm := findWordChild(tcPr, "vMerge"); vm != nil {
+			val, _ := getWordAttr(vm, "val")
 			switch val {
 			case "restart":
 				if err := cell.SetVMerge(domain.VMergeRestart); err != nil {
@@ -2752,7 +3198,7 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 	}
 
 	for _, child := range elem.Children {
-		if child == nil || child.Name.Local != "p" {
+		if !isWordElement(child, "p") {
 			continue
 		}
 
@@ -2771,9 +3217,9 @@ func hydrateTableCell(cell domain.TableCell, elem *Element, ctx *reconstructCont
 
 // cellGridSpan returns the grid column span for a <w:tc> element (defaults to 1).
 func cellGridSpan(tcElem *Element) int {
-	if tcPr := findChild(tcElem, "tcPr"); tcPr != nil {
-		if gs := findChild(tcPr, "gridSpan"); gs != nil {
-			if val, ok := getAttr(gs, "val"); ok {
+	if tcPr := findWordChild(tcElem, "tcPr"); tcPr != nil {
+		if gs := findWordChild(tcPr, "gridSpan"); gs != nil {
+			if val, ok := getWordAttr(gs, "val"); ok {
 				if n, err := strconv.Atoi(val); err == nil && n > 1 {
 					return n
 				}

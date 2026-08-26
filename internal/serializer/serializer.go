@@ -10,6 +10,7 @@ package serializer
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/mmonterroca/docxgo/v2/domain"
@@ -20,6 +21,15 @@ import (
 
 type drawingIDProvider interface {
 	NextDrawingID() int
+}
+
+func sortedSectionPartTypes[K ~int, V any](parts map[K]V) []K {
+	keys := make([]K, 0, len(parts))
+	for key := range parts {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys
 }
 
 // RunSerializer converts a domain.Run to xml.Run
@@ -796,6 +806,20 @@ func (s *TableSerializer) Serialize(table domain.Table) *xml.Table {
 	return xmlTable
 }
 
+// SerializeShell returns the table properties and grid without any rows.
+// Round-trip preservation uses this stable projection to distinguish a row
+// edit from a change to the table's own layout.
+func (s *TableSerializer) SerializeShell(table domain.Table) (*xml.TableProperties, *xml.TableGrid) {
+	return s.serializeTableProperties(table), s.serializeGrid(table)
+}
+
+// SerializeRow serializes one table row. It is exported within the internal
+// serializer package so round-trip preservation can regenerate only a row
+// that actually changed.
+func (s *TableSerializer) SerializeRow(row domain.TableRow) *xml.TableRow {
+	return s.serializeRow(row)
+}
+
 func (s *TableSerializer) serializeTableProperties(table domain.Table) *xml.TableProperties {
 	props := &xml.TableProperties{}
 
@@ -1338,6 +1362,27 @@ func (s *DocumentSerializer) NextDrawingID() int {
 	return s.drawingCounter
 }
 
+// EnsureDrawingIDAtLeast advances the document-scoped drawing counter without
+// allocating an ID. Round-trip composition uses it to stay above wp:docPr IDs
+// that remain in preserved source fragments.
+func (s *DocumentSerializer) EnsureDrawingIDAtLeast(id int) {
+	if id > s.drawingCounter {
+		s.drawingCounter = id
+	}
+}
+
+// SerializeTable serializes a table with this document serializer's shared
+// drawing-ID provider.
+func (s *DocumentSerializer) SerializeTable(table domain.Table) *xml.Table {
+	return s.tableSerializer.Serialize(table)
+}
+
+// SerializeTableRow serializes one table row with this document serializer's
+// shared drawing-ID provider.
+func (s *DocumentSerializer) SerializeTableRow(row domain.TableRow) *xml.TableRow {
+	return s.tableSerializer.SerializeRow(row)
+}
+
 // SerializeBody converts document content to xml.Body while preserving insertion order.
 func (s *DocumentSerializer) SerializeBody(doc domain.Document) *xml.Body {
 	blocks := doc.Blocks()
@@ -1346,28 +1391,8 @@ func (s *DocumentSerializer) SerializeBody(doc domain.Document) *xml.Body {
 	}
 
 	for _, block := range blocks {
-		switch {
-		case block.Paragraph != nil:
-			body.Content = append(body.Content, s.paraSerializer.Serialize(block.Paragraph))
-		case block.Table != nil:
-			body.Content = append(body.Content, s.tableSerializer.Serialize(block.Table))
-		case block.SectionBreak != nil && block.SectionBreak.Section != nil:
-			sectPr := s.serializeSectionProperties(block.SectionBreak.Section)
-			if sectPr == nil {
-				continue
-			}
-
-			if block.SectionBreak.Type >= domain.SectionBreakTypeNextPage &&
-				block.SectionBreak.Type <= domain.SectionBreakTypeOddPage {
-				sectPr.Type = &xml.SectionType{Val: s.sectionBreakTypeToString(block.SectionBreak.Type)}
-			}
-
-			para := &xml.Paragraph{
-				Properties: &xml.ParagraphProperties{
-					SectionProperties: sectPr,
-				},
-			}
-			body.Content = append(body.Content, para)
+		if elem := s.SerializeBlock(block); elem != nil {
+			body.Content = append(body.Content, elem)
 		}
 	}
 
@@ -1379,6 +1404,36 @@ func (s *DocumentSerializer) SerializeBody(doc domain.Document) *xml.Body {
 	}
 
 	return body
+}
+
+// SerializeBlock converts one top-level domain block to its XML element.
+// Keeping this operation independently callable lets the round-trip writer
+// replace one changed block while retaining every untouched source fragment.
+func (s *DocumentSerializer) SerializeBlock(block domain.Block) interface{} {
+	switch {
+	case block.Paragraph != nil:
+		return s.paraSerializer.Serialize(block.Paragraph)
+	case block.Table != nil:
+		return s.tableSerializer.Serialize(block.Table)
+	case block.SectionBreak != nil && block.SectionBreak.Section != nil:
+		sectPr := s.serializeSectionProperties(block.SectionBreak.Section)
+		if sectPr == nil {
+			return nil
+		}
+
+		if block.SectionBreak.Type >= domain.SectionBreakTypeNextPage &&
+			block.SectionBreak.Type <= domain.SectionBreakTypeOddPage {
+			sectPr.Type = &xml.SectionType{Val: s.sectionBreakTypeToString(block.SectionBreak.Type)}
+		}
+
+		return &xml.Paragraph{
+			Properties: &xml.ParagraphProperties{
+				SectionProperties: sectPr,
+			},
+		}
+	default:
+		return nil
+	}
 }
 
 // SerializeDocument creates the complete document XML structure.
@@ -1998,7 +2053,9 @@ func (s *DocumentSerializer) serializeSectionProperties(section domain.Section) 
 		HeadersAll() map[domain.HeaderType]domain.Header
 		FootersAll() map[domain.FooterType]domain.Footer
 	}); ok {
-		for headerType, header := range secWithMaps.HeadersAll() {
+		headers := secWithMaps.HeadersAll()
+		for _, headerType := range sortedSectionPartTypes(headers) {
+			header := headers[headerType]
 			headerMeta, ok := header.(interface {
 				RelationshipID() string
 			})
@@ -2010,7 +2067,9 @@ func (s *DocumentSerializer) serializeSectionProperties(section domain.Section) 
 			}
 		}
 
-		for footerType, footer := range secWithMaps.FootersAll() {
+		footers := secWithMaps.FootersAll()
+		for _, footerType := range sortedSectionPartTypes(footers) {
+			footer := footers[footerType]
 			footerMeta, ok := footer.(interface {
 				RelationshipID() string
 			})
