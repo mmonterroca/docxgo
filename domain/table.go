@@ -74,6 +74,22 @@ type TableRow interface {
 
 	// SetHeight sets the row height in twips.
 	SetHeight(twips int) error
+
+	// RepeatAsHeader reports whether the row repeats at the top of every
+	// page the table spans (w:tblHeader).
+	RepeatAsHeader() bool
+
+	// SetRepeatAsHeader marks the row as a header row that Word repeats at
+	// the top of each page. Word only honours it on a contiguous run of rows
+	// starting at the first one.
+	SetRepeatAsHeader(repeat bool) error
+
+	// CantSplit reports whether the row is kept whole on one page
+	// (w:cantSplit).
+	CantSplit() bool
+
+	// SetCantSplit keeps the row from breaking across pages.
+	SetCantSplit(cantSplit bool) error
 }
 
 // TableCell represents a cell in a table.

@@ -496,6 +496,34 @@ func (pb *ParagraphBuilder) Alignment(align domain.Alignment) *ParagraphBuilder 
 	return pb
 }
 
+// Shading sets the paragraph background fill (w:shd in w:pPr).
+func (pb *ParagraphBuilder) Shading(fill domain.Color) *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if err := pb.para.SetShading(fill); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
+// KeepNext keeps the paragraph on the same page as the next one.
+func (pb *ParagraphBuilder) KeepNext() *ParagraphBuilder {
+	if pb.err != nil {
+		return pb
+	}
+
+	if err := pb.para.SetKeepNext(true); err != nil {
+		pb.err = err
+		pb.parent.errors = append(pb.parent.errors, err)
+	}
+
+	return pb
+}
+
 // Underline sets the underline style of the last run.
 func (pb *ParagraphBuilder) Underline(style domain.UnderlineStyle) *ParagraphBuilder {
 	if pb.err != nil {

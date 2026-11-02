@@ -73,9 +73,14 @@ type TableRow struct {
 }
 
 // TableRowProperties represents w:trPr element.
+//
+// CT_TrPr is a repeating choice, so child order is free; this follows the
+// order Word itself writes (cantSplit, trHeight, tblHeader).
 type TableRowProperties struct {
-	XMLName xml.Name        `xml:"w:trPr"`
-	Height  *TableRowHeight `xml:"w:trHeight,omitempty"`
+	XMLName   xml.Name        `xml:"w:trPr"`
+	CantSplit *BoolValue      `xml:"w:cantSplit,omitempty"`
+	Height    *TableRowHeight `xml:"w:trHeight,omitempty"`
+	Header    *BoolValue      `xml:"w:tblHeader,omitempty"`
 }
 
 // TableRowHeight represents w:trHeight element.

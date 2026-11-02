@@ -60,10 +60,20 @@ type paragraph struct {
 	indentHangingSet   bool
 	numbering          *domain.NumberingReference
 	borders            domain.ParagraphBorders
-	idGen              IDGenerator
-	relManager         *manager.RelationshipManager
-	bookmarkID         string // ID for bookmark (if this paragraph needs one for TOC)
-	bookmarkName       string // Name for bookmark (e.g., "_Toc123456")
+	// shading/shadingSet: domain.Color's zero value is black, so the flag
+	// is what tells "never shaded" apart from an explicit black fill.
+	shading    domain.Color
+	shadingSet bool
+	// keepNext*/keepLines*: the *Set flags let an explicit false be written
+	// (overriding a style), the same way the spacing flags above work.
+	keepNext     bool
+	keepNextSet  bool
+	keepLines    bool
+	keepLinesSet bool
+	idGen        IDGenerator
+	relManager   *manager.RelationshipManager
+	bookmarkID   string // ID for bookmark (if this paragraph needs one for TOC)
+	bookmarkName string // Name for bookmark (e.g., "_Toc123456")
 	// bookmarkHydrated distinguishes a bookmark read from a source document
 	// from one generateHeadingBookmarks assigned on some earlier WriteTo (or
 	// one set through the public SetBookmark) -- see HydrateBookmark.
@@ -736,6 +746,80 @@ func (p *paragraph) SetBorderRight(border domain.BorderStyle) error {
 	}
 	p.borders.Right = border
 	return nil
+}
+
+// Shading returns the paragraph background fill and whether one was set.
+func (p *paragraph) Shading() (domain.Color, bool) {
+	if p == nil {
+		return domain.Color{}, false
+	}
+	return p.shading, p.shadingSet
+}
+
+// SetShading sets the paragraph background fill.
+func (p *paragraph) SetShading(fill domain.Color) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetShading", "paragraph is nil")
+	}
+	p.shading = fill
+	p.shadingSet = true
+	return nil
+}
+
+// ClearShading removes the paragraph background fill.
+func (p *paragraph) ClearShading() {
+	if p == nil {
+		return
+	}
+	p.shading = domain.Color{}
+	p.shadingSet = false
+}
+
+// KeepNext reports whether the paragraph is kept with the next one.
+func (p *paragraph) KeepNext() bool {
+	if p == nil {
+		return false
+	}
+	return p.keepNext
+}
+
+// SetKeepNext keeps the paragraph on the same page as the next one.
+func (p *paragraph) SetKeepNext(keep bool) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetKeepNext", "paragraph is nil")
+	}
+	p.keepNext = keep
+	p.keepNextSet = true
+	return nil
+}
+
+// KeepNextSet reports whether SetKeepNext was ever called, so the serializer
+// can write an explicit false. Concrete-type only, like SpacingBeforeSet.
+func (p *paragraph) KeepNextSet() bool {
+	return p != nil && p.keepNextSet
+}
+
+// KeepLines reports whether the paragraph's lines are kept on one page.
+func (p *paragraph) KeepLines() bool {
+	if p == nil {
+		return false
+	}
+	return p.keepLines
+}
+
+// SetKeepLines keeps all lines of the paragraph on one page.
+func (p *paragraph) SetKeepLines(keep bool) error {
+	if p == nil {
+		return errors.InvalidState("Paragraph.SetKeepLines", "paragraph is nil")
+	}
+	p.keepLines = keep
+	p.keepLinesSet = true
+	return nil
+}
+
+// KeepLinesSet is KeepNextSet's counterpart for SetKeepLines.
+func (p *paragraph) KeepLinesSet() bool {
+	return p != nil && p.keepLinesSet
 }
 
 // ClearRuns removes all runs from the paragraph.

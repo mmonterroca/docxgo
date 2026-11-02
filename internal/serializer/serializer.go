@@ -576,13 +576,30 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 		sepRun := &xml.Run{FieldChar: xml.NewFieldSeparate()}
 		elements = append(elements, sepRun)
 
+		// A multi-line result ("\n"-separated, e.g. a pre-rendered TOC) is
+		// written as one run per line with a w:br between them, so it shows
+		// as separate lines until Word recalculates the field.
 		resultText := field.Result()
 		if resultText != "" {
-			resultRun := &xml.Run{
-				Properties: s.runSerializer.serializeProperties(run),
-				Text:       &xml.Text{Content: resultText},
+			for i, line := range strings.Split(resultText, "\n") {
+				if i > 0 {
+					elements = append(elements, &xml.Run{
+						Properties: s.runSerializer.serializeProperties(run),
+						Break:      &xml.Break{},
+					})
+				}
+				if line == "" {
+					continue
+				}
+				text := &xml.Text{Content: line}
+				if strings.TrimSpace(line) != line {
+					text.Space = "preserve"
+				}
+				elements = append(elements, &xml.Run{
+					Properties: s.runSerializer.serializeProperties(run),
+					Text:       text,
+				})
 			}
-			elements = append(elements, resultRun)
 		}
 
 		endRun := &xml.Run{FieldChar: xml.NewFieldEnd()}
@@ -702,7 +719,44 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 		}
 	}
 
+	// Shading: w:val="clear" draws no pattern, so w:fill is the colour a
+	// reader sees -- the same form TableSerializer writes for a cell.
+	if fill, ok := para.Shading(); ok {
+		props.Shading = &xml.Shading{Val: "clear", Color: "auto", Fill: color.ToHex(fill)}
+	}
+
+	// keepNext/keepLines: a true value is the bare element; an explicit
+	// false is written as w:val="false" so it overrides a style that turns
+	// the property on. Never-set stays absent.
+	keepNextSet, keepLinesSet := keepSetFlags(para)
+	props.KeepNext = onOffElement(para.KeepNext(), keepNextSet)
+	props.KeepLines = onOffElement(para.KeepLines(), keepLinesSet)
+
 	return props
+}
+
+// keepSetFlags reads the concrete paragraph's explicit-set flags for
+// keepNext/keepLines. A domain.Paragraph that doesn't expose them degrades
+// to false, so only a true value gets written for it.
+func keepSetFlags(para domain.Paragraph) (keepNextSet, keepLinesSet bool) {
+	if p, ok := para.(interface{ KeepNextSet() bool }); ok {
+		keepNextSet = p.KeepNextSet()
+	}
+	if p, ok := para.(interface{ KeepLinesSet() bool }); ok {
+		keepLinesSet = p.KeepLinesSet()
+	}
+	return keepNextSet, keepLinesSet
+}
+
+func onOffElement(value, set bool) *xml.BoolValue {
+	switch {
+	case value:
+		return &xml.BoolValue{}
+	case set:
+		return &xml.BoolValue{Val: boolPtr(false)}
+	default:
+		return nil
+	}
 }
 
 func (s *ParagraphSerializer) hasBorders(borders domain.ParagraphBorders) bool {
@@ -996,14 +1050,22 @@ func (s *TableSerializer) serializeRow(row domain.TableRow) *xml.TableRow {
 		Cells: make([]*xml.TableCell, 0, len(row.Cells())),
 	}
 
-	// Height
+	// Height, cantSplit, tblHeader
+	props := &xml.TableRowProperties{}
 	if row.Height() > 0 {
-		xmlRow.Properties = &xml.TableRowProperties{
-			Height: &xml.TableRowHeight{
-				Val:  row.Height(),
-				Rule: "atLeast",
-			},
+		props.Height = &xml.TableRowHeight{
+			Val:  row.Height(),
+			Rule: "atLeast",
 		}
+	}
+	if row.CantSplit() {
+		props.CantSplit = &xml.BoolValue{}
+	}
+	if row.RepeatAsHeader() {
+		props.Header = &xml.BoolValue{}
+	}
+	if props.Height != nil || props.CantSplit != nil || props.Header != nil {
+		xmlRow.Properties = props
 	}
 
 	// Serialize cells, skipping horizontal merge continuations

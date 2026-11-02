@@ -169,6 +169,8 @@ type tableRow struct {
 	id           string
 	cells        []domain.TableCell
 	height       int
+	header       bool
+	cantSplit    bool
 	table        *table
 	idGen        *manager.IDGenerator
 	relManager   *manager.RelationshipManager
@@ -216,6 +218,28 @@ func (r *tableRow) Cells() []domain.TableCell {
 // Height returns the row height.
 func (r *tableRow) Height() int {
 	return r.height
+}
+
+// RepeatAsHeader reports whether the row repeats on every page.
+func (r *tableRow) RepeatAsHeader() bool {
+	return r.header
+}
+
+// SetRepeatAsHeader marks the row as a repeating header row.
+func (r *tableRow) SetRepeatAsHeader(repeat bool) error {
+	r.header = repeat
+	return nil
+}
+
+// CantSplit reports whether the row is kept on one page.
+func (r *tableRow) CantSplit() bool {
+	return r.cantSplit
+}
+
+// SetCantSplit keeps the row from breaking across pages.
+func (r *tableRow) SetCantSplit(cantSplit bool) error {
+	r.cantSplit = cantSplit
+	return nil
 }
 
 // SetHeight sets the row height in twips.
