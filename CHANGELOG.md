@@ -1,4 +1,4 @@
-## Unreleased
+## v2.15.0 - 2026-11-01
 
 ### Added
 
@@ -9,7 +9,7 @@
 
 ### Compatibility
 
-- These are new methods on the `domain.Paragraph` and `domain.TableRow` interfaces. Code that only uses docxgo's own types needs no change; an external type implementing either interface must add them.
+- **`domain.Paragraph` and `domain.TableRow` gained methods** (`Shading`, `SetShading`, `ClearShading`, `KeepNext`, `SetKeepNext`, `KeepLines`, `SetKeepLines` on `Paragraph`; `RepeatAsHeader`, `SetRepeatAsHeader`, `CantSplit`, `SetCantSplit` on `TableRow`). Code that only uses docxgo's own types needs no change. If you implement either interface with your own type, most commonly a hand-written test double, you must add the new methods; embedding `domain.Paragraph` or `domain.TableRow` in your type is unaffected, since the methods are promoted automatically. The only exported function that accepts a caller-provided value of either type is `template.ConsolidateRuns(domain.Paragraph)`. This is a minor release for the same reason as `domain.Run.SetLanguage` in v2.12.0 and the `domain.Header`/`domain.Footer` methods in v2.13.0: the interfaces describe types docxgo itself returns, not an extension point.
 
 ---
 
