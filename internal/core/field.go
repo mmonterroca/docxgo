@@ -235,7 +235,12 @@ func (f *docxField) Update() error {
 	case domain.FieldTypeNumPages:
 		f.result = "1" // Placeholder - actual value determined by Word
 	case domain.FieldTypeTOC:
-		f.result = "Table of Contents" // Placeholder
+		// A result the caller set with SetResult (e.g. a pre-rendered list
+		// of entries) is kept: a dirty TOC still gets rebuilt by Word on
+		// open, and until then the caller's text is better than this one.
+		if f.result == "" {
+			f.result = "Table of Contents" // Placeholder
+		}
 	case domain.FieldTypeStyleRef:
 		f.result = "" // Placeholder - populated by Word
 	case domain.FieldTypeHyperlink:

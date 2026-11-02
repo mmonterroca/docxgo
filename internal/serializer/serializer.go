@@ -576,13 +576,30 @@ func (s *ParagraphSerializer) expandRunWithFields(run domain.Run, fields []domai
 		sepRun := &xml.Run{FieldChar: xml.NewFieldSeparate()}
 		elements = append(elements, sepRun)
 
+		// A multi-line result ("\n"-separated, e.g. a pre-rendered TOC) is
+		// written as one run per line with a w:br between them, so it shows
+		// as separate lines until Word recalculates the field.
 		resultText := field.Result()
 		if resultText != "" {
-			resultRun := &xml.Run{
-				Properties: s.runSerializer.serializeProperties(run),
-				Text:       &xml.Text{Content: resultText},
+			for i, line := range strings.Split(resultText, "\n") {
+				if i > 0 {
+					elements = append(elements, &xml.Run{
+						Properties: s.runSerializer.serializeProperties(run),
+						Break:      &xml.Break{},
+					})
+				}
+				if line == "" {
+					continue
+				}
+				text := &xml.Text{Content: line}
+				if strings.TrimSpace(line) != line {
+					text.Space = "preserve"
+				}
+				elements = append(elements, &xml.Run{
+					Properties: s.runSerializer.serializeProperties(run),
+					Text:       text,
+				})
 			}
-			elements = append(elements, resultRun)
 		}
 
 		endRun := &xml.Run{FieldChar: xml.NewFieldEnd()}
