@@ -640,6 +640,69 @@ func applyParagraphProperties(para domain.Paragraph, props *Element) error {
 	if err := applyParagraphNumbering(para, props); err != nil {
 		return err
 	}
+	if err := applyParagraphShading(para, props); err != nil {
+		return err
+	}
+	return applyParagraphKeep(para, props)
+}
+
+// applyParagraphShading hydrates a w:pPr/w:shd. Which attribute holds the
+// visible colour depends on the pattern, exactly as in applyCellShading:
+// "clear" (or no w:val) shows w:fill, "solid" shows w:color, and any real
+// pattern blends the two, which a single flat colour can't represent, so it
+// is left alone. A theme-linked fill only keeps its cached hex value here --
+// the paragraph domain has no theme link.
+func applyParagraphShading(para domain.Paragraph, props *Element) error {
+	shdElem := findWordChild(props, "shd")
+	if shdElem == nil {
+		return nil
+	}
+	val, _ := getWordAttr(shdElem, "val")
+	var source string
+	switch {
+	case val == "" || strings.EqualFold(val, "clear"):
+		source = "fill"
+	case strings.EqualFold(val, "solid"):
+		source = "color"
+	default:
+		return nil
+	}
+	raw, ok := getWordAttr(shdElem, source)
+	if !ok || !isHexRGB(raw) {
+		return nil
+	}
+	clr, err := pkgcolor.FromHex(raw)
+	if err != nil {
+		return nil
+	}
+	if err := para.SetShading(clr); err != nil {
+		return errors.Wrap(err, "applyParagraphShading")
+	}
+	return nil
+}
+
+// applyParagraphKeep hydrates w:keepNext/w:keepLines. A bare element means
+// on; w:val="0"/"false"/"off" is an explicit off that overrides the style.
+func applyParagraphKeep(para domain.Paragraph, props *Element) error {
+	for _, item := range []struct {
+		name string
+		set  func(bool) error
+	}{
+		{"keepNext", para.SetKeepNext},
+		{"keepLines", para.SetKeepLines},
+	} {
+		elem := findWordChild(props, item.name)
+		if elem == nil {
+			continue
+		}
+		on := true
+		if v, ok := getWordAttr(elem, "val"); ok {
+			on = parseBoolAttr(v)
+		}
+		if err := item.set(on); err != nil {
+			return errors.Wrap(err, "applyParagraphKeep")
+		}
+	}
 	return nil
 }
 

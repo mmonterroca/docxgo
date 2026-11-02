@@ -50,13 +50,16 @@ type BookmarkEnd struct {
 // Element order follows ISO/IEC 29500 (OOXML) schema sequence requirements.
 type ParagraphProperties struct {
 	XMLName           xml.Name             `xml:"w:pPr"`
-	Style             *ParagraphStyleRef   `xml:"w:pStyle,omitempty"`  // 1. pStyle
-	Numbering         *NumberingProperties `xml:"w:numPr,omitempty"`   // 2. numPr (after pStyle, before pBdr)
-	Borders           *ParagraphBorders    `xml:"w:pBdr,omitempty"`    // 3. pBdr
-	Spacing           *Spacing             `xml:"w:spacing,omitempty"` // 4. spacing
-	Indentation       *Indentation         `xml:"w:ind,omitempty"`     // 5. ind
-	Justification     *Justification       `xml:"w:jc,omitempty"`      // 6. jc (near the end)
-	SectionProperties *SectionProperties   `xml:"w:sectPr,omitempty"`  // 7. sectPr (always last)
+	Style             *ParagraphStyleRef   `xml:"w:pStyle,omitempty"`    // 1. pStyle
+	KeepNext          *BoolValue           `xml:"w:keepNext,omitempty"`  // 2. keepNext
+	KeepLines         *BoolValue           `xml:"w:keepLines,omitempty"` // 3. keepLines
+	Numbering         *NumberingProperties `xml:"w:numPr,omitempty"`     // 4. numPr (after pStyle, before pBdr)
+	Borders           *ParagraphBorders    `xml:"w:pBdr,omitempty"`      // 5. pBdr
+	Shading           *Shading             `xml:"w:shd,omitempty"`       // 6. shd (right after pBdr)
+	Spacing           *Spacing             `xml:"w:spacing,omitempty"`   // 7. spacing
+	Indentation       *Indentation         `xml:"w:ind,omitempty"`       // 8. ind
+	Justification     *Justification       `xml:"w:jc,omitempty"`        // 9. jc (near the end)
+	SectionProperties *SectionProperties   `xml:"w:sectPr,omitempty"`    // 10. sectPr (always last)
 }
 
 // ParagraphBorders represents w:pBdr element (paragraph borders).

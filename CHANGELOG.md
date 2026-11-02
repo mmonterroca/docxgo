@@ -1,3 +1,16 @@
+## Unreleased
+
+### Added
+
+- **Paragraph shading:** `Paragraph.Shading() (Color, bool)`, `SetShading(Color)` and `ClearShading()` write `<w:shd w:val="clear" w:fill="RRGGBB"/>` in `w:pPr`, right after `w:pBdr` as CT_PPrBase requires. The bool tells "unset" apart from black, which is `Color`'s zero value. The reader hydrates a source `w:shd` with the same clear/solid rules as cell shading. `ParagraphBuilder.Shading(Color)` is the builder entry point.
+- **Paragraph keep-with-next / keep-lines-together:** `Paragraph.KeepNext()`, `SetKeepNext(bool)`, `KeepLines()` and `SetKeepLines(bool)` write `w:keepNext`/`w:keepLines` right after `w:pStyle`. An explicit `false` is written as `w:val="false"`, so it overrides a style; the reader hydrates both. `ParagraphBuilder.KeepNext()` is the builder entry point.
+
+### Compatibility
+
+- These are new methods on the `domain.Paragraph` interface. Code that only uses docxgo's own paragraphs needs no change; an external type implementing `domain.Paragraph` must add them.
+
+---
+
 ## v2.14.0 - 2026-08-26
 
 ### Added

@@ -135,6 +135,38 @@ type Paragraph interface {
 	// SetBorderRight sets the right border.
 	SetBorderRight(border BorderStyle) error
 
+	// Shading returns the paragraph's background fill and whether one was
+	// set. The bool is what tells "no shading" apart from a black fill:
+	// Color's zero value is black, so the colour alone can't.
+	Shading() (Color, bool)
+
+	// SetShading paints the paragraph's background with a flat fill, written
+	// as <w:shd w:val="clear" w:fill="RRGGBB"/> in w:pPr. The fill covers the
+	// paragraph's text area between its indents; consecutive paragraphs with
+	// the same fill and no spacing between them render as one band.
+	SetShading(fill Color) error
+
+	// ClearShading removes any background set by SetShading (or read from a
+	// source document), so the paragraph inherits its style's shading again.
+	ClearShading()
+
+	// KeepNext reports whether the paragraph is kept on the same page as the
+	// next one (w:keepNext).
+	KeepNext() bool
+
+	// SetKeepNext keeps the paragraph on the same page as the next one, e.g.
+	// an image and its caption. Once called, the value is always written,
+	// so SetKeepNext(false) also overrides a style that turns keepNext on.
+	SetKeepNext(keep bool) error
+
+	// KeepLines reports whether all lines of the paragraph are kept on the
+	// same page (w:keepLines).
+	KeepLines() bool
+
+	// SetKeepLines keeps all lines of the paragraph on one page. Like
+	// SetKeepNext, an explicit false is written too.
+	SetKeepLines(keep bool) error
+
 	// ClearRuns removes all runs from the paragraph.
 	ClearRuns()
 

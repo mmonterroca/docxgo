@@ -702,7 +702,44 @@ func (s *ParagraphSerializer) serializeProperties(para domain.Paragraph) *xml.Pa
 		}
 	}
 
+	// Shading: w:val="clear" draws no pattern, so w:fill is the colour a
+	// reader sees -- the same form TableSerializer writes for a cell.
+	if fill, ok := para.Shading(); ok {
+		props.Shading = &xml.Shading{Val: "clear", Color: "auto", Fill: color.ToHex(fill)}
+	}
+
+	// keepNext/keepLines: a true value is the bare element; an explicit
+	// false is written as w:val="false" so it overrides a style that turns
+	// the property on. Never-set stays absent.
+	keepNextSet, keepLinesSet := keepSetFlags(para)
+	props.KeepNext = onOffElement(para.KeepNext(), keepNextSet)
+	props.KeepLines = onOffElement(para.KeepLines(), keepLinesSet)
+
 	return props
+}
+
+// keepSetFlags reads the concrete paragraph's explicit-set flags for
+// keepNext/keepLines. A domain.Paragraph that doesn't expose them degrades
+// to false, so only a true value gets written for it.
+func keepSetFlags(para domain.Paragraph) (keepNextSet, keepLinesSet bool) {
+	if p, ok := para.(interface{ KeepNextSet() bool }); ok {
+		keepNextSet = p.KeepNextSet()
+	}
+	if p, ok := para.(interface{ KeepLinesSet() bool }); ok {
+		keepLinesSet = p.KeepLinesSet()
+	}
+	return keepNextSet, keepLinesSet
+}
+
+func onOffElement(value, set bool) *xml.BoolValue {
+	switch {
+	case value:
+		return &xml.BoolValue{}
+	case set:
+		return &xml.BoolValue{Val: boolPtr(false)}
+	default:
+		return nil
+	}
 }
 
 func (s *ParagraphSerializer) hasBorders(borders domain.ParagraphBorders) bool {
