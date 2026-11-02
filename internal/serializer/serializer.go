@@ -1033,14 +1033,22 @@ func (s *TableSerializer) serializeRow(row domain.TableRow) *xml.TableRow {
 		Cells: make([]*xml.TableCell, 0, len(row.Cells())),
 	}
 
-	// Height
+	// Height, cantSplit, tblHeader
+	props := &xml.TableRowProperties{}
 	if row.Height() > 0 {
-		xmlRow.Properties = &xml.TableRowProperties{
-			Height: &xml.TableRowHeight{
-				Val:  row.Height(),
-				Rule: "atLeast",
-			},
+		props.Height = &xml.TableRowHeight{
+			Val:  row.Height(),
+			Rule: "atLeast",
 		}
+	}
+	if row.CantSplit() {
+		props.CantSplit = &xml.BoolValue{}
+	}
+	if row.RepeatAsHeader() {
+		props.Header = &xml.BoolValue{}
+	}
+	if props.Height != nil || props.CantSplit != nil || props.Header != nil {
+		xmlRow.Properties = props
 	}
 
 	// Serialize cells, skipping horizontal merge continuations

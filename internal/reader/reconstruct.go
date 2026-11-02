@@ -2888,6 +2888,25 @@ func applyRowProperties(row domain.TableRow, elem *Element) error {
 		return nil
 	}
 
+	// w:tblHeader / w:cantSplit: a bare element is on, w:val="0"/"false" off.
+	for _, item := range []struct {
+		name string
+		set  func(bool) error
+	}{
+		{"tblHeader", row.SetRepeatAsHeader},
+		{"cantSplit", row.SetCantSplit},
+	} {
+		if e := findWordChild(trPr, item.name); e != nil {
+			on := true
+			if v, ok := getWordAttr(e, "val"); ok {
+				on = parseBoolAttr(v)
+			}
+			if err := item.set(on); err != nil {
+				return errors.WrapWithContext(err, opHydrateTable, map[string]interface{}{"attr": item.name})
+			}
+		}
+	}
+
 	heightElem := findWordChild(trPr, "trHeight")
 	if heightElem == nil {
 		return nil
