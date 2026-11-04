@@ -1,3 +1,11 @@
+## Unreleased
+
+### Added
+
+- **`paragraph.remove` and `table.remove` CLI/RPC methods** expose `Document.RemoveBlock` through the JSON-RPC protocol and the Node.js wrapper. `paragraph.remove` addresses the same index `paragraph.list` reports, and `table.remove` the same index `table.list` reports — each maps internally to the paragraph's or table's position in the document's block list before removing it, so a document opened from a file keeps the rest of `word/document.xml` byte-for-byte. Indices shift after each removal, same as `Blocks()` itself. `system.capabilities` reports `removeBlock: true` for feature detection.
+
+---
+
 ## v2.16.0 - 2026-11-03
 
 ### Added

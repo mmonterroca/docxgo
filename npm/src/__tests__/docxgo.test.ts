@@ -8,7 +8,7 @@ import { DocxgoRPC, DocxgoExec, DocumentBuilder, DocxgoError, resolveBinary } fr
 import type {
   BufferResult, FileResult, InspectResult, ParagraphListResult, TableListResult,
   PingResult, SystemVersionResult, SystemCapabilitiesResult, BatchResult,
-  TemplateInspectResult, TemplateRenderResult, ApplyPatchResult,
+  TemplateInspectResult, TemplateRenderResult, ApplyPatchResult, IndexResult,
 } from '../types';
 
 const BINARY = join(__dirname, '..', '..', 'bin', 'docxgo');
@@ -253,6 +253,148 @@ describe('DocxgoRPC', () => {
         return true;
       },
     );
+  });
+
+  // createMultiBlockDocument builds a document with three body paragraphs
+  // ("First", "Second", "Third") interleaved with two one-cell tables
+  // ("Cell A", "Cell B"), so paragraph.list and table.list each report their
+  // own, denser indexing even though the underlying block list also holds
+  // the tables between the paragraphs. Used to exercise paragraph.remove /
+  // table.remove and the index shifting that follows a removal.
+  async function createMultiBlockDocument(): Promise<string> {
+    const cell = (text: string) => ({
+      type: 'table' as const,
+      rows: [{ cells: [{ paragraphs: [{ runs: [{ text }] }] }] }],
+    });
+    const paragraph = (text: string) => ({
+      type: 'paragraph' as const,
+      runs: [{ text }],
+    });
+    const createResult = await rpc.call<BufferResult>('document.create', {
+      content: [
+        paragraph('First'),
+        cell('Cell A'),
+        paragraph('Second'),
+        cell('Cell B'),
+        paragraph('Third'),
+      ],
+      output: 'buffer',
+    });
+    return createResult.documentId;
+  }
+
+  it('removes a paragraph by index and shifts later indices', async () => {
+    const docId = await createMultiBlockDocument();
+
+    const removeResult = await rpc.call<IndexResult>('paragraph.remove', {
+      documentId: docId,
+      index: 1, // "Second"
+    });
+    assert.deepEqual(removeResult, { ok: true, index: 1 });
+
+    const paraList = await rpc.call<ParagraphListResult>('paragraph.list', { documentId: docId });
+    assert.deepEqual(paraList.paragraphs.map((p) => p.text), ['First', 'Third']);
+
+    // The tables, which sit between the removed paragraph and its
+    // neighbors in the block list, must be untouched.
+    const tableList = await rpc.call<TableListResult>('table.list', { documentId: docId });
+    assert.equal(tableList.count, 2);
+
+    await rpc.call('document.close', { documentId: docId });
+  });
+
+  it('removes a table by index and shifts later indices', async () => {
+    const docId = await createMultiBlockDocument();
+
+    const removeResult = await rpc.call<IndexResult>('table.remove', {
+      documentId: docId,
+      index: 0, // "Cell A"
+    });
+    assert.deepEqual(removeResult, { ok: true, index: 0 });
+
+    const tableList = await rpc.call<TableListResult>('table.list', {
+      documentId: docId,
+      includeText: true,
+    });
+    assert.equal(tableList.count, 1);
+    assert.deepEqual(tableList.tables[0].cells, [['Cell B']]);
+
+    // The paragraphs, which sit around and between the removed table, must
+    // be untouched.
+    const paraList = await rpc.call<ParagraphListResult>('paragraph.list', { documentId: docId });
+    assert.deepEqual(paraList.paragraphs.map((p) => p.text), ['First', 'Second', 'Third']);
+
+    await rpc.call('document.close', { documentId: docId });
+  });
+
+  it('rejects an out-of-range paragraph.remove index without mutating the document', async () => {
+    const docId = await createMultiBlockDocument();
+
+    await assert.rejects(
+      () => rpc.call('paragraph.remove', { documentId: docId, index: 99 }),
+      (err: unknown) => {
+        assert.ok(err instanceof DocxgoError);
+        assert.equal(err.code, 'VALIDATION_ERROR');
+        return true;
+      },
+    );
+
+    const paraList = await rpc.call<ParagraphListResult>('paragraph.list', { documentId: docId });
+    assert.deepEqual(paraList.paragraphs.map((p) => p.text), ['First', 'Second', 'Third']);
+
+    await rpc.call('document.close', { documentId: docId });
+  });
+
+  it('rejects an out-of-range table.remove index without mutating the document', async () => {
+    const docId = await createMultiBlockDocument();
+
+    await assert.rejects(
+      () => rpc.call('table.remove', { documentId: docId, index: 99 }),
+      (err: unknown) => {
+        assert.ok(err instanceof DocxgoError);
+        assert.equal(err.code, 'VALIDATION_ERROR');
+        return true;
+      },
+    );
+
+    const tableList = await rpc.call<TableListResult>('table.list', { documentId: docId });
+    assert.equal(tableList.count, 2);
+
+    await rpc.call('document.close', { documentId: docId });
+  });
+
+  it('keeps untouched content intact when removing a block from an opened document', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'docxgo-remove-block-'));
+    const docPath = join(tmpDir, 'remove-block.docx');
+    const editedPath = join(tmpDir, 'remove-block-edited.docx');
+
+    const docId = await createMultiBlockDocument();
+    await rpc.call('document.save', { documentId: docId, output: 'file', filePath: docPath });
+    await rpc.call('document.close', { documentId: docId });
+
+    const openResult = await rpc.call<{ documentId: string }>('document.open', { filePath: docPath });
+    const openedId = openResult.documentId;
+
+    await rpc.call('paragraph.remove', { documentId: openedId, index: 1 }); // "Second"
+    await rpc.call('table.remove', { documentId: openedId, index: 0 }); // "Cell A"
+    await rpc.call('document.save', { documentId: openedId, output: 'file', filePath: editedPath });
+    await rpc.call('document.close', { documentId: openedId });
+
+    const reopenResult = await rpc.call<{ documentId: string }>('document.open', { filePath: editedPath });
+    const reopenedId = reopenResult.documentId;
+
+    const paraList = await rpc.call<ParagraphListResult>('paragraph.list', { documentId: reopenedId });
+    assert.deepEqual(paraList.paragraphs.map((p) => p.text), ['First', 'Third']);
+
+    const tableList = await rpc.call<TableListResult>('table.list', {
+      documentId: reopenedId,
+      includeText: true,
+    });
+    assert.equal(tableList.count, 1);
+    assert.deepEqual(tableList.tables[0].cells, [['Cell B']]);
+
+    await rpc.call('document.close', { documentId: reopenedId });
+    rmSync(tmpDir, { recursive: true });
   });
 });
 

@@ -120,6 +120,8 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleParagraphList(req)
 	case "paragraph.setText":
 		return s.handleParagraphSetText(req)
+	case "paragraph.remove":
+		return s.handleParagraphRemove(req)
 	// table.*
 	case "table.add":
 		return s.handleTableAdd(req)
@@ -129,6 +131,8 @@ func (s *server) dispatch(req *Request) Response {
 		return s.handleTableGetCell(req)
 	case "table.setCell":
 		return s.handleTableSetCell(req)
+	case "table.remove":
+		return s.handleTableRemove(req)
 	// section.*
 	case "section.add":
 		return s.handleSectionAdd(req)
@@ -323,6 +327,25 @@ type paragraphSetTextParams struct {
 	DocumentID string `json:"documentId"`
 	Index      *int   `json:"index"`
 	paragraphItem
+}
+
+// paragraphRemoveParams are the parameters for paragraph.remove. Index is
+// the body-paragraph index as reported by paragraph.list, not a position in
+// Blocks() — the handler maps one to the other internally.
+//
+// Index is a pointer for the same reason as paragraphSetTextParams.Index: an
+// omitted field must be rejected rather than defaulting to 0 and silently
+// removing the first paragraph.
+type paragraphRemoveParams struct {
+	DocumentID string `json:"documentId"`
+	Index      *int   `json:"index"`
+}
+
+// tableRemoveParams are the parameters for table.remove. Index is the table
+// index as reported by table.list, not a position in Blocks().
+type tableRemoveParams struct {
+	DocumentID string `json:"documentId"`
+	Index      *int   `json:"index"`
 }
 
 // tableCellRef addresses a single cell, shared by table.getCell and
@@ -1090,6 +1113,79 @@ func (s *server) handleParagraphSetText(req *Request) Response {
 	}}
 }
 
+func (s *server) handleParagraphRemove(req *Request) Response {
+	const op = "paragraph.remove"
+
+	var params paragraphRemoveParams
+	if err := decodeStrict(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+	if params.Index == nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "index is required", op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	paragraphs := doc.Paragraphs()
+	index := *params.Index
+	if index < 0 || index >= len(paragraphs) {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			fmt.Sprintf("paragraph index %d out of range (document has %d paragraphs)",
+				index, len(paragraphs)), op)
+	}
+
+	// paragraph.list (and this method's index) address doc.Paragraphs(), but
+	// RemoveBlock addresses doc.Blocks(), a different slice that also
+	// includes tables and section breaks. Resolve the target paragraph to
+	// its position in Blocks() by identity before removing it.
+	blockIndex, found := blockIndexForParagraph(doc, paragraphs[index])
+	if !found {
+		return errorResponse(req.ID, errors.ErrCodeInternal,
+			fmt.Sprintf("paragraph %d is not a removable top-level block", index), op)
+	}
+
+	if err := doc.RemoveBlock(blockIndex); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":    true,
+		"index": index,
+	}}
+}
+
+// blockIndexForParagraph returns the index into doc.Blocks() of the block
+// wrapping p, matched by identity — the same comparison RemoveBlock itself
+// uses internally. paragraph.list and paragraph.remove address
+// doc.Paragraphs(), a different slice from doc.Blocks(), so the two must be
+// reconciled before calling RemoveBlock. The second result is false if p is
+// not found among the top-level blocks (not currently reachable through the
+// public API, since every paragraph in Paragraphs() is also a block, but
+// checked defensively rather than assumed).
+func blockIndexForParagraph(doc domain.Document, p domain.Paragraph) (int, bool) {
+	for i, b := range doc.Blocks() {
+		if b.Paragraph == p {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+// blockIndexForTable returns the index into doc.Blocks() of the block
+// wrapping t, matched by identity. See blockIndexForParagraph.
+func blockIndexForTable(doc domain.Document, t domain.Table) (int, bool) {
+	for i, b := range doc.Blocks() {
+		if b.Table == t {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
 // decodeStrict decodes data into v, rejecting a literal null and any field v
 // does not declare. Plain json.Unmarshal accepts both silently: a misspelled
 // field name or a null array element would otherwise decode to a zero value
@@ -1290,6 +1386,47 @@ func (s *server) handleTableSetCell(req *Request) Response {
 	return Response{ID: req.ID, Result: map[string]interface{}{
 		"ok":             true,
 		"paragraphCount": len(cell.Paragraphs()),
+	}}
+}
+
+func (s *server) handleTableRemove(req *Request) Response {
+	const op = "table.remove"
+
+	var params tableRemoveParams
+	if err := decodeStrict(req.Params, &params); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "invalid params: "+err.Error(), op)
+	}
+	if params.Index == nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, "index is required", op)
+	}
+
+	doc, ok := s.getDoc(params.DocumentID)
+	if !ok {
+		return errorResponse(req.ID, errors.ErrCodeNotFound,
+			fmt.Sprintf("document %q not found", params.DocumentID), op)
+	}
+
+	tables := doc.Tables()
+	index := *params.Index
+	if index < 0 || index >= len(tables) {
+		return errorResponse(req.ID, errors.ErrCodeValidation,
+			fmt.Sprintf("table index %d out of range (document has %d tables)",
+				index, len(tables)), op)
+	}
+
+	blockIndex, found := blockIndexForTable(doc, tables[index])
+	if !found {
+		return errorResponse(req.ID, errors.ErrCodeInternal,
+			fmt.Sprintf("table %d is not a removable top-level block", index), op)
+	}
+
+	if err := doc.RemoveBlock(blockIndex); err != nil {
+		return errorResponse(req.ID, errors.ErrCodeValidation, err.Error(), op)
+	}
+
+	return Response{ID: req.ID, Result: map[string]interface{}{
+		"ok":    true,
+		"index": index,
 	}}
 }
 
