@@ -1,3 +1,19 @@
+## Unreleased
+
+### Added
+
+- **`Document.RemoveBlock(index int) error`** removes the top-level paragraph or table at an index into `Blocks()` (#124, PR #125; contributed by @coffee-realist). For a document opened from a file, the removed element is omitted on save and the rest of `word/document.xml` is written back byte-for-byte. A paragraph that carries a mid-document `w:sectPr` can be removed without losing the section break, and a bookmark or comment range that crosses the removed paragraph loses its unmatched half instead of leaving it dangling. Section breaks cannot be removed. Remove several blocks in descending index order, since indices shift after each removal.
+
+### Fixed
+
+- **Runs whose text is only whitespace are no longer dropped on read** (#126, PR #127; contributed by @coffee-realist). A run like `<w:t xml:space="preserve"> </w:t>`, which Word often writes between two differently formatted words, was skipped when the document was opened. Untouched paragraphs were still written back verbatim, but an edited paragraph lost the space and the words around it were glued together. A lone no-break space was lost the same way, and a field instruction split around a space-only `w:instrText` read back as `PAGE\* MERGEFORMAT`. Whitespace-only text is now kept when `xml:space="preserve"` applies to it, set on the element or inherited, as XML 1.0 defines it. A no-break space is always kept. Without `preserve`, whitespace-only text is still ignored, since Word doesn't show it either.
+
+### Compatibility
+
+- **`domain.Document` gained `RemoveBlock`.** Code that only uses docxgo's own types needs no change. If you implement `domain.Document` with your own type, most commonly a hand-written test double, you must add the method; embedding `domain.Document` in your type is unaffected. Unlike what the v2.6.0 note said about this interface, `pkg/template` has accepted a caller-provided `domain.Document` (`MergeTemplate`, `ValidateTemplate`, `ReplaceText`, `FindPlaceholders`, `FindPlaceholdersCustom`, `PlaceholderNames`). This is still a minor release for the same reason as the `domain.Paragraph` additions in v2.15.0: the interface describes a type docxgo itself returns, not an extension point.
+
+---
+
 ## v2.15.0 - 2026-11-01
 
 ### Added
