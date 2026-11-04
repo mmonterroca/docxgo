@@ -230,6 +230,7 @@ Returns a map of supported features for the current binary.
   "setLanguage": true,
   "replaceText": true,
   "cellEdit": true,
+  "removeBlock": true,
   "streaming": false,
   "partialUpdate": false
 }

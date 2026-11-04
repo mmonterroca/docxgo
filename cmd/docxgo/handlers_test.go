@@ -2972,6 +2972,9 @@ func TestHandleSystemCapabilities(t *testing.T) {
 	if !result["cellEdit"] {
 		t.Error("expected cellEdit capability to be true")
 	}
+	if !result["removeBlock"] {
+		t.Error("expected removeBlock capability to be true")
+	}
 }
 
 // ─── System batch tests ──────────────────────────────────────────────────────

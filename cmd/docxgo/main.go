@@ -89,6 +89,7 @@ func capabilitiesMap() map[string]bool {
 		"setLanguage":   true,
 		"replaceText":   true,
 		"cellEdit":      true,
+		"removeBlock":   true,
 		"streaming":     false,
 		"partialUpdate": false,
 	}
