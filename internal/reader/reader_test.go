@@ -438,6 +438,40 @@ func TestDocumentNamespacesRetainsOriginalPrefixBindings(t *testing.T) {
 	}
 }
 
+// Whitespace between child elements is indentation and stays out of Text.
+// In an element without children it is the content itself when
+// xml:space="preserve" applies, set on the element or inherited, and is not
+// significant otherwise. A no-break space is not XML whitespace.
+func TestParseXMLTreeWhitespaceOnlyTextOfLeafElements(t *testing.T) {
+	tests := []struct {
+		name, runAttr, text, want string
+	}{
+		{name: "preserve", text: `<w:t xml:space="preserve"> </w:t>`, want: " "},
+		{name: "no preserve", text: `<w:t> </w:t>`, want: ""},
+		{name: "inherited preserve", runAttr: ` xml:space="preserve"`, text: `<w:t> </w:t>`, want: " "},
+		{name: "overridden preserve", runAttr: ` xml:space="preserve"`, text: `<w:t xml:space="default"> </w:t>`, want: ""},
+		{name: "no-break space", text: "<w:t> </w:t>", want: " "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tree, err := parseXMLTree([]byte(`<w:r xmlns:w="` + constants.NamespaceMain + `"` + tt.runAttr + ">\n  " + tt.text + "\n</w:r>"))
+			if err != nil {
+				t.Fatalf("parseXMLTree: %v", err)
+			}
+			if tree.Text != "" {
+				t.Errorf("w:r Text = %q, want indentation ignored", tree.Text)
+			}
+			text := findChild(tree, "t")
+			if text == nil {
+				t.Fatal("w:t not found")
+			}
+			if text.Text != tt.want {
+				t.Errorf("w:t Text = %q, want %q", text.Text, tt.want)
+			}
+		})
+	}
+}
+
 type capturedBookmarkIDs []string
 
 func (ids *capturedBookmarkIDs) ObserveHydratedBookmarkID(id string) {
@@ -2527,6 +2561,75 @@ func TestReconstructRunContentExtensions(t *testing.T) {
 	}
 	if hyperFieldURL != "https://example.com" {
 		t.Fatalf("unexpected hyperlink url: %q", hyperFieldURL)
+	}
+}
+
+// A run whose only text is a space separates the words around it. Dropping
+// it on read glued "Hello" and "world" together once the paragraph was
+// edited and rewritten from the model. A no-break space (U+00A0) counts as
+// whitespace for bytes.TrimSpace too, so it was dropped the same way.
+func TestReconstructRunWithWhitespaceOnlyTextSurvivesEdit(t *testing.T) {
+	for _, space := range []string{" ", "\u00a0"} {
+		doc := reconstructFromBookmarkBody(t, `<w:p><w:r><w:t>Hello</w:t></w:r><w:r><w:t xml:space="preserve">`+space+`</w:t></w:r><w:r><w:t>world</w:t></w:r></w:p>`)
+
+		para := doc.Paragraphs()[0]
+		if got, want := para.Text(), "Hello"+space+"world"; got != want {
+			t.Fatalf("Text() = %q, want %q", got, want)
+		}
+		if n := len(para.Runs()); n != 3 {
+			t.Fatalf("%q: len(Runs()) = %d, want 3", space, n)
+		}
+
+		if err := para.SetAlignment(domain.AlignmentCenter); err != nil {
+			t.Fatalf("SetAlignment: %v", err)
+		}
+		var buf bytes.Buffer
+		if _, err := doc.WriteTo(&buf); err != nil {
+			t.Fatalf("WriteTo: %v", err)
+		}
+		if written := documentXML(t, buf.Bytes()); !strings.Contains(written, ">"+space+"</w:t>") {
+			t.Errorf("%q: edited paragraph lost the space run:\n%s", space, written)
+		}
+	}
+}
+
+// Without xml:space="preserve" a whitespace-only w:t is not significant and
+// Word does not show it, so editing the paragraph must not make it visible.
+func TestReconstructRunWithInsignificantWhitespaceStaysHidden(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:r><w:t>Hello</w:t></w:r><w:r><w:t> </w:t></w:r><w:r><w:t>world</w:t></w:r></w:p>`)
+
+	para := doc.Paragraphs()[0]
+	if got, want := para.Text(), "Helloworld"; got != want {
+		t.Fatalf("Text() = %q, want %q", got, want)
+	}
+	if err := para.SetAlignment(domain.AlignmentCenter); err != nil {
+		t.Fatalf("SetAlignment: %v", err)
+	}
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	if written := documentXML(t, buf.Bytes()); strings.Contains(written, "> </w:t>") {
+		t.Errorf("edited paragraph made the space visible:\n%s", written)
+	}
+}
+
+// Word splits field instructions across runs, sometimes with a run that
+// holds only the space between the field name and its switches.
+func TestReconstructFieldInstructionKeepsWhitespaceOnlyPart(t *testing.T) {
+	doc := reconstructFromBookmarkBody(t, `<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r>`+
+		`<w:r><w:instrText>PAGE</w:instrText></w:r><w:r><w:instrText xml:space="preserve"> </w:instrText></w:r>`+
+		`<w:r><w:instrText>\* MERGEFORMAT</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>`+
+		`<w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>`)
+
+	var codes []string
+	for _, run := range doc.Paragraphs()[0].Runs() {
+		for _, field := range run.Fields() {
+			codes = append(codes, field.Code())
+		}
+	}
+	if len(codes) != 1 || codes[0] != `PAGE \* MERGEFORMAT` {
+		t.Errorf("field codes = %q, want [%q]", codes, `PAGE \* MERGEFORMAT`)
 	}
 }
 
