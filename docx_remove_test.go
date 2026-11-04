@@ -115,6 +115,51 @@ func TestRemoveBlock(t *testing.T) {
 	}
 }
 
+// Removing every block leaves a document that saves and reopens empty.
+// Validate reports it as empty, the same as for a new document.
+func TestRemoveBlockEveryBlock(t *testing.T) {
+	doc := NewDocument()
+	addTextParagraph(t, doc, "A")
+	if _, err := doc.AddTable(1, 1); err != nil {
+		t.Fatalf("AddTable: %v", err)
+	}
+	addTextParagraph(t, doc, "B")
+
+	opened := reopen(t, doc)
+	for i := len(opened.Blocks()) - 1; i >= 0; i-- {
+		if err := opened.RemoveBlock(i); err != nil {
+			t.Fatalf("RemoveBlock(%d): %v", i, err)
+		}
+	}
+	if err := opened.Validate(); err == nil {
+		t.Error("Validate() = nil, want empty-document error")
+	}
+	if got := blockTexts(reopen(t, opened)); len(got) != 0 {
+		t.Errorf("blocks after save = %q, want none", got)
+	}
+}
+
+// A body-level content control is not part of Blocks(), so it can't be
+// removed, and removing its neighbour writes it back as it was.
+func TestRemoveBlockKeepsContentControl(t *testing.T) {
+	const sdt = `<w:sdt><w:sdtContent><w:p><w:r><w:t>inside</w:t></w:r></w:p></w:sdtContent></w:sdt>`
+	doc := openBody(t, sdt+`<w:p><w:r><w:t>B</w:t></w:r></w:p><w:sectPr/>`)
+	if got, want := blockTexts(doc), []string{"B"}; !slices.Equal(got, want) {
+		t.Fatalf("blocks = %q, want %q", got, want)
+	}
+	if err := doc.RemoveBlock(0); err != nil {
+		t.Fatalf("RemoveBlock(0): %v", err)
+	}
+
+	written := readZipPart(t, doc, constants.PathDocument)
+	if !strings.Contains(written, sdt) {
+		t.Errorf("content control was not written back as it was:\n%s", written)
+	}
+	if strings.Contains(written, "<w:t>B</w:t>") {
+		t.Errorf("removed paragraph survived the save:\n%s", written)
+	}
+}
+
 func TestRemoveBlockErrors(t *testing.T) {
 	doc := NewDocument()
 	addTextParagraph(t, doc, "A")

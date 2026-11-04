@@ -111,6 +111,11 @@ type Document interface {
 	// Blocks returns all top-level content elements (paragraphs, tables,
 	// and section breaks) in the order they were added to the document.
 	// The returned slice is a copy and modifications won't affect the document.
+	//
+	// For a document opened from a file, body content the model does not
+	// represent, such as a body-level content control (w:sdt) and the
+	// paragraphs inside it, is not part of Blocks(). It is written back as
+	// it was on save.
 	Blocks() []Block
 
 	// RemoveBlock removes the top-level paragraph or table at index,
@@ -128,6 +133,10 @@ type Document interface {
 	// half on save; other multi-paragraph constructs, such as a field like a
 	// TOC, are left as they are. Removing the only paragraph between two
 	// tables makes Word render them as one table.
+	//
+	// Content that is not part of Blocks(), such as a body-level content
+	// control, cannot be removed this way. Removing every block leaves a
+	// document that still saves, but Validate reports it as empty.
 	RemoveBlock(index int) error
 
 	// WriteTo writes the document to the provided writer in .docx format.
