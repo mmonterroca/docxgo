@@ -26,6 +26,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -328,6 +329,40 @@ func (d *document) Blocks() []domain.Block {
 	blocks := make([]domain.Block, len(d.blocks))
 	copy(blocks, d.blocks)
 	return blocks
+}
+
+// RemoveBlock removes the top-level paragraph or table at index in Blocks().
+//
+// Removal is only a matter of dropping the block from d.blocks
+// (and from d.paragraphs/d.tables): composeRoundTripMainDocument already skips
+// every source body entry whose blocks are no longer present and writes the
+// untouched entries back verbatim.
+// A paragraph that also carries a section break is handled by composeSectionCarrier,
+// which keeps the sectPr.
+func (d *document) RemoveBlock(index int) error {
+	const op = "Document.RemoveBlock"
+
+	if index < 0 || index >= len(d.blocks) {
+		return errors.InvalidArgument(op, "index", index, "block index out of range")
+	}
+
+	block := d.blocks[index]
+	switch {
+	case block.Paragraph != nil:
+		d.paragraphs = slices.DeleteFunc(d.paragraphs, func(p domain.Paragraph) bool {
+			return p == block.Paragraph
+		})
+	case block.Table != nil:
+		d.tables = slices.DeleteFunc(d.tables, func(t domain.Table) bool {
+			return t == block.Table
+		})
+	default:
+		return errors.InvalidArgument(op, "index", index, "section breaks cannot be removed")
+	}
+
+	d.blocks = slices.Delete(d.blocks, index, index+1)
+
+	return nil
 }
 
 // generateHeadingBookmarks generates bookmarks for all headings in the document.

@@ -113,6 +113,23 @@ type Document interface {
 	// The returned slice is a copy and modifications won't affect the document.
 	Blocks() []Block
 
+	// RemoveBlock removes the top-level paragraph or table at index,
+	// where index is a position in the slice returned by Blocks().
+	// Section breaks cannot be removed. For a document opened from a file,
+	// the removed element is omitted on save and the rest of the body is
+	// written as it was.
+	//
+	// Blocks() indices include section breaks and shift after each removal,
+	// so remove several blocks in descending index order.
+	//
+	// RemoveBlock does not repair content that spans the removed paragraph.
+	// When a bookmark or comment range starts in it and ends in a kept
+	// paragraph (or the other way round), the writer drops the unmatched
+	// half on save; other multi-paragraph constructs, such as a field like a
+	// TOC, are left as they are. Removing the only paragraph between two
+	// tables makes Word render them as one table.
+	RemoveBlock(index int) error
+
 	// WriteTo writes the document to the provided writer in .docx format.
 	// Returns the number of bytes written and any error encountered.
 	WriteTo(w io.Writer) (int64, error)
