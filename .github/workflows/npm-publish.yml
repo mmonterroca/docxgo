@@ -1,5 +1,14 @@
 name: npm Publish
 
+# Publishes to npm with trusted publishing (OIDC): no long-lived npm token is
+# stored in the repo. npm validates the workflow that triggered the run, i.e.
+# the *calling* workflow when this file is invoked through workflow_call, so
+# each of the six packages needs a trusted publisher registered on npmjs.com
+# for release.yml (tag releases) and, only when using the manual fallback
+# below, one for npm-publish.yml. Repository and filename are case-sensitive,
+# and the publisher must allow direct `npm publish` ("Allowed actions"). If
+# OIDC fails, npm reports a misleading E404 or ENEEDAUTH instead of saying so.
+
 on:
   # release.yml invokes this workflow directly as a job (see its publish-npm
   # job), passing the version explicitly. There is deliberately no `release:
@@ -23,11 +32,26 @@ on:
   # workflow can be edited from it) can't be used directly as the dispatch
   # ref. Run this from the default branch and pass the version input; the jobs
   # below still check out the matching vX.Y.Z tag before building.
+  #
+  # A dispatch authenticates as npm-publish.yml, not release.yml, so it only
+  # works while each package has a trusted publisher registered for this file.
+  # New publishers expire if they do not complete a publish within 2 days, so
+  # add them right before dispatching rather than leaving them standing.
   workflow_dispatch:
     inputs:
       version:
         description: 'Version to publish (e.g. 2.7.2, no "v" prefix)'
         required: true
+      # Runs `npm publish --dry-run` instead of publishing and fails unless the
+      # OIDC token exchange succeeded. Safe to run for any version, published or
+      # not; it is the only way to check the trusted publisher setup without
+      # releasing (a plain re-run of a published version is skipped before npm
+      # ever tries to authenticate).
+      dry_run:
+        description: 'Only check OIDC authentication (npm publish --dry-run)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -83,10 +107,20 @@ jobs:
           go-version: '1.23.x'
           cache: false
 
+      # Trusted publishing needs npm >= 11.5.1 and Node >= 22.14. registry-url
+      # is deliberately omitted: it makes setup-node write a placeholder
+      # NODE_AUTH_TOKEN into .npmrc, which the registry rejects on the plain
+      # `npm view` reads below. npm already defaults to registry.npmjs.org.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '24'
+
+      - name: Ensure npm supports trusted publishing
+        run: |
+          if ! printf '%s\n%s\n' 11.5.1 "$(npm --version)" | sort -V -C; then
+            npm install -g npm@11
+          fi
+          echo "node $(node --version), npm $(npm --version)"
 
       - name: Extract version from tag
         id: version
@@ -144,17 +178,23 @@ jobs:
           documentation, usage, and the CLI/JSON-RPC protocol reference.
           EOF
 
-      - name: Publish platform package (provenance)
+      - name: Publish platform package
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           cd npm/platforms/${{ matrix.suffix }}
           PKG="@mmonterroca/docxgo-${{ matrix.suffix }}@${{ steps.version.outputs.version }}"
-          if npm view "$PKG" version >/dev/null 2>&1; then
+          if [ "$DRY_RUN" = "true" ]; then
+            # npm exchanges the OIDC token before it checks for an already
+            # published version, so this verifies auth for any version.
+            npm publish --access public --dry-run --loglevel verbose > "$RUNNER_TEMP/npm-dry-run.log" 2>&1 || true
+            cat "$RUNNER_TEMP/npm-dry-run.log"
+            grep -q 'oidc Successfully retrieved and set token' "$RUNNER_TEMP/npm-dry-run.log"
+          elif npm view "$PKG" version >/dev/null 2>&1; then
             echo "$PKG already published, skipping (safe re-run)"
           else
-            npm publish --access public --provenance
+            npm publish --access public
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-main-package:
     name: Publish @mmonterroca/docxgo
@@ -165,10 +205,17 @@ jobs:
         with:
           ref: ${{ inputs.version != '' && format('refs/tags/v{0}', inputs.version) || github.ref }}
 
+      # See the platform job: npm >= 11.5.1 and Node >= 22.14, no registry-url.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '24'
+
+      - name: Ensure npm supports trusted publishing
+        run: |
+          if ! printf '%s\n%s\n' 11.5.1 "$(npm --version)" | sort -V -C; then
+            npm install -g npm@11
+          fi
+          echo "node $(node --version), npm $(npm --version)"
 
       - name: Extract version from tag
         id: version
@@ -208,17 +255,21 @@ jobs:
             require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
-      - name: Publish (provenance)
+      - name: Publish
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           cd npm
           PKG="@mmonterroca/docxgo@${{ steps.version.outputs.version }}"
-          if npm view "$PKG" version >/dev/null 2>&1; then
+          if [ "$DRY_RUN" = "true" ]; then
+            npm publish --access public --dry-run --loglevel verbose > "$RUNNER_TEMP/npm-dry-run.log" 2>&1 || true
+            cat "$RUNNER_TEMP/npm-dry-run.log"
+            grep -q 'oidc Successfully retrieved and set token' "$RUNNER_TEMP/npm-dry-run.log"
+          elif npm view "$PKG" version >/dev/null 2>&1; then
             echo "$PKG already published, skipping (safe re-run)"
           else
-            npm publish --access public --provenance
+            npm publish --access public
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   notify-on-failure:
     name: Notify on publish failure
@@ -238,10 +289,13 @@ jobs:
               '',
               `Run: ${runUrl}`,
               '',
-              'Common cause: the `NPM_TOKEN` repo secret has expired (granular access ' +
-                'tokens require an expiration) or lacks permission. Rotate it at ' +
-                'https://www.npmjs.com/settings/mmonterroca/tokens and update the repo secret, ' +
-                'then re-run the failed jobs from the run above.',
+              'Common causes: a package has no trusted publisher for the workflow that ' +
+                'started this run (release.yml for tag releases, npm-publish.yml for manual ' +
+                'dispatch), the publisher does not allow direct `npm publish`, it expired ' +
+                '(a new one must publish within 2 days), or the npm CLI is older than 11.5.1. npm reports these ' +
+                'as a misleading E404 or ENEEDAUTH. Check the settings at ' +
+                'https://www.npmjs.com/package/@mmonterroca/docxgo/access (and each ' +
+                '@mmonterroca/docxgo-* platform package), then re-run the failed jobs from the run above.',
             ].join('\n');
 
             const label = 'npm-publish-failure';
