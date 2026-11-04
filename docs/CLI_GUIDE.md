@@ -27,10 +27,12 @@ The `docxgo` CLI binary exposes the full docxgo library API as a JSON-RPC servic
   - [paragraph.add](#paragraphadd)
   - [paragraph.list](#paragraphlist)
   - [paragraph.setText](#paragraphsettext)
+  - [paragraph.remove](#paragraphremove)
   - [table.add](#tableadd)
   - [table.list](#tablelist)
   - [table.getCell](#tablegetcell)
   - [table.setCell](#tablesetcell)
+  - [table.remove](#tableremove)
   - [section.add](#sectionadd)
   - [template.inspect](#templateinspect)
   - [template.render](#templaterender)
@@ -802,6 +804,42 @@ Accepts the same content fields as `paragraph.add`, but decoded strictly: an unr
 
 ---
 
+### paragraph.remove
+
+Removes a body paragraph by index (the same index reported by `paragraph.list`). Internally this resolves to the paragraph's position in the document's top-level block list and removes it there, so it behaves exactly like `Document.RemoveBlock`: for a document opened from a file, the paragraph is omitted on save and the rest of `word/document.xml` is written back byte-for-byte.
+
+Indices shift after each removal, same as `Blocks()` itself: `paragraph.list` reflects the new, denser indexing immediately, so remove several paragraphs starting from the highest index if you are working off indices gathered before any of them were removed. Removing the only paragraph between two tables makes Word render them as one table. This method only addresses paragraphs in the document body; a paragraph inside a table cell or a header/footer is not reachable by index here.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `index` | Number | Yes | Zero-based body paragraph index, as reported by `paragraph.list` |
+
+Params are decoded strictly: an unrecognized field is rejected rather than silently ignored.
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 0 }
+```
+
+**Example:**
+
+```json
+{
+  "id": 14,
+  "method": "paragraph.remove",
+  "params": {
+    "documentId": "doc-1",
+    "index": 0
+  }
+}
+```
+
+---
+
 ### table.add
 
 Adds a table to an existing document. Uses the same table format as the content array.
@@ -969,6 +1007,42 @@ The cell's paragraph count always matches the number of items you provide: fewer
     "rowIndex": 1,
     "columnIndex": 1,
     "text": "Yes"
+  }
+}
+```
+
+---
+
+### table.remove
+
+Removes a table by index (the same index reported by `table.list`). Internally this resolves to the table's position in the document's top-level block list and removes it there, so it behaves exactly like `Document.RemoveBlock`: for a document opened from a file, the table is omitted on save and the rest of `word/document.xml` is written back byte-for-byte.
+
+Indices shift after each removal: `table.list` reflects the new, denser indexing immediately, so remove several tables starting from the highest index if you are working off indices gathered before any of them were removed.
+
+**Params:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `documentId` | String | Yes | Session document ID |
+| `index` | Number | Yes | Zero-based table index, as reported by `table.list` |
+
+Params are decoded strictly: an unrecognized field is rejected rather than silently ignored.
+
+**Success result:**
+
+```json
+{ "ok": true, "index": 0 }
+```
+
+**Example:**
+
+```json
+{
+  "id": 15,
+  "method": "table.remove",
+  "params": {
+    "documentId": "doc-1",
+    "index": 0
   }
 }
 ```
