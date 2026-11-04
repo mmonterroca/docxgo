@@ -1,7 +1,7 @@
 # docxgo v2 Implementation Status
 
 **Last Updated**: November 2026
-**Version**: 2.15.0 (Stable)
+**Version**: 2.16.0 (Stable)
 
 This document tracks the implementation status of all v2 features, helping developers understand what's available, what's in progress, and what's planned.
 
@@ -45,6 +45,7 @@ All development phases have been completed. The library has gone through multipl
 | v2.13.0     | Aug 2026 | Header/footer tables, `Table.SetBorders`, `Run.SetCaps`, full header/footer edit round-trip, table property hydration overhaul, hyperlink/bookmark fidelity (#101), theme-linked cell shading |
 | v2.14.0     | Aug 2026 | Lossless `document.xml` round-trip engine, stable row insertion and section edits, QName-safe OOXML handling, tolerant real-world table widths, `CellBuilder.Alignment` (#116-#118) |
 | v2.15.0     | Nov 2026 | Paragraph shading, `KeepNext`/`KeepLines`, repeating table header rows and `CantSplit`, TOC fields keep a caller-set result (multi-line results written with `w:br`), builder `Shading()` and `KeepNext()` (#128) |
+| v2.16.0     | Nov 2026 | `Document.RemoveBlock` removes top-level paragraphs and tables with a lossless round trip, whitespace-only runs kept on read under `xml:space="preserve"` (#124-#127, contributed by @coffee-realist) |
 
 ---
 
