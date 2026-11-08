@@ -143,4 +143,3 @@ jobs:
     uses: ./.github/workflows/npm-publish.yml
     with:
       version: ${{ needs.release.outputs.version }}
-    secrets: inherit
