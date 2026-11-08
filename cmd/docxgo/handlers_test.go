@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -2387,6 +2388,317 @@ func TestHandleTableList_NotFound(t *testing.T) {
 	}
 }
 
+// ─── paragraph.remove / table.remove tests ────────────────────────────────────
+
+// newMultiBlockTestDoc creates a document with three body paragraphs
+// ("First", "Second", "Third") interleaved with two one-cell tables ("Cell
+// A", "Cell B"), so Blocks() is [P(First), T(Cell A), P(Second), T(Cell B),
+// P(Third)] while Paragraphs() and Tables() each report their own, denser
+// indexing. This lets tests exercise the index mapping paragraph.remove and
+// table.remove perform between the two.
+func newMultiBlockTestDoc(t *testing.T) (*server, string) {
+	t.Helper()
+	s := newServer()
+	cellContent := func(text string) interface{} {
+		return map[string]interface{}{
+			"type": "table",
+			"rows": []interface{}{
+				map[string]interface{}{"cells": []interface{}{
+					map[string]interface{}{"paragraphs": []interface{}{
+						map[string]interface{}{"runs": []interface{}{map[string]interface{}{"text": text}}},
+					}},
+				}},
+			},
+		}
+	}
+	paragraph := func(text string) interface{} {
+		return map[string]interface{}{
+			"type": "paragraph",
+			"runs": []interface{}{map[string]interface{}{"text": text}},
+		}
+	}
+	resp := s.dispatch(makeRequest(1, "document.create", map[string]interface{}{
+		"content": []interface{}{
+			paragraph("First"),
+			cellContent("Cell A"),
+			paragraph("Second"),
+			cellContent("Cell B"),
+			paragraph("Third"),
+		},
+		"output": "buffer",
+	}))
+	if resp.Error != nil {
+		t.Fatalf("create failed: %+v", resp.Error)
+	}
+	docID := resp.Result.(map[string]interface{})["documentId"].(string)
+	return s, docID
+}
+
+// paragraphTexts returns the text of every body paragraph, in paragraph.list
+// order.
+func paragraphTexts(t *testing.T, s *server, docID string) []string {
+	t.Helper()
+	resp := s.dispatch(makeRequest(90, "paragraph.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if resp.Error != nil {
+		t.Fatalf("paragraph.list failed: %+v", resp.Error)
+	}
+	paras := resp.Result.(map[string]interface{})["paragraphs"].([]map[string]interface{})
+	texts := make([]string, len(paras))
+	for i, p := range paras {
+		texts[i] = p["text"].(string)
+	}
+	return texts
+}
+
+func TestHandleParagraphRemove(t *testing.T) {
+	s, docID := newMultiBlockTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.remove", map[string]interface{}{
+		"documentId": docID, "index": 1, // "Second"
+	}))
+	if resp.Error != nil {
+		t.Fatalf("paragraph.remove failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["ok"] != true || result["index"] != 1 {
+		t.Errorf("unexpected result: %+v", result)
+	}
+
+	if got, want := paragraphTexts(t, s, docID), []string{"First", "Third"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("paragraphs = %v, want %v", got, want)
+	}
+
+	// The tables, which sit between the removed paragraph and its
+	// neighbors in Blocks(), must be untouched.
+	tableResp := s.dispatch(makeRequest(3, "table.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if got := tableResp.Result.(map[string]interface{})["count"]; got != 2 {
+		t.Errorf("table count = %v, want 2", got)
+	}
+}
+
+// TestHandleParagraphRemove_IndexShiftsAfterRemoval removes the same index
+// (0) twice in a row: paragraph.list indices shift after each removal, so a
+// caller removing "First" and then index 0 again must land on "Second", not
+// on a stale "Third" or an out-of-range error.
+func TestHandleParagraphRemove_IndexShiftsAfterRemoval(t *testing.T) {
+	s, docID := newMultiBlockTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.remove", map[string]interface{}{
+		"documentId": docID, "index": 0, // "First"
+	}))
+	if resp.Error != nil {
+		t.Fatalf("first paragraph.remove failed: %+v", resp.Error)
+	}
+	if got, want := paragraphTexts(t, s, docID), []string{"Second", "Third"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("paragraphs after first removal = %v, want %v", got, want)
+	}
+
+	resp = s.dispatch(makeRequest(3, "paragraph.remove", map[string]interface{}{
+		"documentId": docID, "index": 0, // now "Second"
+	}))
+	if resp.Error != nil {
+		t.Fatalf("second paragraph.remove failed: %+v", resp.Error)
+	}
+	if got, want := paragraphTexts(t, s, docID), []string{"Third"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("paragraphs after second removal = %v, want %v", got, want)
+	}
+}
+
+func TestHandleParagraphRemove_IndexOutOfRange(t *testing.T) {
+	s, docID := newMultiBlockTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.remove", map[string]interface{}{
+		"documentId": docID, "index": 99,
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	if got, want := paragraphTexts(t, s, docID), []string{"First", "Second", "Third"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("document was mutated despite rejected request: paragraphs = %v, want %v", got, want)
+	}
+}
+
+func TestHandleParagraphRemove_MissingIndexIsRejected(t *testing.T) {
+	s, docID := newMultiBlockTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.remove", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+}
+
+func TestHandleParagraphRemove_RejectsUnknownField(t *testing.T) {
+	s, docID := newMultiBlockTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "paragraph.remove", map[string]interface{}{
+		"documentId": docID, "index": 0, "idnex": 0,
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR for unknown field, got %+v", resp.Error)
+	}
+	if got, want := paragraphTexts(t, s, docID), []string{"First", "Second", "Third"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("document was mutated despite rejected request: paragraphs = %v, want %v", got, want)
+	}
+}
+
+func TestHandleParagraphRemove_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "paragraph.remove", map[string]interface{}{
+		"documentId": "nonexistent", "index": 0,
+	}))
+	if resp.Error == nil || resp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND, got %+v", resp.Error)
+	}
+}
+
+func TestHandleTableRemove(t *testing.T) {
+	s, docID := newMultiBlockTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.remove", map[string]interface{}{
+		"documentId": docID, "index": 0, // "Cell A"
+	}))
+	if resp.Error != nil {
+		t.Fatalf("table.remove failed: %+v", resp.Error)
+	}
+	result := resp.Result.(map[string]interface{})
+	if result["ok"] != true || result["index"] != 0 {
+		t.Errorf("unexpected result: %+v", result)
+	}
+
+	listResp := s.dispatch(makeRequest(3, "table.list", map[string]interface{}{
+		"documentId": docID, "includeText": true,
+	}))
+	tables := listResp.Result.(map[string]interface{})["tables"].([]map[string]interface{})
+	if len(tables) != 1 {
+		t.Fatalf("table count = %d, want 1", len(tables))
+	}
+	cells := tables[0]["cells"].([][]string)
+	if cells[0][0] != "Cell B" {
+		t.Errorf("remaining table cell = %q, want %q", cells[0][0], "Cell B")
+	}
+
+	// The paragraphs, which sit between and around the removed table in
+	// Blocks(), must be untouched.
+	if got, want := paragraphTexts(t, s, docID), []string{"First", "Second", "Third"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("paragraphs = %v, want %v", got, want)
+	}
+}
+
+func TestHandleTableRemove_IndexOutOfRange(t *testing.T) {
+	s, docID := newMultiBlockTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.remove", map[string]interface{}{
+		"documentId": docID, "index": 99,
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+	listResp := s.dispatch(makeRequest(3, "table.list", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if got := listResp.Result.(map[string]interface{})["count"]; got != 2 {
+		t.Errorf("document was mutated despite rejected request: table count = %v, want 2", got)
+	}
+}
+
+func TestHandleTableRemove_MissingIndexIsRejected(t *testing.T) {
+	s, docID := newMultiBlockTestDoc(t)
+
+	resp := s.dispatch(makeRequest(2, "table.remove", map[string]interface{}{
+		"documentId": docID,
+	}))
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+}
+
+func TestHandleTableRemove_NotFound(t *testing.T) {
+	s := newServer()
+	resp := s.dispatch(makeRequest(1, "table.remove", map[string]interface{}{
+		"documentId": "nonexistent", "index": 0,
+	}))
+	if resp.Error == nil || resp.Error.Code != "NOT_FOUND" {
+		t.Errorf("expected NOT_FOUND, got %+v", resp.Error)
+	}
+}
+
+// TestIntegration_RemoveBlockRoundTrip exercises paragraph.remove and
+// table.remove against a document opened from a file: it removes one
+// paragraph and one table, saves, reopens, and checks that the removed
+// content is gone while the rest of the document — including a table that
+// was never touched — survived the round trip.
+func TestIntegration_RemoveBlockRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	docPath := dir + "/remove-block.docx"
+	editedPath := dir + "/remove-block-edited.docx"
+
+	s, docID := newMultiBlockTestDoc(t)
+	saveResp := s.dispatch(makeRequest(2, "document.save", map[string]interface{}{
+		"documentId": docID, "output": "file", "filePath": docPath,
+	}))
+	if saveResp.Error != nil {
+		t.Fatalf("save failed: %+v", saveResp.Error)
+	}
+
+	openResp := s.dispatch(makeRequest(3, "document.open", map[string]interface{}{
+		"filePath": docPath,
+	}))
+	if openResp.Error != nil {
+		t.Fatalf("open failed: %+v", openResp.Error)
+	}
+	openedID := openResp.Result.(map[string]interface{})["documentId"].(string)
+
+	removeParaResp := s.dispatch(makeRequest(4, "paragraph.remove", map[string]interface{}{
+		"documentId": openedID, "index": 1, // "Second"
+	}))
+	if removeParaResp.Error != nil {
+		t.Fatalf("paragraph.remove failed: %+v", removeParaResp.Error)
+	}
+	removeTableResp := s.dispatch(makeRequest(5, "table.remove", map[string]interface{}{
+		"documentId": openedID, "index": 0, // "Cell A"
+	}))
+	if removeTableResp.Error != nil {
+		t.Fatalf("table.remove failed: %+v", removeTableResp.Error)
+	}
+
+	saveResp = s.dispatch(makeRequest(6, "document.save", map[string]interface{}{
+		"documentId": openedID, "output": "file", "filePath": editedPath,
+	}))
+	if saveResp.Error != nil {
+		t.Fatalf("save edited failed: %+v", saveResp.Error)
+	}
+
+	reopenResp := s.dispatch(makeRequest(7, "document.open", map[string]interface{}{
+		"filePath": editedPath,
+	}))
+	if reopenResp.Error != nil {
+		t.Fatalf("reopen failed: %+v", reopenResp.Error)
+	}
+	reopenedID := reopenResp.Result.(map[string]interface{})["documentId"].(string)
+
+	if got, want := paragraphTexts(t, s, reopenedID), []string{"First", "Third"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("reopened paragraphs = %v, want %v", got, want)
+	}
+
+	listResp := s.dispatch(makeRequest(8, "table.list", map[string]interface{}{
+		"documentId": reopenedID, "includeText": true,
+	}))
+	tables := listResp.Result.(map[string]interface{})["tables"].([]map[string]interface{})
+	if len(tables) != 1 {
+		t.Fatalf("reopened table count = %d, want 1", len(tables))
+	}
+	cells := tables[0]["cells"].([][]string)
+	if cells[0][0] != "Cell B" {
+		t.Errorf("reopened remaining table cell = %q, want %q", cells[0][0], "Cell B")
+	}
+}
+
 // ─── section.add tests ──────────────────────────────────────────────────────
 
 func TestHandleSectionAdd(t *testing.T) {
@@ -2659,6 +2971,9 @@ func TestHandleSystemCapabilities(t *testing.T) {
 	}
 	if !result["cellEdit"] {
 		t.Error("expected cellEdit capability to be true")
+	}
+	if !result["removeBlock"] {
+		t.Error("expected removeBlock capability to be true")
 	}
 }
 

@@ -327,6 +327,16 @@ export interface ParagraphSetTextParams extends ParagraphAddParams {
   index: number;
 }
 
+/** Removes a body paragraph by index (as reported by paragraph.list).
+ * Indices shift after each removal, same as the underlying block list:
+ * paragraph.list reflects the new, denser indexing right away, so remove
+ * several paragraphs starting from the highest index if you gathered them
+ * before any removal. Result is an {@link IndexResult}. */
+export interface ParagraphRemoveParams {
+  documentId: string;
+  index: number;
+}
+
 export interface TableAddParams {
   documentId: string;
   rows?: TableRowDef[];
@@ -358,6 +368,16 @@ export type TableGetCellParams = TableCellRef;
 export interface TableSetCellParams extends TableCellRef {
   text?: string;
   paragraphs?: Array<Omit<ParagraphItem, 'type'>>;
+}
+
+/** Removes a table by index (as reported by table.list). Indices shift
+ * after each removal, same as the underlying block list: table.list
+ * reflects the new, denser indexing right away, so remove several tables
+ * starting from the highest index if you gathered them before any removal.
+ * Result is an {@link IndexResult}. */
+export interface TableRemoveParams {
+  documentId: string;
+  index: number;
 }
 
 export interface ReplaceTextParams {

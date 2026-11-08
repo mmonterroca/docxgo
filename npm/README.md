@@ -406,10 +406,12 @@ The following JSON-RPC methods are available:
 | `paragraph.add` | Add a single paragraph |
 | `paragraph.list` | List all paragraphs |
 | `paragraph.setText` | Replace a body paragraph's content by index |
+| `paragraph.remove` | Remove a body paragraph by index |
 | `table.add` | Add a single table |
 | `table.list` | List all tables (optionally with cell text) |
 | `table.getCell` | Read a single table cell's content |
 | `table.setCell` | Replace a single table cell's content |
+| `table.remove` | Remove a table by index |
 | `section.add` | Add a section break |
 | `template.inspect` | Find template placeholders |
 | `template.render` | Render template with data |
